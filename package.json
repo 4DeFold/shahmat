@@ -1,0 +1,28 @@
+{
+  "name": "shahmat",
+  "version": "1.0.0",
+  "description": "online shahmat site for students.",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "test": "node --test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/4DeFold/shahmat.git"
+  },
+  "bugs": {
+    "url": "https://github.com/4DeFold/shahmat/issues"
+  },
+  "homepage": "https://github.com/4DeFold/shahmat#readme",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.119.0"
+  },
+  "devDependencies": {
+    "jsdom": "^31.0.1",
+    "vite": "^8.3.8"
+  },
+  "private": true,
+  "type": "module"
+}

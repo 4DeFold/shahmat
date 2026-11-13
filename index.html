@@ -1,19 +1,59 @@
 <!doctype html>
-<html lang="en">
+<html lang="ru">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#ffffff">
     <title>shahmat.xyz</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="theme.js" defer></script>
+    <link rel="stylesheet" href="/style.css">
+    <script type="module" src="/app.js"></script>
   </head>
   <body>
     <main class="landing">
-      <div class="landing__content">
+      <section class="screen landing__content" id="landing-screen" aria-label="shahmat.xyz">
         <h1><span class="title-highlight">shah</span>mat.xyz</h1>
-        <button class="play-button" type="button" aria-label="PLAY: switch color theme">PLAY</button>
-      </div>
+        <button class="play-button" id="play" type="button">PLAY</button>
+      </section>
+
+      <section class="screen panel" id="auth-screen" hidden aria-labelledby="auth-title">
+        <div class="panel-top"><button class="text-button back" type="button" data-action="home">← На главную</button><button class="text-button theme-toggle" type="button">Тема ◐</button></div>
+        <div class="wordmark"><span class="title-highlight">shah</span>mat.xyz</div>
+        <div class="section-head"><p class="eyebrow">ШАХМАТЫ НАЧИНАЮТСЯ ЗДЕСЬ</p><h2 id="auth-title">Добро пожаловать.</h2><p class="subtle">Войди или создай аккаунт, чтобы продолжить.</p></div>
+        <div class="auth-tabs" aria-label="Авторизация"><button type="button" id="tab-login" class="tab active" aria-pressed="true">Вход</button><button type="button" id="tab-signup" class="tab" aria-pressed="false">Регистрация</button></div>
+        <form id="auth-form">
+          <label for="email">Электронная почта</label><input id="email" type="email" autocomplete="email" placeholder="you@example.com" required maxlength="254">
+          <label for="password">Пароль</label><input id="password" type="password" autocomplete="current-password" placeholder="Не менее 6 символов" required minlength="6" maxlength="72">
+          <p class="message" id="auth-message" role="status" aria-live="polite"></p>
+          <button class="primary" id="auth-submit" type="submit">Войти <span>↗</span></button>
+        </form>
+      </section>
+
+      <section class="screen panel" id="profile-screen" hidden aria-labelledby="profile-title">
+        <div class="panel-top"><span class="wordmark small"><span class="title-highlight">shah</span>mat.xyz</span><button class="text-button theme-toggle" type="button">Тема ◐</button></div>
+        <div class="section-head"><p class="eyebrow" id="profile-kicker">ШАГ 01 / 02</p><h2 id="profile-title">Это ты.</h2><p class="subtle">Выбери имя, под которым тебя узнают другие игроки.</p></div>
+        <form id="profile-form">
+          <label for="username">Имя пользователя <span class="required">*</span></label><input id="username" autocomplete="nickname" placeholder="например, shahmatplayer" required minlength="3" maxlength="24" pattern="[A-Za-z0-9_]{3,24}" aria-describedby="username-help"><p class="hint" id="username-help">3–24 символа: латинские буквы, цифры и _</p>
+          <label for="bio">О себе <span class="optional">необязательно</span></label><textarea id="bio" maxlength="280" rows="3" placeholder="Пара слов о тебе и шахматах"></textarea>
+          <p class="message" id="profile-message" role="status" aria-live="polite"></p>
+          <button class="primary" type="submit" id="profile-submit">Продолжить <span>→</span></button>
+          <button class="text-button signout" type="button">Выйти из аккаунта</button>
+        </form>
+      </section>
+
+      <section class="screen panel" id="palette-screen" hidden aria-labelledby="palette-title">
+        <div class="panel-top"><span class="wordmark small"><span class="title-highlight">shah</span>mat.xyz</span><button class="text-button theme-toggle" type="button">Тема ◐</button></div>
+        <div class="section-head"><p class="eyebrow">ШАГ 02 / 02</p><h2 id="palette-title">Твой стиль.</h2><p class="subtle">Выбери палитру. Пока доступна одна — классика.</p></div>
+        <form id="palette-form"><label class="palette-option"><input type="radio" name="palette" value="monochrome" checked><span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span class="palette-name">Чёрно-белая<small>Классическая палитра</small></span><span class="palette-check" aria-hidden="true">✓</span></label><p class="message" id="palette-message" role="status" aria-live="polite"></p><button class="primary" type="submit">Готово <span>↗</span></button></form>
+      </section>
+
+      <section class="screen panel" id="account-screen" hidden aria-labelledby="account-title">
+        <div class="panel-top"><span class="wordmark small"><span class="title-highlight">shah</span>mat.xyz</span><button class="text-button theme-toggle" type="button">Тема ◐</button></div>
+        <div class="section-head"><p class="eyebrow">ТВОЙ ПРОФИЛЬ</p><h2 id="account-title">Привет.</h2><p class="subtle" id="account-bio"></p></div>
+        <div class="account-detail"><span>ПАЛИТРА</span><strong>Чёрно-белая</strong></div>
+        <p class="message" id="account-message" role="status" aria-live="polite"></p>
+        <button class="primary" id="edit-profile" type="button">Редактировать профиль <span>↗</span></button>
+        <button class="text-button signout" type="button">Выйти из аккаунта</button>
+      </section>
     </main>
   </body>
 </html>
