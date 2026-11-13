@@ -1,0 +1,89 @@
+@font-face {
+  font-family: 'Playfair Display';
+  src: url('fonts/playfair-display-latin-400-normal.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Charis SIL';
+  src: url('fonts/charis-sil-latin-400-normal.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  background: #ede1d6;
+}
+
+.landing {
+  min-height: 100vh;
+  min-height: 100svh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 35% 58% at 19% 38%, rgba(248, 240, 233, .75), transparent 100%),
+    radial-gradient(ellipse 33% 48% at 80% 75%, rgba(248, 240, 233, .72), transparent 100%),
+    linear-gradient(170deg, #ede1d6 0%, #ecdcca 58%, #e7cdb4 100%);
+}
+
+.landing__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  transform: translateY(6vh);
+}
+
+h1 {
+  margin: 0;
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: clamp(3rem, 10vw, 8rem);
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: 0;
+  color: #936141;
+  background: linear-gradient(110deg, #9c6644, #7f5539);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+button {
+  width: 240px;
+  height: 60px;
+  padding: 0;
+  border: 3px solid #bd9473;
+  border-radius: 999px;
+  background: #9c6644;
+  color: #ede0d4;
+  font-family: 'Charis SIL', Georgia, serif;
+  font-size: 40px;
+  font-weight: 400;
+  line-height: 1;
+  cursor: pointer;
+}
+
+button:focus-visible {
+  outline: 2px solid #7f5539;
+  outline-offset: 4px;
+}
+
+@media (max-width: 480px) {
+  .landing__content { gap: 20px; }
+  h1 { font-size: clamp(2.6rem, 10vw, 4.8rem); }
+  button { width: 190px; height: 50px; font-size: 32px; }
+}
