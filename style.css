@@ -16,31 +16,26 @@
 
 :root {
   color-scheme: light;
-  --page-background: #ede0d4;
-  --landing-background: linear-gradient(to bottom, #ede0d4, #e6ccb2);
-  --glow-color: #fbf7f2;
-  --glow-opacity: 1;
-  --title-start: #9c6644;
-  --title-end: #7f5539;
-  --button-background: #9c6644;
-  --button-border: #bd9473;
-  --button-text: #ede0d4;
-  --focus-color: #7f5539;
+  --page-background: #fff;
+  --board-light: #fff;
+  --board-dark: #e8e8e8;
+  --foreground: #000;
+  --button-background: #000;
+  --button-text: #fff;
+  --halo: rgba(255, 255, 255, .92);
 }
 
-/* Reserved for a future dark theme; not enabled by the current page. */
-:root[data-theme='dark'] {
-  color-scheme: dark;
-  --page-background: #7f5539;
-  --landing-background: linear-gradient(to bottom, #7f5539, #9c6644);
-  --glow-color: #e6ccb2;
-  --glow-opacity: .25;
-  --title-start: #ede0d4;
-  --title-end: #e6ccb2;
-  --button-background: #e6ccb2;
-  --button-border: #b08968;
-  --button-text: #7f5539;
-  --focus-color: #ede0d4;
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --page-background: #000;
+    --board-light: #080808;
+    --board-dark: #202020;
+    --foreground: #fff;
+    --button-background: #fff;
+    --button-text: #000;
+    --halo: rgba(65, 65, 65, .55);
+  }
 }
 
 * {
@@ -57,73 +52,61 @@ body {
 }
 
 .landing {
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
   min-height: 100vh;
   min-height: 100svh;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
   padding: 80px 16px;
-  background: var(--landing-background);
-}
-
-/* The two blurred circles sit behind the content in both themes. */
-.landing::before,
-.landing::after {
-  content: '';
-  position: absolute;
-  z-index: -1;
-  width: min(39.0625vw, 500px);
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: var(--glow-color);
-  opacity: var(--glow-opacity);
-  filter: blur(min(15.625vw, 200px));
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-}
-
-.landing::before {
-  left: 19.53%;
-  top: 43%;
-}
-
-.landing::after {
-  left: 80.47%;
-  top: 77%;
+  background-color: var(--board-light);
+  background-image: repeating-conic-gradient(
+    var(--board-light) 0% 25%,
+    var(--board-dark) 0% 50%
+  );
+  /* Eight squares along the longer side, with square cells on every screen. */
+  background-size: 25vmax 25vmax;
+  background-position: center;
 }
 
 .landing__content {
   position: relative;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 20px;
 }
 
+/* A soft monochrome halo separates the title and button from the board. */
+.landing__content::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: -30px -55px;
+  border-radius: 50%;
+  background: var(--halo);
+  filter: blur(48px);
+  pointer-events: none;
+}
+
 h1 {
   margin: 0;
-  /* Extra room keeps Playfair's descenders inside the gradient clipping box. */
+  /* Keep Playfair's descenders fully visible. */
   padding-bottom: .15em;
+  color: var(--foreground);
   font-family: 'Playfair Display', Georgia, serif;
   font-size: clamp(3rem, 10vw, 8rem);
   font-weight: 400;
   line-height: 1.2;
   letter-spacing: 0;
-  color: var(--title-start);
-  background: linear-gradient(to bottom, var(--title-start), var(--title-end));
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
 }
 
 .play-button {
   width: 240px;
   height: 60px;
   padding: 0;
-  border: 3px solid var(--button-border);
+  border: 0;
   border-radius: 999px;
   background: var(--button-background);
   color: var(--button-text);
@@ -135,11 +118,12 @@ h1 {
 }
 
 .play-button:focus-visible {
-  outline: 2px solid var(--focus-color);
+  outline: 2px solid var(--foreground);
   outline-offset: 4px;
 }
 
 @media (max-width: 480px) {
   h1 { font-size: clamp(2.6rem, 10vw, 4.8rem); }
   .play-button { width: 190px; height: 50px; font-size: 32px; }
+  .landing__content::before { inset: -20px -25px; filter: blur(32px); }
 }
