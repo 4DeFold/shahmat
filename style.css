@@ -16,13 +16,13 @@
 
 :root {
   color-scheme: light;
-  --page-background: #fff;
-  --board-light: #fff;
-  --board-dark: #e8e8e8;
+  --page-background: #fafafa;
+  --board-light: #fafafa;
+  --board-dark: #f1f1f1;
   --foreground: #000;
   --button-background: #000;
   --button-text: #fff;
-  --halo: rgba(255, 255, 255, .92);
+  --halo: rgba(250, 250, 250, .92);
 }
 
 @media (prefers-color-scheme: dark) {
