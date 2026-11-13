@@ -23,8 +23,11 @@ async function show(id) {
   next.hidden = false;
   screen = next;
   requestAnimationFrame(() => requestAnimationFrame(() => next.classList.remove('entering')));
-  const focusTarget = next.querySelector('h2');
-  if (focusTarget) { focusTarget.setAttribute('tabindex', '-1'); focusTarget.focus({ preventScroll: true }); }
+  const focusTarget = next.querySelector('h2') || next.querySelector('.tab.active');
+  if (focusTarget) {
+    if (focusTarget.tagName === 'H2') focusTarget.setAttribute('tabindex', '-1');
+    focusTarget.focus({ preventScroll: true });
+  }
   navigating = false;
 }
 function message(id, text = '') { $(id).textContent = text; }
@@ -37,6 +40,7 @@ function describe(error) {
   return 'Не получилось выполнить действие. Проверь данные и попробуй ещё раз.';
 }
 function setMode(value) {
+  const changed = mode !== value;
   mode = value;
   for (const name of ['login', 'signup']) {
     const tab = $('tab-' + name);
@@ -46,6 +50,12 @@ function setMode(value) {
   $('password').autocomplete = mode === 'login' ? 'current-password' : 'new-password';
   $('auth-submit').innerHTML = mode === 'login' ? 'Войти <span>↗</span>' : 'Создать аккаунт <span>↗</span>';
   message('auth-message');
+  if (changed && !reducedMotion.matches) {
+    const form = $('auth-form');
+    form.classList.remove('mode-changing');
+    void form.offsetWidth;
+    form.classList.add('mode-changing');
+  }
 }
 async function loadProfile(user) {
   const { data, error } = await supabase.from('profiles').select('username,bio,palette').eq('id', user.id).maybeSingle();
