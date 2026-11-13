@@ -16,34 +16,32 @@
 
 :root {
   color-scheme: light;
-  --page-background: #ede1d6;
-  --landing-background: linear-gradient(170deg, #ede1d6 0%, #ecdcca 58%, #e7cdb4 100%);
-  --glow-color: #fbf7f3;
-  --glow-opacity: .9;
+  --page-background: #ede0d4;
+  --landing-background: linear-gradient(to bottom, #ede0d4, #e6ccb2);
+  --glow-color: #fbf7f2;
+  --glow-opacity: 1;
   --title-start: #9c6644;
   --title-end: #7f5539;
   --button-background: #9c6644;
   --button-border: #bd9473;
   --button-text: #ede0d4;
   --focus-color: #7f5539;
-  --switch-track: #bd9473;
-  --switch-knob: #ede0d4;
 }
 
-:root[data-theme='dark'] {
-  color-scheme: dark;
-  --page-background: #7f5539;
-  --landing-background: linear-gradient(170deg, #7f5539 0%, #7f5539 58%, #9c6644 100%);
-  --glow-color: #e6ccb2;
-  --glow-opacity: .3;
-  --title-start: #ede0d4;
-  --title-end: #e6ccb2;
-  --button-background: #e6ccb2;
-  --button-border: #b08968;
-  --button-text: #7f5539;
-  --focus-color: #ede0d4;
-  --switch-track: #e6ccb2;
-  --switch-knob: #7f5539;
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --page-background: #7f5539;
+    --landing-background: linear-gradient(to bottom, #7f5539, #9c6644);
+    --glow-color: #e6ccb2;
+    --glow-opacity: .25;
+    --title-start: #ede0d4;
+    --title-end: #e6ccb2;
+    --button-background: #e6ccb2;
+    --button-border: #b08968;
+    --button-text: #7f5539;
+    --focus-color: #ede0d4;
+  }
 }
 
 * {
@@ -116,7 +114,7 @@ h1 {
   line-height: 1.2;
   letter-spacing: 0;
   color: var(--title-start);
-  background: linear-gradient(110deg, var(--title-start), var(--title-end));
+  background: linear-gradient(to bottom, var(--title-start), var(--title-end));
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -137,58 +135,9 @@ h1 {
   cursor: pointer;
 }
 
-.play-button:focus-visible,
-.theme-switch input:focus-visible + .theme-switch__track {
+.play-button:focus-visible {
   outline: 2px solid var(--focus-color);
   outline-offset: 4px;
-}
-
-/* Temporary theme switch: kept separate from the landing styles for easy removal. */
-.theme-switch {
-  position: absolute;
-  top: calc(100% + 20px);
-  left: 50%;
-  display: grid;
-  place-items: center;
-  width: 48px;
-  height: 44px;
-  transform: translateX(-50%);
-  cursor: pointer;
-}
-
-.theme-switch input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-}
-
-.theme-switch__track {
-  position: relative;
-  width: 44px;
-  height: 24px;
-  border-radius: 999px;
-  background: var(--switch-track);
-}
-
-.theme-switch__track::after {
-  content: '';
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: var(--switch-knob);
-  transition: transform 180ms ease;
-}
-
-.theme-switch input:checked + .theme-switch__track::after {
-  transform: translateX(20px);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .theme-switch__track::after { transition: none; }
 }
 
 @media (max-width: 480px) {
