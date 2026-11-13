@@ -28,20 +28,19 @@
   --focus-color: #7f5539;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-    --page-background: #7f5539;
-    --landing-background: linear-gradient(to bottom, #7f5539, #9c6644);
-    --glow-color: #e6ccb2;
-    --glow-opacity: .25;
-    --title-start: #ede0d4;
-    --title-end: #e6ccb2;
-    --button-background: #e6ccb2;
-    --button-border: #b08968;
-    --button-text: #7f5539;
-    --focus-color: #ede0d4;
-  }
+/* Reserved for a future dark theme; not enabled by the current page. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --page-background: #7f5539;
+  --landing-background: linear-gradient(to bottom, #7f5539, #9c6644);
+  --glow-color: #e6ccb2;
+  --glow-opacity: .25;
+  --title-start: #ede0d4;
+  --title-end: #e6ccb2;
+  --button-background: #e6ccb2;
+  --button-border: #b08968;
+  --button-text: #7f5539;
+  --focus-color: #ede0d4;
 }
 
 * {
