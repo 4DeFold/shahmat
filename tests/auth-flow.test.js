@@ -41,6 +41,8 @@ test('registration continues through required profile, palette, editing and logo
   await click('tab-signup'); $('email').value = 'player@example.com'; $('password').value = 'secret123';
   await submit('auth-form'); assert.equal(getSignUps(), 1); assert.equal($('profile-screen').hidden, false);
   assert.equal($('username').required, true);
+  assert.equal($('profile-screen').querySelector('.signout'), null);
+  assert.doesNotMatch($('profile-screen').textContent, /ШАГ 01/);
   $('username').value = 'Player_1'; $('bio').value = 'Chess'; await submit('profile-form');
   assert.equal(getProfile().username, 'Player_1'); assert.equal(getProfile().palette, 'monochrome');
   assert.equal($('palette-screen').hidden, false); await submit('palette-form');

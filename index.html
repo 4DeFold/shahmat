@@ -16,7 +16,7 @@
       </section>
 
       <section class="screen panel" id="auth-screen" hidden aria-label="Вход и регистрация">
-        <div class="panel-top"><button class="text-button back" type="button" data-action="home">← На главную</button><button class="text-button theme-toggle" type="button">Тема ◐</button></div>
+        <div class="panel-top"><button class="text-button back" type="button" data-action="home">← На главную</button></div>
         <div class="wordmark"><span class="title-highlight">shah</span>mat.xyz</div>
         <div class="auth-tabs" aria-label="Авторизация"><button type="button" id="tab-login" class="tab active" aria-pressed="true">Вход</button><button type="button" id="tab-signup" class="tab" aria-pressed="false">Регистрация</button></div>
         <form id="auth-form">
@@ -28,25 +28,24 @@
       </section>
 
       <section class="screen panel" id="profile-screen" hidden aria-labelledby="profile-title">
-        <div class="panel-top"><span class="wordmark small"><span class="title-highlight">shah</span>mat.xyz</span><button class="text-button theme-toggle" type="button">Тема ◐</button></div>
-        <div class="section-head"><p class="eyebrow" id="profile-kicker">ШАГ 01 / 02</p><h2 id="profile-title">Это ты.</h2><p class="subtle">Выбери имя, под которым тебя узнают другие игроки.</p></div>
+        <div class="panel-top"><span class="wordmark small"><span class="title-highlight">shah</span>mat.xyz</span></div>
+        <div class="section-head"><h2 id="profile-title">Это ты.</h2><p class="subtle">Выбери имя, под которым тебя узнают другие игроки.</p></div>
         <form id="profile-form">
           <label for="username">Имя пользователя <span class="required">*</span></label><input id="username" autocomplete="nickname" placeholder="например, shahmatplayer" required minlength="3" maxlength="24" pattern="[A-Za-z0-9_]{3,24}" aria-describedby="username-help"><p class="hint" id="username-help">3–24 символа: латинские буквы, цифры и _</p>
           <label for="bio">О себе <span class="optional">необязательно</span></label><textarea id="bio" maxlength="280" rows="3" placeholder="Пара слов о тебе и шахматах"></textarea>
           <p class="message" id="profile-message" role="status" aria-live="polite"></p>
           <button class="primary" type="submit" id="profile-submit">Продолжить <span>→</span></button>
-          <button class="text-button signout" type="button">Выйти из аккаунта</button>
         </form>
       </section>
 
       <section class="screen panel" id="palette-screen" hidden aria-labelledby="palette-title">
-        <div class="panel-top"><span class="wordmark small"><span class="title-highlight">shah</span>mat.xyz</span><button class="text-button theme-toggle" type="button">Тема ◐</button></div>
+        <div class="panel-top"><span class="wordmark small"><span class="title-highlight">shah</span>mat.xyz</span></div>
         <div class="section-head"><p class="eyebrow">ШАГ 02 / 02</p><h2 id="palette-title">Твой стиль.</h2><p class="subtle">Выбери палитру. Пока доступна одна — классика.</p></div>
         <form id="palette-form"><label class="palette-option"><input type="radio" name="palette" value="monochrome" checked><span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span class="palette-name">Чёрно-белая<small>Классическая палитра</small></span><span class="palette-check" aria-hidden="true">✓</span></label><p class="message" id="palette-message" role="status" aria-live="polite"></p><button class="primary" type="submit">Готово <span>↗</span></button></form>
       </section>
 
       <section class="screen panel" id="account-screen" hidden aria-labelledby="account-title">
-        <div class="panel-top"><span class="wordmark small"><span class="title-highlight">shah</span>mat.xyz</span><button class="text-button theme-toggle" type="button">Тема ◐</button></div>
+        <div class="panel-top"><span class="wordmark small"><span class="title-highlight">shah</span>mat.xyz</span></div>
         <div class="section-head"><p class="eyebrow">ТВОЙ ПРОФИЛЬ</p><h2 id="account-title">Привет.</h2><p class="subtle" id="account-bio"></p></div>
         <div class="account-detail"><span>ПАЛИТРА</span><strong>Чёрно-белая</strong></div>
         <p class="message" id="account-message" role="status" aria-live="polite"></p>

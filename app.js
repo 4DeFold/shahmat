@@ -65,7 +65,6 @@ async function loadProfile(user) {
   else { displayProfile(); await show('account-screen'); }
 }
 function prepareProfile() {
-  $('profile-kicker').textContent = editing ? 'ТВОЙ ПРОФИЛЬ' : 'ШАГ 01 / 02';
   $('profile-title').textContent = editing ? 'О тебе.' : 'Это ты.';
   $('username').value = profile?.username || '';
   $('bio').value = profile?.bio || '';
