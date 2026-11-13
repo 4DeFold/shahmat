@@ -22,23 +22,12 @@
   --button-text: #fff;
 }
 
-/* A manual choice takes precedence over the system preference. */
 :root[data-theme='dark'] {
   color-scheme: dark;
   --page-background: #000;
   --foreground: #fff;
   --button-background: #fff;
   --button-text: #000;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme]) {
-    color-scheme: dark;
-    --page-background: #000;
-    --foreground: #fff;
-    --button-background: #fff;
-    --button-text: #000;
-  }
 }
 
 * {
@@ -52,6 +41,26 @@ html, body {
 
 body {
   background: var(--page-background);
+}
+
+/* Reveal the entire page from a solid black screen on entry. */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #000;
+  pointer-events: none;
+  animation: entrance-reveal 1s linear forwards;
+}
+
+@keyframes entrance-reveal {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::after { animation: none; opacity: 0; }
 }
 
 .landing {

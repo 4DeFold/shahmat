@@ -2,8 +2,6 @@
   var root = document.documentElement;
   var button = document.querySelector('.play-button');
   var themeColor = document.querySelector('meta[name="theme-color"]');
-  var preference = window.matchMedia('(prefers-color-scheme: dark)');
-  var manuallyChanged = false;
 
   function applyTheme(dark) {
     root.dataset.theme = dark ? 'dark' : 'light';
@@ -12,12 +10,8 @@
     themeColor.setAttribute('content', dark ? '#000000' : '#ffffff');
   }
 
-  applyTheme(preference.matches);
+  applyTheme(false);
   button.addEventListener('click', function () {
-    manuallyChanged = true;
     applyTheme(root.dataset.theme !== 'dark');
-  });
-  preference.addEventListener('change', function (event) {
-    if (!manuallyChanged) applyTheme(event.matches);
   });
 }());
