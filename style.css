@@ -16,31 +16,29 @@
 
 :root {
   color-scheme: light;
-  --page-background: #ede0d4;
-  --landing-background: linear-gradient(to bottom, #ede0d4, #e6ccb2);
-  --glow-color: #fbf7f2;
-  --glow-opacity: 1;
-  --title-start: #9c6644;
-  --title-end: #7f5539;
-  --button-background: #9c6644;
-  --button-border: #bd9473;
-  --button-text: #ede0d4;
-  --focus-color: #7f5539;
+  --page-background: #fff;
+  --foreground: #000;
+  --button-background: #000;
+  --button-text: #fff;
 }
 
-/* Reserved for a future dark theme; not enabled by the current page. */
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --page-background: #7f5539;
-  --landing-background: linear-gradient(to bottom, #7f5539, #9c6644);
-  --glow-color: #e6ccb2;
-  --glow-opacity: .25;
-  --title-start: #ede0d4;
-  --title-end: #e6ccb2;
-  --button-background: #e6ccb2;
-  --button-border: #b08968;
-  --button-text: #7f5539;
-  --focus-color: #ede0d4;
+  --page-background: #000;
+  --foreground: #fff;
+  --button-background: #fff;
+  --button-text: #000;
+}
+
+/* Match the device before JavaScript initializes the theme. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --page-background: #000;
+    --foreground: #fff;
+    --button-background: #fff;
+    --button-text: #000;
+  }
 }
 
 * {
@@ -56,47 +54,36 @@ body {
   background: var(--page-background);
 }
 
+/* Reveal the entire page from a solid black screen on entry. */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #000;
+  pointer-events: none;
+  animation: entrance-reveal 1s linear forwards;
+}
+
+@keyframes entrance-reveal {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
 .landing {
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
   min-height: 100vh;
   min-height: 100svh;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
   padding: 80px 16px;
-  background: var(--landing-background);
-}
-
-/* The two blurred circles sit behind the content in both themes. */
-.landing::before,
-.landing::after {
-  content: '';
-  position: absolute;
-  z-index: -1;
-  width: min(39.0625vw, 500px);
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: var(--glow-color);
-  opacity: var(--glow-opacity);
-  filter: blur(min(15.625vw, 200px));
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-}
-
-.landing::before {
-  left: 19.53%;
-  top: 43%;
-}
-
-.landing::after {
-  left: 80.47%;
-  top: 77%;
+  background: var(--page-background);
 }
 
 .landing__content {
   position: relative;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -105,25 +92,28 @@ body {
 
 h1 {
   margin: 0;
-  /* Extra room keeps Playfair's descenders inside the gradient clipping box. */
+  /* Keep Playfair's descenders fully visible. */
   padding-bottom: .15em;
+  color: var(--foreground);
   font-family: 'Playfair Display', Georgia, serif;
   font-size: clamp(3rem, 10vw, 8rem);
   font-weight: 400;
   line-height: 1.2;
   letter-spacing: 0;
-  color: var(--title-start);
-  background: linear-gradient(to bottom, var(--title-start), var(--title-end));
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+}
+
+.title-highlight {
+  display: inline-block;
+  background: var(--foreground);
+  color: var(--page-background);
+  line-height: 1.2;
 }
 
 .play-button {
   width: 240px;
   height: 60px;
   padding: 0;
-  border: 3px solid var(--button-border);
+  border: 0;
   border-radius: 999px;
   background: var(--button-background);
   color: var(--button-text);
@@ -132,10 +122,21 @@ h1 {
   font-weight: 400;
   line-height: 1;
   cursor: pointer;
+  animation: button-entrance 1s cubic-bezier(.22, 1, .36, 1) 1s both;
+}
+
+@keyframes button-entrance {
+  from { opacity: 0; transform: translateY(24px); visibility: hidden; }
+  to { opacity: 1; transform: translateY(0); visibility: visible; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::after { animation: none; opacity: 0; }
+  .play-button { animation: none; }
 }
 
 .play-button:focus-visible {
-  outline: 2px solid var(--focus-color);
+  outline: 2px solid var(--foreground);
   outline-offset: 4px;
 }
 
