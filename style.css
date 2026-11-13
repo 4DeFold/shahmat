@@ -14,6 +14,40 @@
   font-display: swap;
 }
 
+:root {
+  color-scheme: light;
+  --page-background: #ede1d6;
+  --landing-background:
+    radial-gradient(ellipse 35% 58% at 19% 38%, rgba(248, 240, 233, .75), transparent 100%),
+    radial-gradient(ellipse 33% 48% at 80% 75%, rgba(248, 240, 233, .72), transparent 100%),
+    linear-gradient(170deg, #ede1d6 0%, #ecdcca 58%, #e7cdb4 100%);
+  --title-start: #9c6644;
+  --title-end: #7f5539;
+  --button-background: #9c6644;
+  --button-border: #bd9473;
+  --button-text: #ede0d4;
+  --focus-color: #7f5539;
+  --switch-track: #bd9473;
+  --switch-knob: #ede0d4;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --page-background: #7f5539;
+  --landing-background:
+    radial-gradient(ellipse 35% 58% at 19% 38%, rgba(156, 102, 68, .55), transparent 100%),
+    radial-gradient(ellipse 33% 48% at 80% 75%, rgba(176, 137, 104, .42), transparent 100%),
+    linear-gradient(170deg, #7f5539 0%, #7f5539 58%, #9c6644 100%);
+  --title-start: #ede0d4;
+  --title-end: #e6ccb2;
+  --button-background: #e6ccb2;
+  --button-border: #b08968;
+  --button-text: #7f5539;
+  --focus-color: #ede0d4;
+  --switch-track: #e6ccb2;
+  --switch-knob: #7f5539;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -24,7 +58,7 @@ html, body {
 }
 
 body {
-  background: #ede1d6;
+  background: var(--page-background);
 }
 
 .landing {
@@ -33,43 +67,43 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
-  background:
-    radial-gradient(ellipse 35% 58% at 19% 38%, rgba(248, 240, 233, .75), transparent 100%),
-    radial-gradient(ellipse 33% 48% at 80% 75%, rgba(248, 240, 233, .72), transparent 100%),
-    linear-gradient(170deg, #ede1d6 0%, #ecdcca 58%, #e7cdb4 100%);
+  padding: 32px 16px 96px;
+  background: var(--landing-background);
 }
 
 .landing__content {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 20px;
-  transform: translateY(6vh);
+  transform: translateY(calc(6vh + 32px));
 }
 
 h1 {
   margin: 0;
+  /* Extra room keeps Playfair's descenders inside the gradient clipping box. */
+  padding-bottom: .15em;
   font-family: 'Playfair Display', Georgia, serif;
   font-size: clamp(3rem, 10vw, 8rem);
   font-weight: 400;
-  line-height: 1.1;
+  line-height: 1.2;
   letter-spacing: 0;
-  color: #936141;
-  background: linear-gradient(110deg, #9c6644, #7f5539);
+  color: var(--title-start);
+  background: linear-gradient(110deg, var(--title-start), var(--title-end));
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
-button {
+.play-button {
   width: 240px;
   height: 60px;
   padding: 0;
-  border: 3px solid #bd9473;
+  border: 3px solid var(--button-border);
   border-radius: 999px;
-  background: #9c6644;
-  color: #ede0d4;
+  background: var(--button-background);
+  color: var(--button-text);
   font-family: 'Charis SIL', Georgia, serif;
   font-size: 40px;
   font-weight: 400;
@@ -77,13 +111,61 @@ button {
   cursor: pointer;
 }
 
-button:focus-visible {
-  outline: 2px solid #7f5539;
+.play-button:focus-visible,
+.theme-switch input:focus-visible + .theme-switch__track {
+  outline: 2px solid var(--focus-color);
   outline-offset: 4px;
 }
 
+/* Temporary theme switch: kept separate from the landing styles for easy removal. */
+.theme-switch {
+  position: absolute;
+  top: calc(100% + 20px);
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 44px;
+  transform: translateX(-50%);
+  cursor: pointer;
+}
+
+.theme-switch input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.theme-switch__track {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--switch-track);
+}
+
+.theme-switch__track::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--switch-knob);
+  transition: transform 180ms ease;
+}
+
+.theme-switch input:checked + .theme-switch__track::after {
+  transform: translateX(20px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-switch__track::after { transition: none; }
+}
+
 @media (max-width: 480px) {
-  .landing__content { gap: 20px; }
   h1 { font-size: clamp(2.6rem, 10vw, 4.8rem); }
-  button { width: 190px; height: 50px; font-size: 32px; }
+  .play-button { width: 190px; height: 50px; font-size: 32px; }
 }

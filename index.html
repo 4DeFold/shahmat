@@ -6,12 +6,18 @@
     <meta name="theme-color" content="#ede1d6">
     <title>shahmat.xyz</title>
     <link rel="stylesheet" href="style.css">
+    <script src="theme.js"></script>
   </head>
   <body>
     <main class="landing">
       <div class="landing__content">
         <h1>shahmat.xyz</h1>
-        <button type="button">PLAY</button>
+        <button class="play-button" type="button">PLAY</button>
+        <!-- Temporary theme switch; see DESIGN.md for removal instructions. -->
+        <label class="theme-switch">
+          <input type="checkbox" role="switch" aria-label="Dark theme">
+          <span class="theme-switch__track" aria-hidden="true"></span>
+        </label>
       </div>
     </main>
   </body>
