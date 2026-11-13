@@ -17,12 +17,9 @@
 :root {
   color-scheme: light;
   --page-background: #fff;
-  --board-light: #fff;
-  --board-dark: #000;
   --foreground: #000;
   --button-background: #000;
   --button-text: #fff;
-  --halo: rgba(255, 255, 255, .98);
 }
 
 /* A manual choice takes precedence over the system preference. */
@@ -32,7 +29,6 @@
   --foreground: #fff;
   --button-background: #fff;
   --button-text: #000;
-  --halo: rgba(0, 0, 0, .98);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -42,7 +38,6 @@
     --foreground: #fff;
     --button-background: #fff;
     --button-text: #000;
-    --halo: rgba(0, 0, 0, .98);
   }
 }
 
@@ -67,14 +62,7 @@ body {
   justify-content: center;
   overflow: hidden;
   padding: 80px 16px;
-  background-color: var(--board-light);
-  background-image: repeating-conic-gradient(
-    var(--board-light) 0% 25%,
-    var(--board-dark) 0% 50%
-  );
-  /* Eight squares along the longer side, with square cells on every screen. */
-  background-size: 25vmax 25vmax;
-  background-position: center;
+  background: var(--page-background);
 }
 
 .landing__content {
@@ -86,29 +74,23 @@ body {
   gap: 20px;
 }
 
-/* A soft monochrome halo separates the title and button from the board. */
-.landing__content::before {
-  content: '';
-  position: absolute;
-  z-index: -1;
-  inset: -30px -55px;
-  border-radius: 50%;
-  background: var(--halo);
-  filter: blur(48px);
-  pointer-events: none;
-}
-
 h1 {
   margin: 0;
   /* Keep Playfair's descenders fully visible. */
   padding-bottom: .15em;
   color: var(--foreground);
-  text-shadow: 0 0 12px var(--halo), 0 0 24px var(--halo);
   font-family: 'Playfair Display', Georgia, serif;
   font-size: clamp(3rem, 10vw, 8rem);
   font-weight: 400;
   line-height: 1.2;
   letter-spacing: 0;
+}
+
+.title-highlight {
+  display: inline-block;
+  background: var(--foreground);
+  color: var(--page-background);
+  line-height: 1.2;
 }
 
 .play-button {
@@ -118,7 +100,6 @@ h1 {
   border: 0;
   border-radius: 999px;
   background: var(--button-background);
-  box-shadow: 0 0 24px 10px var(--halo);
   color: var(--button-text);
   font-family: 'Charis SIL', Georgia, serif;
   font-size: 40px;
@@ -135,5 +116,4 @@ h1 {
 @media (max-width: 480px) {
   h1 { font-size: clamp(2.6rem, 10vw, 4.8rem); }
   .play-button { width: 190px; height: 50px; font-size: 32px; }
-  .landing__content::before { inset: -20px -25px; filter: blur(32px); }
 }
