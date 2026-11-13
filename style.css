@@ -17,10 +17,9 @@
 :root {
   color-scheme: light;
   --page-background: #ede1d6;
-  --landing-background:
-    radial-gradient(ellipse 35% 58% at 19% 38%, rgba(248, 240, 233, .75), transparent 100%),
-    radial-gradient(ellipse 33% 48% at 80% 75%, rgba(248, 240, 233, .72), transparent 100%),
-    linear-gradient(170deg, #ede1d6 0%, #ecdcca 58%, #e7cdb4 100%);
+  --landing-background: linear-gradient(170deg, #ede1d6 0%, #ecdcca 58%, #e7cdb4 100%);
+  --glow-color: #fbf7f3;
+  --glow-opacity: .9;
   --title-start: #9c6644;
   --title-end: #7f5539;
   --button-background: #9c6644;
@@ -34,10 +33,9 @@
 :root[data-theme='dark'] {
   color-scheme: dark;
   --page-background: #7f5539;
-  --landing-background:
-    radial-gradient(ellipse 35% 58% at 19% 38%, rgba(156, 102, 68, .55), transparent 100%),
-    radial-gradient(ellipse 33% 48% at 80% 75%, rgba(176, 137, 104, .42), transparent 100%),
-    linear-gradient(170deg, #7f5539 0%, #7f5539 58%, #9c6644 100%);
+  --landing-background: linear-gradient(170deg, #7f5539 0%, #7f5539 58%, #9c6644 100%);
+  --glow-color: #e6ccb2;
+  --glow-opacity: .3;
   --title-start: #ede0d4;
   --title-end: #e6ccb2;
   --button-background: #e6ccb2;
@@ -62,13 +60,42 @@ body {
 }
 
 .landing {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   min-height: 100vh;
   min-height: 100svh;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 32px 16px 96px;
+  padding: 80px 16px;
   background: var(--landing-background);
+}
+
+/* The two blurred circles sit behind the content in both themes. */
+.landing::before,
+.landing::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  width: min(39.0625vw, 500px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--glow-color);
+  opacity: var(--glow-opacity);
+  filter: blur(min(15.625vw, 200px));
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.landing::before {
+  left: 19.53%;
+  top: 43%;
+}
+
+.landing::after {
+  left: 80.47%;
+  top: 77%;
 }
 
 .landing__content {
@@ -77,7 +104,6 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 20px;
-  transform: translateY(calc(6vh + 32px));
 }
 
 h1 {
