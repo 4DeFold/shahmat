@@ -16,25 +16,33 @@
 
 :root {
   color-scheme: light;
-  --page-background: #fafafa;
-  --board-light: #fafafa;
-  --board-dark: #f1f1f1;
+  --page-background: #fff;
+  --board-light: #fff;
+  --board-dark: #000;
   --foreground: #000;
   --button-background: #000;
   --button-text: #fff;
-  --halo: rgba(250, 250, 250, .92);
+  --halo: rgba(255, 255, 255, .98);
+}
+
+/* A manual choice takes precedence over the system preference. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --page-background: #000;
+  --foreground: #fff;
+  --button-background: #fff;
+  --button-text: #000;
+  --halo: rgba(0, 0, 0, .98);
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme]) {
     color-scheme: dark;
     --page-background: #000;
-    --board-light: #080808;
-    --board-dark: #202020;
     --foreground: #fff;
     --button-background: #fff;
     --button-text: #000;
-    --halo: rgba(65, 65, 65, .55);
+    --halo: rgba(0, 0, 0, .98);
   }
 }
 
@@ -95,6 +103,7 @@ h1 {
   /* Keep Playfair's descenders fully visible. */
   padding-bottom: .15em;
   color: var(--foreground);
+  text-shadow: 0 0 12px var(--halo), 0 0 24px var(--halo);
   font-family: 'Playfair Display', Georgia, serif;
   font-size: clamp(3rem, 10vw, 8rem);
   font-weight: 400;
@@ -109,6 +118,7 @@ h1 {
   border: 0;
   border-radius: 999px;
   background: var(--button-background);
+  box-shadow: 0 0 24px 10px var(--halo);
   color: var(--button-text);
   font-family: 'Charis SIL', Georgia, serif;
   font-size: 40px;
