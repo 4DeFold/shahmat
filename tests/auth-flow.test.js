@@ -268,3 +268,43 @@ test('profile editing can be cancelled without saving changes', async () => {
   assert.equal($('dashboard-screen').hidden, false);
   assert.equal(getProfile().bio, '');
 });
+
+test('sidebar navigates between empty pages and back to the existing home', async () => {
+  const { $, click, document, window } = await setup({ existing: true, palette: 'forest' });
+  const pageButton = name => document.querySelector(`#dashboard-screen [data-page="${name}"]`);
+  assert.equal($('dashboard-home').hidden, false);
+  await click('nav-play');
+  assert.equal($('dashboard-home').hidden, true);
+  assert.equal($('page-play').hidden, false);
+  assert.equal(window.location.hash, '#play');
+  assert.equal($('nav-play').getAttribute('aria-current'), 'page');
+  await click('account-toggle');
+  assert.equal($('account-toggle').getAttribute('aria-expanded'), 'true');
+  for (const name of ['profile', 'settings', 'help']) {
+    if ($('account-menu').hidden) await click('account-toggle');
+    pageButton(name).click(); await tick();
+    assert.equal($(`page-${name}`).hidden, false);
+    assert.equal($('account-menu').hidden, true);
+    assert.equal(window.location.hash, `#${name}`);
+    assert.equal(document.querySelector('.landing').dataset.palette, 'forest');
+  }
+  document.querySelector('.sidebar-brand').click(); await tick();
+  assert.equal($('dashboard-home').hidden, false);
+  assert.equal(window.location.hash, '');
+  assert.equal($('dashboard-title').textContent, 'Привет, Player.');
+  await click('account-toggle');
+  document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  assert.equal($('account-menu').hidden, true);
+  assert.equal(document.activeElement, $('account-toggle'));
+});
+
+test('sidebar sign out from a blank page clears the route and opens login', async () => {
+  const { $, click, document, window } = await setup({ existing: true });
+  await click('nav-play');
+  await click('account-toggle');
+  document.querySelector('#account-menu .signout').click(); await tick();
+  assert.equal($('auth-screen').hidden, false);
+  assert.equal($('dashboard-screen').hidden, true);
+  assert.equal(window.location.hash, '');
+  assert.equal(document.querySelector('.landing').classList.contains('palette-active'), false);
+});

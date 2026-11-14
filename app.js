@@ -116,6 +116,55 @@ document.addEventListener('visibilitychange', () => {
 let editing = false;
 let navigating = false;
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+const accountMenu = $('account-menu');
+const accountToggle = $('account-toggle');
+const pages = new Set(['home', 'play', 'profile', 'settings', 'help']);
+
+function closeAccountMenu() {
+  accountMenu.hidden = true;
+  accountToggle.setAttribute('aria-expanded', 'false');
+  $('sidebar-message').textContent = '';
+}
+function currentPage() {
+  const name = window.location.hash.slice(1);
+  return pages.has(name) ? name : 'home';
+}
+function showPage(name, { updateHistory = false, focus = false } = {}) {
+  if (!pages.has(name)) name = 'home';
+  if (updateHistory && currentPage() !== name) {
+    const url = new URL(window.location.href);
+    url.hash = name === 'home' ? '' : name;
+    window.history.pushState(null, '', url);
+  }
+  document.querySelectorAll('#dashboard-screen [data-view]').forEach(view => { view.hidden = view.dataset.view !== name; });
+  document.querySelectorAll('#dashboard-screen [data-page]').forEach(button => {
+    if (button.dataset.page === name) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
+  });
+  closeAccountMenu();
+  if (focus) {
+    window.scrollTo(0, 0);
+    const heading = name === 'home' ? $('dashboard-title') : $('page-' + name + '-title');
+    heading.setAttribute('tabindex', '-1');
+    heading.focus({ preventScroll: true });
+  }
+}
+$('dashboard-screen').querySelectorAll('[data-page]').forEach(button => button.addEventListener('click', () => {
+  showPage(button.dataset.page, { updateHistory: true, focus: true });
+}));
+accountToggle.addEventListener('click', () => {
+  if (!accountMenu.hidden) closeAccountMenu();
+  else { accountMenu.hidden = false; accountToggle.setAttribute('aria-expanded', 'true'); }
+});
+document.addEventListener('click', event => {
+  if (!accountMenu.hidden && !$('sidebar-account').contains(event.target)) closeAccountMenu();
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && !accountMenu.hidden) { closeAccountMenu(); accountToggle.focus(); }
+});
+window.addEventListener('popstate', () => {
+  if (screen.id === 'dashboard-screen' && !screen.hidden) showPage(currentPage(), { focus: true });
+});
 
 async function show(id, immediate = false) {
   if (navigating || (screen.id === id && !screen.hidden)) return;
@@ -129,9 +178,11 @@ async function show(id, immediate = false) {
   if (!immediate) next.classList.add('entering');
   next.hidden = false;
   screen = next;
+  if (id === 'dashboard-screen') showPage(currentPage());
+  else closeAccountMenu();
   window.scrollTo(0, 0);
   requestAnimationFrame(() => requestAnimationFrame(() => next.classList.remove('entering')));
-  const focusTarget = next.querySelector('h2') || next.querySelector('.tab.active');
+  const focusTarget = next.querySelector('[data-view]:not([hidden]) h2') || next.querySelector('h2') || next.querySelector('.tab.active');
   if (focusTarget) {
     if (focusTarget.tagName === 'H2') focusTarget.setAttribute('tabindex', '-1');
     focusTarget.focus({ preventScroll: true });
@@ -273,8 +324,10 @@ document.querySelectorAll('.signout').forEach(button => button.addEventListener(
   try {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
-    profile = null; applyPalette('monochrome'); applyTheme(null); $('auth-form').reset(); setMode('login'); await show('auth-screen');
-  } catch (error) { appearanceUserId = signedOutUser; void syncAppearance(); message('dashboard-message', 'Не удалось выйти. Попробуй ещё раз.'); }
+    profile = null; applyPalette('monochrome'); applyTheme(null); $('auth-form').reset(); setMode('login');
+    const url = new URL(window.location.href); url.hash = ''; window.history.replaceState(null, '', url);
+    await show('auth-screen');
+  } catch (error) { appearanceUserId = signedOutUser; void syncAppearance(); message('sidebar-message', 'Не удалось выйти. Попробуй ещё раз.'); }
   finally { busy(button, false); }
 }));
 

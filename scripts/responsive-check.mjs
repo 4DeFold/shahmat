@@ -128,6 +128,36 @@ for (const device of devices) {
   await paletteName.dblclick();
   assert.equal(await page.evaluate(() => window.getSelection().toString()), '', 'palette text should not be selected by a double click');
   await screenshot('dashboard');
+  // The left rail remains available on all signed-in views.
+  await page.locator('#nav-play').click();
+  assert.equal(await page.locator('#page-play').isVisible(), true);
+  assert.equal(await page.locator('#dashboard-home').isVisible(), false);
+  assert.equal(new URL(page.url()).hash, '#play');
+  await checkLayout('play');
+  await page.reload();
+  await page.locator('#page-play').waitFor({ state: 'visible' });
+  await page.locator('#account-toggle').click();
+  assert.equal(await page.locator('#account-toggle').getAttribute('aria-expanded'), 'true');
+  const activeColors = await page.locator('#nav-play').evaluate(el => ({ background: getComputedStyle(el).backgroundColor, color: getComputedStyle(el).color }));
+  const toggleColors = await page.locator('#account-toggle').evaluate(el => ({ background: getComputedStyle(el).backgroundColor, color: getComputedStyle(el).color }));
+  assert.deepEqual(toggleColors, activeColors, 'expanded profile control must remain legible on hover');
+  await checkLayout('account menu');
+  await page.screenshot({ path: `${output}/${device.id}-navigation.png`, animations: 'disabled' });
+  await page.keyboard.press('Escape');
+  assert.equal(await page.locator('#account-menu').isVisible(), false);
+  for (const name of ['profile', 'settings', 'help']) {
+    await page.locator('#account-toggle').click();
+    await page.locator(`#account-menu [data-page=${name}]`).click();
+    assert.equal(await page.locator(`#page-${name}`).isVisible(), true);
+    assert.equal(await page.locator('#account-menu').isVisible(), false);
+    assert.equal(new URL(page.url()).hash, `#${name}`);
+    await checkLayout(name);
+  }
+  await page.goBack();
+  await page.locator('#page-settings').waitFor({ state: 'visible' });
+  await page.locator('.sidebar-brand').click();
+  assert.equal(await page.locator('#dashboard-home').isVisible(), true);
+  assert.equal(new URL(page.url()).hash, '');
   // Exercise navigation from the bottom of a long screen, not only from the top.
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
   await page.locator('#edit-profile').click(); await atTop('profile-screen');
@@ -146,6 +176,7 @@ for (const device of devices) {
     await page.locator(`#dashboard-palettes label[data-choice=${palette}]`).click();
     assert.equal(await page.locator('.landing').getAttribute('data-palette-theme'), 'light');
   }
+  await page.locator('#account-toggle').click();
   await page.locator('.signout').click(); await atTop('auth-screen');
   assert.deepEqual(errors, [], `${device.id}: browser errors`);
   results.push({ ...device, hero });
