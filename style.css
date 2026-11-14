@@ -52,6 +52,20 @@ html, body {
 
 body {
   background: var(--page-background);
+  /* Interface copy should not be accidentally selected during taps or drags. */
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Keep normal text editing and selection in form fields. */
+input, textarea, [contenteditable='true'] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Avoid the browser's transient touch overlay; keyboard focus remains visible. */
+button, label, a, input {
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* Reveal the entire page from a solid black screen on entry. */
@@ -78,6 +92,7 @@ body.startup-ready::after {
   min-height: 100svh;
   display: flex;
   align-items: center;
+  align-items: safe center;
   justify-content: center;
   overflow: hidden;
   padding: 80px 16px;
@@ -85,6 +100,7 @@ body.startup-ready::after {
 }
 
 .landing__content {
+  --hero-size: clamp(3rem, 10vw, 8rem);
   position: relative;
   isolation: isolate;
   display: flex;
@@ -99,7 +115,7 @@ h1 {
   padding-bottom: .15em;
   color: var(--foreground);
   font-family: 'Playfair Display', Georgia, serif;
-  font-size: clamp(3rem, 10vw, 8rem);
+  font-size: var(--hero-size);
   font-weight: 400;
   line-height: 1.2;
   letter-spacing: 0;
@@ -113,19 +129,30 @@ h1 {
 }
 
 .play-button {
-  width: 240px;
-  height: 60px;
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  width: calc(var(--hero-size) * 1.875);
+  height: calc(var(--hero-size) * .46875);
   padding: 0;
   border: 1px solid var(--button-background);
   border-radius: 999px;
   background: var(--button-background);
   color: var(--button-text);
   font-family: 'Charis SIL', Georgia, serif;
-  font-size: 40px;
+  font-size: calc(var(--hero-size) * .3125);
   font-weight: 400;
   line-height: 1;
   cursor: pointer;
   visibility: hidden;
+}
+/* Keep a comfortable touch target without enlarging the visible button. */
+.play-button::before {
+  content: '';
+  position: absolute;
+  top: 50%; left: 50%;
+  width: max(100%, 44px); height: max(100%, 44px);
+  transform: translate(-50%, -50%);
 }
 body.startup-ready .play-button {
   animation: button-entrance 1s cubic-bezier(.22, 1, .36, 1) 1s both;
@@ -147,8 +174,7 @@ body.startup-ready .play-button {
 }
 
 @media (max-width: 480px) {
-  h1 { font-size: clamp(2.6rem, 10vw, 4.8rem); }
-  .play-button { width: 190px; height: 50px; font-size: 32px; }
+  .landing__content { --hero-size: clamp(2.6rem, 10vw, 4.8rem); }
 }
 
 @font-face {
@@ -179,6 +205,8 @@ body.startup-ready .play-button {
 .panel-top + .section-head { margin-top: 0; }
 .eyebrow { margin: 0 0 12px; font: 12px/1.3 Arial, sans-serif; letter-spacing: .18em; }
 h2 { margin: 0; font: 400 clamp(38px, 8vw, 54px)/1.15 'Playfair Display', Georgia, serif; letter-spacing: -.03em; overflow-wrap: anywhere; }
+/* Navigation focuses headings for assistive technology, not as interactive controls. */
+.screen h2[tabindex='-1']:focus { outline: none; }
 .subtle { margin: 12px 0 0; opacity: .7; font-size: 16px; line-height: 1.5; }
 .auth-tabs { display: flex; border-bottom: 1px solid var(--foreground); margin: 45px 0 28px; }
 button, input, textarea { font: inherit; }
@@ -368,4 +396,14 @@ textarea { resize: vertical; min-height: 92px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .landing, .landing.palette-active .dashboard, .landing.palette-active .dashboard *, .landing.palette-active .panel, .landing.palette-active .panel * { transition-duration: 0s; }
+}
+
+/* Short landscape screens need less empty space around scrollable forms. */
+@media (max-height: 500px) {
+  .landing, .landing:has(.dashboard:not([hidden])) { padding-block: 24px; }
+  .panel-top { margin-bottom: 32px; }
+}
+
+@media (pointer: coarse) {
+  .text-button, .tab, .dashboard-link { min-height: 44px; }
 }
