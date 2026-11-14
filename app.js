@@ -25,11 +25,93 @@ function applyPalette(value) {
     input.checked = input.value === selectedPalette;
   });
 }
-async function savePalette(value, theme = selectedTheme) {
-  if (!palettes.has(value)) throw new Error('Invalid palette');
-  const { error } = await supabase.auth.updateUser({ data: { palette: value, palette_theme: theme } });
-  if (error) throw error;
+// Appearance is local-first and scoped to the signed-in account. Pending changes
+// survive reloads and are sent in order, without blocking the interface.
+let appearanceUserId = null;
+let syncingAppearance = false;
+let retryTimer = null;
+let retryDelay = 3000;
+const appearanceMemory = new Map();
+let storageUnavailable = false;
+const appearanceKey = id => `shahmat.appearance.${id}`;
+function readAppearance(id) {
+  if (storageUnavailable) return appearanceMemory.get(id) || null;
+  try {
+    const value = JSON.parse(localStorage.getItem(appearanceKey(id)) || 'null');
+    if (value && palettes.has(value.palette) && (value.theme === null || value.theme === 'dark' || value.theme === 'light') && Number.isSafeInteger(value.version) && typeof value.dirty === 'boolean') {
+      appearanceMemory.set(id, value);
+      return value;
+    }
+  } catch { storageUnavailable = true; /* Keep the current session usable. */ }
+  return appearanceMemory.get(id) || null;
 }
+function writeAppearance(id, value) {
+  appearanceMemory.set(id, value);
+  try { if (!storageUnavailable) localStorage.setItem(appearanceKey(id), JSON.stringify(value)); } catch { storageUnavailable = true; }
+}
+function recordAppearance() {
+  if (!appearanceUserId) return;
+  const previous = readAppearance(appearanceUserId);
+  writeAppearance(appearanceUserId, { palette: selectedPalette, theme: selectedTheme, dirty: true, version: (previous?.version || 0) + 1 });
+  if (retryTimer !== null) { clearTimeout(retryTimer); retryTimer = null; }
+  void syncAppearance();
+}
+function scheduleAppearanceRetry() {
+  if (!appearanceUserId || retryTimer !== null) return;
+  retryTimer = setTimeout(() => { retryTimer = null; void syncAppearance(); }, retryDelay);
+  retryDelay = Math.min(retryDelay * 2, 60000);
+}
+async function syncAppearance() {
+  if (syncingAppearance || !appearanceUserId) return;
+  const id = appearanceUserId;
+  const pending = readAppearance(id);
+  if (!pending?.dirty) return;
+  syncingAppearance = true;
+  let failed = false;
+  try {
+    // Never send one account's local settings using another account's session.
+    const { data, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) throw sessionError;
+    if (appearanceUserId !== id) return;
+    if (!data.session || data.session.user.id !== id) throw new Error('Session unavailable');
+    const { error } = await supabase.auth.updateUser({ data: { palette: pending.palette, palette_theme: pending.theme } });
+    if (error) throw error;
+    const latest = readAppearance(id);
+    if (latest?.version === pending.version) writeAppearance(id, { ...latest, dirty: false });
+    retryDelay = 3000;
+  } catch { failed = true; }
+  finally {
+    syncingAppearance = false;
+    if (appearanceUserId === id && readAppearance(id)?.dirty) {
+      if (failed) scheduleAppearanceRetry();
+      else void syncAppearance();
+    } else if (appearanceUserId && appearanceUserId !== id) {
+      void syncAppearance();
+    }
+  }
+}
+function restoreAppearance(user) {
+  appearanceUserId = user.id;
+  const local = readAppearance(user.id);
+  const remote = user.user_metadata || {};
+  if (local?.dirty || (!palettes.has(remote.palette) && local)) {
+    applyPalette(local.palette); applyTheme(local.theme);
+  } else {
+    applyPalette(remote.palette); applyTheme(remote.palette_theme);
+    writeAppearance(user.id, { palette: selectedPalette, theme: selectedTheme, dirty: false, version: local?.version || 0 });
+  }
+  void syncAppearance();
+}
+window.addEventListener('online', () => {
+  if (retryTimer !== null) { clearTimeout(retryTimer); retryTimer = null; }
+  void syncAppearance();
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    if (retryTimer !== null) { clearTimeout(retryTimer); retryTimer = null; }
+    void syncAppearance();
+  }
+});
 
 let editing = false;
 let navigating = false;
@@ -86,8 +168,7 @@ async function loadProfile(user, immediate = false) {
   const { data, error } = await supabase.from('profiles').select('username,bio,palette').eq('id', user.id).maybeSingle();
   if (error) throw error;
   profile = data;
-  applyPalette(user.user_metadata?.palette);
-  applyTheme(user.user_metadata?.palette_theme);
+  restoreAppearance(user);
   if (!data) { editing = false; prepareProfile(); await show('profile-screen', immediate); }
   else { displayProfile(); await show('dashboard-screen', immediate); }
 }
@@ -155,48 +236,42 @@ function toggleSelectedTheme() {
   applyTheme(landing.dataset.paletteTheme === 'dark' ? 'light' : 'dark');
 }
 $('onboarding-palettes').addEventListener('click', event => {
-  if (event.target.matches('input[name="onboarding-palette"]') && event.target.value === selectedPalette) toggleSelectedTheme();
+  if (event.target.matches('input[name="onboarding-palette"]') && event.target.value === selectedPalette) {
+    toggleSelectedTheme(); recordAppearance();
+  }
 });
 $('onboarding-palettes').addEventListener('change', event => {
-  if (event.target.matches('input[name="onboarding-palette"]')) applyPalette(event.target.value);
+  if (event.target.matches('input[name="onboarding-palette"]')) {
+    applyPalette(event.target.value); recordAppearance();
+  }
 });
 $('palette-form').addEventListener('submit', async event => {
   event.preventDefault();
-  const button = $('palette-submit');
-  if (button.disabled) return;
-  busy(button, true); message('palette-message');
-  const controls = $('onboarding-palettes').querySelectorAll('input');
-  controls.forEach(input => { input.disabled = true; });
-  try { await savePalette(selectedPalette); displayProfile(); await show('dashboard-screen'); }
-  catch (error) { message('palette-message', 'Не удалось сохранить палитру. Попробуй ещё раз.'); }
-  finally { controls.forEach(input => { input.disabled = false; }); busy(button, false); }
+  recordAppearance();
+  displayProfile();
+  await show('dashboard-screen');
 });
-async function updateDashboardPalette(nextPalette, toggleTheme = false) {
-  const oldPalette = selectedPalette;
-  const oldTheme = selectedTheme;
-  const controls = $('dashboard-palettes').querySelectorAll('input');
-  controls.forEach(input => { input.disabled = true; });
-  if (toggleTheme) toggleSelectedTheme();
-  else applyPalette(nextPalette);
-  message('dashboard-message');
-  try { await savePalette(selectedPalette); message('dashboard-message', toggleTheme ? 'Тема сохранена.' : 'Палитра сохранена.'); }
-  catch (error) { applyPalette(oldPalette); applyTheme(oldTheme); message('dashboard-message', 'Не удалось сохранить оформление. Попробуй ещё раз.'); }
-  finally { controls.forEach(input => { input.disabled = false; }); }
-}
 $('dashboard-palettes').addEventListener('click', event => {
-  if (event.target.matches('input[name="dashboard-palette"]') && event.target.value === selectedPalette) updateDashboardPalette(selectedPalette, true);
+  if (event.target.matches('input[name="dashboard-palette"]') && event.target.value === selectedPalette) {
+    toggleSelectedTheme(); recordAppearance();
+  }
 });
 $('dashboard-palettes').addEventListener('change', event => {
-  if (event.target.matches('input[name="dashboard-palette"]') && event.target.value !== selectedPalette) updateDashboardPalette(event.target.value);
+  if (event.target.matches('input[name="dashboard-palette"]') && event.target.value !== selectedPalette) {
+    applyPalette(event.target.value); recordAppearance();
+  }
 });
 $('edit-profile').addEventListener('click', () => { editing = true; prepareProfile(); show('profile-screen'); });
 document.querySelectorAll('.signout').forEach(button => button.addEventListener('click', async () => {
   busy(button, true);
+  const signedOutUser = appearanceUserId;
+  appearanceUserId = null;
+  if (retryTimer !== null) { clearTimeout(retryTimer); retryTimer = null; }
   try {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
     profile = null; applyPalette('monochrome'); applyTheme(null); $('auth-form').reset(); setMode('login'); await show('auth-screen');
-  } catch (error) { message('dashboard-message', 'Не удалось выйти. Попробуй ещё раз.'); }
+  } catch (error) { appearanceUserId = signedOutUser; void syncAppearance(); message('dashboard-message', 'Не удалось выйти. Попробуй ещё раз.'); }
   finally { busy(button, false); }
 }));
 
