@@ -52,6 +52,20 @@ html, body {
 
 body {
   background: var(--page-background);
+  /* Interface copy should not be accidentally selected during taps or drags. */
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Keep normal text editing and selection in form fields. */
+input, textarea, [contenteditable='true'] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Avoid the browser's transient touch overlay; keyboard focus remains visible. */
+button, label, a, input {
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* Reveal the entire page from a solid black screen on entry. */
@@ -115,6 +129,8 @@ h1 {
 }
 
 .play-button {
+  appearance: none;
+  -webkit-appearance: none;
   position: relative;
   width: calc(var(--hero-size) * 1.875);
   height: calc(var(--hero-size) * .46875);
@@ -189,6 +205,8 @@ body.startup-ready .play-button {
 .panel-top + .section-head { margin-top: 0; }
 .eyebrow { margin: 0 0 12px; font: 12px/1.3 Arial, sans-serif; letter-spacing: .18em; }
 h2 { margin: 0; font: 400 clamp(38px, 8vw, 54px)/1.15 'Playfair Display', Georgia, serif; letter-spacing: -.03em; overflow-wrap: anywhere; }
+/* Navigation focuses headings for assistive technology, not as interactive controls. */
+.screen h2[tabindex='-1']:focus { outline: none; }
 .subtle { margin: 12px 0 0; opacity: .7; font-size: 16px; line-height: 1.5; }
 .auth-tabs { display: flex; border-bottom: 1px solid var(--foreground); margin: 45px 0 28px; }
 button, input, textarea { font: inherit; }

@@ -75,6 +75,12 @@ for (const device of devices) {
   await page.locator('#play').waitFor({ state: 'visible' });
   await page.evaluate(() => document.fonts.ready);
   await checkLayout('landing-screen');
+  assert.equal(await page.locator('#play').evaluate(el => getComputedStyle(el).webkitTapHighlightColor), 'rgba(0, 0, 0, 0)');
+  if (!device.touch) {
+    await page.keyboard.press('Tab');
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'play');
+    assert.notEqual(await page.locator('#play').evaluate(el => getComputedStyle(el).outlineStyle), 'none', 'keyboard focus must remain visible');
+  }
   const hero = await page.evaluate(() => {
     const title = document.querySelector('h1'), play = document.querySelector('#play');
     const titleRect = title.getBoundingClientRect(), playRect = play.getBoundingClientRect();
@@ -106,12 +112,21 @@ for (const device of devices) {
   assert.equal(await page.locator('#profile-cancel').isVisible(), false);
   await screenshot('profile');
   await page.locator('#username').fill('LongPlayerName_123456789');
+  await page.locator('#username').selectText();
+  assert.equal(await page.locator('#username').evaluate(el => el.value.slice(el.selectionStart, el.selectionEnd)), 'LongPlayerName_123456789', 'form text remains selectable');
   await page.locator('#bio').fill('Люблю шахматы.');
   await page.locator('#profile-submit').click(); await atTop('palette-screen'); await screenshot('palette');
   await page.locator('#onboarding-palettes label[data-choice=forest]').click();
   assert.equal(await page.locator('.landing').getAttribute('data-palette'), 'forest');
   await page.locator('#palette-submit').click(); await atTop('dashboard-screen');
   assert.match(await page.locator('#dashboard-title').innerText(), /LongPlayerName_123456789/);
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'dashboard-title', 'navigation should keep accessible focus');
+  assert.equal(await page.locator('#dashboard-title').evaluate(el => getComputedStyle(el).outlineStyle), 'none', 'programmatic heading focus should not be outlined');
+  assert.equal(await page.locator('#dashboard-title').evaluate(el => getComputedStyle(el).userSelect), 'none');
+  const paletteName = page.locator('#dashboard-palettes label[data-choice=gray] .palette-name');
+  assert.equal(await paletteName.evaluate(el => getComputedStyle(el).userSelect), 'none');
+  await paletteName.dblclick();
+  assert.equal(await page.evaluate(() => window.getSelection().toString()), '', 'palette text should not be selected by a double click');
   await screenshot('dashboard');
   // Exercise navigation from the bottom of a long screen, not only from the top.
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
