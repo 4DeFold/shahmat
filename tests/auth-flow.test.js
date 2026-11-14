@@ -74,3 +74,18 @@ test('failed palette save reverts selection and reports error', async () => {
   assert.equal(getMetadata().palette, 'forest'); assert.match($('dashboard-message').textContent, /Не удалось/);
   assert.equal($('dashboard-palettes').querySelector('input[value="forest"]').checked, true);
 });
+
+test('gray palette follows monochrome and persists after signing back in', async () => {
+  const { $, click, choose, submit, getMetadata, document } = await setup({ existing: true });
+  for (const id of ['onboarding-palettes', 'dashboard-palettes']) {
+    assert.deepEqual(Array.from($(id).querySelectorAll('input'), input => input.value), ['monochrome', 'gray', 'forest', 'atelier', 'wood']);
+  }
+  await click('play'); await choose('dashboard-palettes', 'gray');
+  assert.equal(getMetadata().palette, 'gray');
+  assert.equal(document.querySelector('.landing').dataset.palette, 'gray');
+  $('dashboard-screen').querySelector('.signout').click(); await tick();
+  assert.equal(document.querySelector('.landing').classList.contains('palette-active'), false);
+  $('email').value = 'player@example.com'; $('password').value = 'secret123'; await submit('auth-form');
+  assert.equal(document.querySelector('.landing').dataset.palette, 'gray');
+  assert.equal($('dashboard-palettes').querySelector('input[value="gray"]').checked, true);
+});

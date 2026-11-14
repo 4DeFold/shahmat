@@ -224,6 +224,13 @@ textarea { resize: vertical; min-height: 92px; }
   --board-light: #f5f5f5;
   --board-dark: #999;
 }
+.landing.palette-active[data-palette='gray'] {
+  --page-background: #f8f9fa; --foreground: #212529;
+  --button-background: #343a40; --button-text: #f8f9fa;
+  --surface: #f8f9fa; --surface-raised: #e9ecef; --ink: #212529;
+  --line: #6c757d; --accent: #343a40; --accent-ink: #f8f9fa;
+  --board-light: #dee2e6; --board-dark: #6c757d;
+}
 .landing.palette-active[data-palette='forest'] {
   --page-background: #f8f6f0; --foreground: #26362e;
   --button-background: #3d5a40; --button-text: #f8f6f0;
@@ -257,6 +264,7 @@ textarea { resize: vertical; min-height: 92px; }
 .palette-option input { margin: 0; flex: 0 0 auto; accent-color: var(--accent, var(--foreground)); }
 .palette-swatch { flex: 0 0 48px; height: 48px; border: none; }
 .palette-swatch.monochrome { background: linear-gradient(135deg,#fff 50%,#000 50%); border: 1px solid #888; }
+.palette-swatch.gray { background: linear-gradient(135deg,#f8f9fa 0% 11.11%,#e9ecef 11.11% 22.22%,#dee2e6 22.22% 33.33%,#ced4da 33.33% 44.44%,#adb5bd 44.44% 55.55%,#6c757d 55.55% 66.66%,#495057 66.66% 77.77%,#343a40 77.77% 88.88%,#212529 88.88%); border: 1px solid #adb5bd; }
 .palette-swatch.forest { background: linear-gradient(135deg,#f8f6f0 0 20%,#eeeed2 20% 40%,#769656 40% 60%,#3d5a40 60% 80%,#26362e 80%); }
 .palette-swatch.atelier { background: linear-gradient(135deg,#f6f1e7 0 16.66%,#e9dcc7 16.66% 33.33%,#6f858a 33.33% 50%,#314f58 50% 66.66%,#b47750 66.66% 83.33%,#26343b 83.33%); }
 .palette-swatch.wood { background: linear-gradient(135deg,#ede0d4 0 16.66%,#e6ccb2 16.66% 33.33%,#ddb892 33.33% 50%,#b08968 50% 66.66%,#7f5539 66.66% 83.33%,#9c6644 83.33%); }

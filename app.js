@@ -8,7 +8,7 @@ let screen = $('landing-screen');
 let mode = 'login';
 let profile = null;
 let selectedPalette = 'monochrome';
-const palettes = new Set(['monochrome', 'forest', 'atelier', 'wood']);
+const palettes = new Set(['monochrome', 'gray', 'forest', 'atelier', 'wood']);
 const landing = document.querySelector('.landing');
 
 function applyPalette(value) {
