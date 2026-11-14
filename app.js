@@ -7,6 +7,23 @@ const $ = id => document.getElementById(id);
 let screen = $('landing-screen');
 let mode = 'login';
 let profile = null;
+let selectedPalette = 'monochrome';
+const palettes = new Set(['monochrome', 'forest', 'atelier', 'wood']);
+const landing = document.querySelector('.landing');
+
+function applyPalette(value) {
+  selectedPalette = palettes.has(value) ? value : 'monochrome';
+  landing.dataset.palette = selectedPalette;
+  document.querySelectorAll('.palette-list input').forEach(input => {
+    input.checked = input.value === selectedPalette;
+  });
+}
+async function savePalette(value) {
+  if (!palettes.has(value)) throw new Error('Invalid palette');
+  const { error } = await supabase.auth.updateUser({ data: { palette: value } });
+  if (error) throw error;
+}
+
 let editing = false;
 let navigating = false;
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -19,6 +36,7 @@ async function show(id) {
   if (!reducedMotion.matches) await new Promise(resolve => setTimeout(resolve, 300));
   screen.hidden = true;
   screen.classList.remove('leaving');
+  landing.classList.toggle('palette-active', ['profile-screen', 'palette-screen', 'dashboard-screen'].includes(id));
   next.classList.add('entering');
   next.hidden = false;
   screen = next;
@@ -61,8 +79,9 @@ async function loadProfile(user) {
   const { data, error } = await supabase.from('profiles').select('username,bio,palette').eq('id', user.id).maybeSingle();
   if (error) throw error;
   profile = data;
+  applyPalette(user.user_metadata?.palette);
   if (!data) { editing = false; prepareProfile(); await show('profile-screen'); }
-  else { displayProfile(); await show('account-screen'); }
+  else { displayProfile(); await show('dashboard-screen'); }
 }
 function prepareProfile() {
   $('profile-title').textContent = editing ? 'О тебе.' : 'Это ты.';
@@ -72,8 +91,9 @@ function prepareProfile() {
   message('profile-message');
 }
 function displayProfile() {
-  $('account-title').textContent = 'Привет, ' + profile.username + '.';
-  $('account-bio').textContent = profile.bio || 'Твой профиль готов.';
+  $('dashboard-title').textContent = 'Привет, ' + profile.username + '.';
+  $('dashboard-profile-heading').textContent = profile.username;
+  $('dashboard-bio').textContent = profile.bio || 'Здесь можно рассказать немного о себе.';
 }
 $('play').addEventListener('click', async () => {
   const button = $('play');
@@ -113,24 +133,48 @@ $('profile-form').addEventListener('submit', async event => {
   try {
     const { data: auth, error: authError } = await supabase.auth.getUser();
     if (authError || !auth.user) throw authError || new Error('No user');
-    const values = { id: auth.user.id, username: $('username').value.trim(), bio: $('bio').value.trim(), palette: 'monochrome' };
+    const values = { id: auth.user.id, username: $('username').value.trim(), bio: $('bio').value.trim(), palette: profile?.palette || 'monochrome' };
     if (!/^[A-Za-z0-9_]{3,24}$/.test(values.username)) throw new Error('Invalid username');
     const { error } = await supabase.from('profiles').upsert(values);
     if (error) throw error;
     profile = values;
-    if (editing) { displayProfile(); await show('account-screen'); }
+    if (editing) { displayProfile(); await show('dashboard-screen'); }
     else await show('palette-screen');
   } catch (error) { message('profile-message', describe(error)); }
   finally { busy(button, false); }
 });
-$('palette-form').addEventListener('submit', async event => { event.preventDefault(); displayProfile(); await show('account-screen'); });
+$('onboarding-palettes').addEventListener('change', event => {
+  if (event.target.matches('input[name="onboarding-palette"]')) applyPalette(event.target.value);
+});
+$('palette-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const button = $('palette-submit');
+  if (button.disabled) return;
+  busy(button, true); message('palette-message');
+  const controls = $('onboarding-palettes').querySelectorAll('input');
+  controls.forEach(input => { input.disabled = true; });
+  try { await savePalette(selectedPalette); displayProfile(); await show('dashboard-screen'); }
+  catch (error) { message('palette-message', 'Не удалось сохранить палитру. Попробуй ещё раз.'); }
+  finally { controls.forEach(input => { input.disabled = false; }); busy(button, false); }
+});
+$('dashboard-palettes').addEventListener('change', async event => {
+  if (!event.target.matches('input[name="dashboard-palette"]')) return;
+  const oldPalette = selectedPalette;
+  const nextPalette = event.target.value;
+  const controls = $('dashboard-palettes').querySelectorAll('input');
+  controls.forEach(input => { input.disabled = true; });
+  applyPalette(nextPalette); message('dashboard-message');
+  try { await savePalette(nextPalette); message('dashboard-message', 'Палитра сохранена.'); }
+  catch (error) { applyPalette(oldPalette); message('dashboard-message', 'Не удалось сохранить палитру. Попробуй ещё раз.'); }
+  finally { controls.forEach(input => { input.disabled = false; }); }
+});
 $('edit-profile').addEventListener('click', () => { editing = true; prepareProfile(); show('profile-screen'); });
 document.querySelectorAll('.signout').forEach(button => button.addEventListener('click', async () => {
   busy(button, true);
   try {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
-    profile = null; $('auth-form').reset(); setMode('login'); await show('auth-screen');
-  } catch (error) { message(screen.id === 'account-screen' ? 'account-message' : 'profile-message', 'Не удалось выйти. Попробуй ещё раз.'); }
+    profile = null; applyPalette('monochrome'); $('auth-form').reset(); setMode('login'); await show('auth-screen');
+  } catch (error) { message('dashboard-message', 'Не удалось выйти. Попробуй ещё раз.'); }
   finally { busy(button, false); }
 }));
