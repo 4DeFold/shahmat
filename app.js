@@ -129,6 +129,7 @@ async function show(id, immediate = false) {
   if (!immediate) next.classList.add('entering');
   next.hidden = false;
   screen = next;
+  window.scrollTo(0, 0);
   requestAnimationFrame(() => requestAnimationFrame(() => next.classList.remove('entering')));
   const focusTarget = next.querySelector('h2') || next.querySelector('.tab.active');
   if (focusTarget) {
@@ -174,6 +175,7 @@ async function loadProfile(user, immediate = false) {
 }
 function prepareProfile() {
   $('profile-title').textContent = editing ? 'О тебе.' : 'Это ты.';
+  $('profile-cancel').hidden = !editing;
   $('username').value = profile?.username || '';
   $('bio').value = profile?.bio || '';
   $('profile-submit').innerHTML = editing ? 'Сохранить <span>↗</span>' : 'Продолжить <span>→</span>';
@@ -262,6 +264,7 @@ $('dashboard-palettes').addEventListener('change', event => {
   }
 });
 $('edit-profile').addEventListener('click', () => { editing = true; prepareProfile(); show('profile-screen'); });
+$('profile-cancel').addEventListener('click', () => { editing = false; show('dashboard-screen'); });
 document.querySelectorAll('.signout').forEach(button => button.addEventListener('click', async () => {
   busy(button, true);
   const signedOutUser = appearanceUserId;

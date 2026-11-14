@@ -2,3 +2,6 @@ node_modules/
 dist/
 .env*
 !.env.example
+
+# Generated browser-test evidence
+responsive-evidence/

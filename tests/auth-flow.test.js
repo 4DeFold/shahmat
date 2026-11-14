@@ -35,6 +35,7 @@ async function setup({ existing = false, palette = 'monochrome', failSave = fals
   window.matchMedia = query => query.includes('reduced-motion') ? { matches: true } : themePreference;
   const changeSystemTheme = dark => { themePreference.matches = dark; themeChange?.({ matches: dark }); };
   window.requestAnimationFrame = cb => cb();
+  window.scrollTo = () => {};
   const realSetTimeout = window.setTimeout.bind(window);
   window.setTimeout = (cb, delay, ...args) => delay >= 3000 ? 1 : realSetTimeout(cb, delay, ...args);
   window.createClient = () => db;
@@ -132,6 +133,7 @@ test('startup waits for session and profile before revealing dashboard', async (
   let resolveSession, resolveProfile;
   window.matchMedia = () => ({ matches: true, addEventListener() {} });
   window.requestAnimationFrame = cb => cb();
+  window.scrollTo = () => {};
   window.createClient = () => ({
     auth: { getSession: () => new Promise(resolve => { resolveSession = resolve; }) },
     from: () => ({ select: () => ({ eq: () => ({ maybeSingle: () => new Promise(resolve => { resolveProfile = resolve; }) }) }) })
@@ -185,6 +187,7 @@ test('session errors show a retry path instead of leaving an indefinite black sc
   const { window } = dom;
   window.matchMedia = () => ({ matches: true, addEventListener() {} });
   window.requestAnimationFrame = cb => cb();
+  window.scrollTo = () => {};
   window.createClient = () => ({ auth: { getSession: async () => ({ error: new Error('offline') }) } });
   window.eval(source); await tick();
   assert.equal(window.document.body.classList.contains('startup-ready'), true);
@@ -253,4 +256,15 @@ test('background sync refuses to save with a different account session', async (
   await choose('dashboard-palettes', 'wood');
   assert.equal(getMetadata().palette, 'forest');
   assert.equal(JSON.parse(window.localStorage.getItem('shahmat.appearance.user-1')).dirty, true);
+});
+
+
+test('profile editing can be cancelled without saving changes', async () => {
+  const { $, click, getProfile } = await setup({ existing: true });
+  await click('edit-profile');
+  assert.equal($('profile-cancel').hidden, false);
+  $('bio').value = 'Unsaved changes';
+  await click('profile-cancel');
+  assert.equal($('dashboard-screen').hidden, false);
+  assert.equal(getProfile().bio, '');
 });

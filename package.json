@@ -6,7 +6,8 @@
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "test": "node --test"
+    "test": "node --test",
+    "test:responsive": "node scripts/responsive-check.mjs"
   },
   "repository": {
     "type": "git",
@@ -21,6 +22,7 @@
   },
   "devDependencies": {
     "jsdom": "^31.0.1",
+    "playwright": "^1.65.1",
     "vite": "^8.3.8"
   },
   "private": true,
