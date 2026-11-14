@@ -10,7 +10,7 @@
   </head>
   <body>
     <main class="landing">
-      <section class="screen landing__content" id="landing-screen" aria-label="shahmat.xyz">
+      <section class="screen landing__content" id="landing-screen" hidden aria-label="shahmat.xyz">
         <h1><span class="title-highlight">shah</span>mat.xyz</h1>
         <button class="play-button" id="play" type="button">PLAY</button>
       </section>
@@ -40,7 +40,7 @@
 
       <section class="screen panel" id="palette-screen" hidden aria-labelledby="palette-title">
         <div class="panel-top"><span class="wordmark small"><span class="title-highlight">shah</span>mat.xyz</span></div>
-        <div class="section-head"><h2 id="palette-title">Твой стиль.</h2><p class="subtle">Выбери палитру для своего пространства.</p></div>
+        <div class="section-head"><h2 id="palette-title">Твой стиль.</h2><p class="subtle">Выбери палитру. Повторное нажатие меняет светлую и тёмную тему.</p></div>
         <form id="palette-form">
           <fieldset class="palette-list" id="onboarding-palettes"><legend class="visually-hidden">Выбери палитру</legend>            <label class="palette-option" data-choice="monochrome"><input type="radio" name="onboarding-palette" value="monochrome" checked><span class="palette-swatch monochrome" aria-hidden="true"></span><span class="palette-name">Монохром<small>Классическая палитра</small></span><span class="palette-check" aria-hidden="true">✓</span></label>
             <label class="palette-option" data-choice="gray"><input type="radio" name="onboarding-palette" value="gray"><span class="palette-swatch gray" aria-hidden="true"></span><span class="palette-name">Графит<small>Мягкие оттенки серого</small></span><span class="palette-check" aria-hidden="true">✓</span></label>
@@ -69,7 +69,7 @@
           </div>
           <aside class="dashboard-sidebar">
             <section class="dashboard-card profile-card" aria-labelledby="dashboard-profile-heading"><p class="dashboard-overline">ПРОФИЛЬ / 01</p><div class="profile-avatar" aria-hidden="true">♟</div><h3 id="dashboard-profile-heading">Профиль</h3><p id="dashboard-bio" class="profile-bio"></p><button class="dashboard-link" id="edit-profile" type="button">Редактировать профиль <span>↗</span></button></section>
-            <section class="dashboard-card palettes-card" aria-labelledby="dashboard-palette-heading"><p class="dashboard-overline">ОФОРМЛЕНИЕ / 02</p><h3 id="dashboard-palette-heading">Твоя палитра.</h3><p class="palette-help">Выбери настроение для своего пространства.</p><fieldset class="palette-list compact" id="dashboard-palettes"><legend class="visually-hidden">Выбери палитру</legend>            <label class="palette-option" data-choice="monochrome"><input type="radio" name="dashboard-palette" value="monochrome" checked><span class="palette-swatch monochrome" aria-hidden="true"></span><span class="palette-name">Монохром<small>Классическая палитра</small></span><span class="palette-check" aria-hidden="true">✓</span></label>
+            <section class="dashboard-card palettes-card" aria-labelledby="dashboard-palette-heading"><p class="dashboard-overline">ОФОРМЛЕНИЕ / 02</p><h3 id="dashboard-palette-heading">Твоя палитра.</h3><p class="palette-help">Выбери палитру. Нажми ещё раз, чтобы сменить тему.</p><fieldset class="palette-list compact" id="dashboard-palettes"><legend class="visually-hidden">Выбери палитру</legend>            <label class="palette-option" data-choice="monochrome"><input type="radio" name="dashboard-palette" value="monochrome" checked><span class="palette-swatch monochrome" aria-hidden="true"></span><span class="palette-name">Монохром<small>Классическая палитра</small></span><span class="palette-check" aria-hidden="true">✓</span></label>
             <label class="palette-option" data-choice="gray"><input type="radio" name="dashboard-palette" value="gray"><span class="palette-swatch gray" aria-hidden="true"></span><span class="palette-name">Графит<small>Мягкие оттенки серого</small></span><span class="palette-check" aria-hidden="true">✓</span></label>
             <label class="palette-option" data-choice="forest"><input type="radio" name="dashboard-palette" value="forest"><span class="palette-swatch forest" aria-hidden="true"></span><span class="palette-name">Лес<small>Спокойные зелёные оттенки</small></span><span class="palette-check" aria-hidden="true">✓</span></label>
             <label class="palette-option" data-choice="atelier"><input type="radio" name="dashboard-palette" value="atelier"><span class="palette-swatch atelier" aria-hidden="true"></span><span class="palette-name">Шахматный кабинет<small>Холодные оттенки и терракота</small></span><span class="palette-check" aria-hidden="true">✓</span></label>
