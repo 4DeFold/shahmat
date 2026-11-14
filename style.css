@@ -286,6 +286,12 @@ textarea { resize: vertical; min-height: 92px; }
   transition: color 1.5s ease, background-color 1.5s ease, border-color 1.5s ease, fill 1.5s ease, stroke 1.5s ease, text-shadow 1.5s ease, opacity .3s ease, transform .4s cubic-bezier(.22, 1, .36, 1);
 }
 .palette-list { padding: 0; margin: 0; border: 0; display: grid; gap: 8px; }
+/* Explicit text colors prevent form controls' system color-scheme from overriding
+   the palette partway through a light/dark transition. */
+.palette-list, .palette-option, .palette-name, .palette-name small, .palette-check,
+.palettes-card h3, .palettes-card .palette-help, .palettes-card .palette-feedback {
+  color: var(--foreground);
+}
 .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 .palette-option { padding: 12px; gap: 12px; border: 1px solid var(--line, var(--foreground)); }
 .palette-option:has(input:checked) { border-color: var(--foreground); }
