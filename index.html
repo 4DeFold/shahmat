@@ -10,7 +10,7 @@
   </head>
   <body>
     <main class="landing">
-      <section class="screen landing__content" id="landing-screen" aria-label="shahmat.xyz">
+      <section class="screen landing__content" id="landing-screen" hidden aria-label="shahmat.xyz">
         <h1><span class="title-highlight">shah</span>mat.xyz</h1>
         <button class="play-button" id="play" type="button">PLAY</button>
       </section>
@@ -40,17 +40,42 @@
 
       <section class="screen panel" id="palette-screen" hidden aria-labelledby="palette-title">
         <div class="panel-top"><span class="wordmark small"><span class="title-highlight">shah</span>mat.xyz</span></div>
-        <div class="section-head"><p class="eyebrow">ШАГ 02 / 02</p><h2 id="palette-title">Твой стиль.</h2><p class="subtle">Выбери палитру. Пока доступна одна — классика.</p></div>
-        <form id="palette-form"><label class="palette-option"><input type="radio" name="palette" value="monochrome" checked><span class="palette-swatch" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span class="palette-name">Чёрно-белая<small>Классическая палитра</small></span><span class="palette-check" aria-hidden="true">✓</span></label><p class="message" id="palette-message" role="status" aria-live="polite"></p><button class="primary" type="submit">Готово <span>↗</span></button></form>
+        <div class="section-head"><h2 id="palette-title">Твой стиль.</h2><p class="subtle">Выбери палитру. Повторное нажатие меняет светлую и тёмную тему.</p></div>
+        <form id="palette-form">
+          <fieldset class="palette-list" id="onboarding-palettes"><legend class="visually-hidden">Выбери палитру</legend>            <label class="palette-option" data-choice="monochrome"><input type="radio" name="onboarding-palette" value="monochrome" checked><span class="palette-swatch monochrome" aria-hidden="true"></span><span class="palette-name">Монохром<small>Классическая палитра</small></span><span class="palette-check" aria-hidden="true">✓</span></label>
+            <label class="palette-option" data-choice="gray"><input type="radio" name="onboarding-palette" value="gray"><span class="palette-swatch gray" aria-hidden="true"></span><span class="palette-name">Графит<small>Мягкие оттенки серого</small></span><span class="palette-check" aria-hidden="true">✓</span></label>
+            <label class="palette-option" data-choice="forest"><input type="radio" name="onboarding-palette" value="forest"><span class="palette-swatch forest" aria-hidden="true"></span><span class="palette-name">Лес<small>Спокойные зелёные оттенки</small></span><span class="palette-check" aria-hidden="true">✓</span></label>
+            <label class="palette-option" data-choice="atelier"><input type="radio" name="onboarding-palette" value="atelier"><span class="palette-swatch atelier" aria-hidden="true"></span><span class="palette-name">Шахматный кабинет<small>Холодные оттенки и терракота</small></span><span class="palette-check" aria-hidden="true">✓</span></label>
+            <label class="palette-option" data-choice="wood"><input type="radio" name="onboarding-palette" value="wood"><span class="palette-swatch wood" aria-hidden="true"></span><span class="palette-name">Тёплое дерево<small>Природные коричневые оттенки</small></span><span class="palette-check" aria-hidden="true">✓</span></label></fieldset>
+          <button class="primary" id="palette-submit" type="submit">Готово <span>↗</span></button>
+        </form>
       </section>
 
-      <section class="screen panel" id="account-screen" hidden aria-labelledby="account-title">
-        <div class="panel-top"><span class="wordmark small"><span class="title-highlight">shah</span>mat.xyz</span></div>
-        <div class="section-head"><p class="eyebrow">ТВОЙ ПРОФИЛЬ</p><h2 id="account-title">Привет.</h2><p class="subtle" id="account-bio"></p></div>
-        <div class="account-detail"><span>ПАЛИТРА</span><strong>Чёрно-белая</strong></div>
-        <p class="message" id="account-message" role="status" aria-live="polite"></p>
-        <button class="primary" id="edit-profile" type="button">Редактировать профиль <span>↗</span></button>
-        <button class="text-button signout" type="button">Выйти из аккаунта</button>
+      <section class="screen dashboard" id="dashboard-screen" hidden aria-labelledby="dashboard-title">
+        <header class="dashboard-header">
+          <span class="wordmark dashboard-logo"><span class="title-highlight">shah</span>mat.xyz</span>
+          <div class="dashboard-header-right"><span class="dashboard-header-label">ЛИЧНЫЙ КАБИНЕТ</span><button class="text-button signout" type="button">Выйти ↗</button></div>
+        </header>
+        <div class="dashboard-layout">
+          <div class="dashboard-main">
+            <div class="welcome"><p class="dashboard-overline"><span class="status-dot"></span> ТВОЁ ПРОСТРАНСТВО</p><h2 id="dashboard-title">Привет.</h2><p class="dashboard-intro">Здесь начинается твоя шахматная история.</p></div>
+            <div class="dashboard-feature">
+              <div class="feature-copy"><p class="dashboard-overline">ШАХМАТЫ / 01</p><h3>Каждая партия<br>имеет значение.</h3><p>Играй, учись и открывай свой стиль. Игровые режимы появятся здесь позже.</p><span class="coming-soon">СКОРО <span aria-hidden="true">↗</span></span></div>
+              <div class="board-art" aria-hidden="true"><div class="board-squares"><i class="board-square light"></i><i class="board-square dark"></i><i class="board-square light"></i><i class="board-square dark"></i><i class="board-square light"></i><i class="board-square dark"></i><i class="board-square light"></i><i class="board-square dark"></i><i class="board-square dark"></i><i class="board-square light"></i><i class="board-square dark"></i><i class="board-square light"></i><i class="board-square dark"></i><i class="board-square light"></i><i class="board-square dark"></i><i class="board-square light"></i><i class="board-square light"></i><i class="board-square dark"></i><i class="board-square light"></i><i class="board-square dark"></i><i class="board-square light"></i><i class="board-square dark"></i><i class="board-square light"></i><i class="board-square dark"></i><i class="board-square dark"></i><i class="board-square light"></i><i class="board-square dark"></i><i class="board-square light"></i><i class="board-square dark"></i><i class="board-square light"></i><i class="board-square dark"></i><i class="board-square light"></i><i class="board-square light"></i><i class="board-square dark"></i><i class="board-square light"></i><i class="board-square dark"></i><i class="board-square light"></i><i class="board-square dark"></i><i class="board-square light"></i><i class="board-square dark"></i><i class="board-square dark"></i><i class="board-square light"></i><i class="board-square dark"></i><i class="board-square light"></i><i class="board-square dark"></i><i class="board-square light"></i><i class="board-square dark"></i><i class="board-square light"></i><i class="board-square light"></i><i class="board-square dark"></i><i class="board-square light"></i><i class="board-square dark"></i><i class="board-square light"></i><i class="board-square dark"></i><i class="board-square light"></i><i class="board-square dark"></i><i class="board-square dark"></i><i class="board-square light"></i><i class="board-square dark"></i><i class="board-square light"></i><i class="board-square dark"></i><i class="board-square light"></i><i class="board-square dark"></i><i class="board-square light"></i><span>♞</span></div></div>
+            </div>
+            <div class="activity-title"><div><p class="dashboard-overline">ТВОЯ ИГРА</p><h3>Первый ход ещё впереди.</h3></div><span>01 / ОБЗОР</span></div>
+            <div class="dashboard-stats"><div><span>ПАРТИИ</span><strong>—</strong><small>Скоро</small></div><div><span>РЕЙТИНГ</span><strong>—</strong><small>Скоро</small></div><div><span>ТРЕНИРОВКИ</span><strong>—</strong><small>Скоро</small></div></div>
+          </div>
+          <aside class="dashboard-sidebar">
+            <section class="dashboard-card profile-card" aria-labelledby="dashboard-profile-heading"><p class="dashboard-overline">ПРОФИЛЬ / 01</p><div class="profile-avatar" aria-hidden="true">♟</div><h3 id="dashboard-profile-heading">Профиль</h3><p id="dashboard-bio" class="profile-bio"></p><button class="dashboard-link" id="edit-profile" type="button">Редактировать профиль <span>↗</span></button></section>
+            <section class="dashboard-card palettes-card" aria-labelledby="dashboard-palette-heading"><p class="dashboard-overline">ОФОРМЛЕНИЕ / 02</p><h3 id="dashboard-palette-heading">Твоя палитра.</h3><p class="palette-help">Выбери палитру. Нажми ещё раз, чтобы сменить тему.</p><fieldset class="palette-list compact" id="dashboard-palettes"><legend class="visually-hidden">Выбери палитру</legend>            <label class="palette-option" data-choice="monochrome"><input type="radio" name="dashboard-palette" value="monochrome" checked><span class="palette-swatch monochrome" aria-hidden="true"></span><span class="palette-name">Монохром<small>Классическая палитра</small></span><span class="palette-check" aria-hidden="true">✓</span></label>
+            <label class="palette-option" data-choice="gray"><input type="radio" name="dashboard-palette" value="gray"><span class="palette-swatch gray" aria-hidden="true"></span><span class="palette-name">Графит<small>Мягкие оттенки серого</small></span><span class="palette-check" aria-hidden="true">✓</span></label>
+            <label class="palette-option" data-choice="forest"><input type="radio" name="dashboard-palette" value="forest"><span class="palette-swatch forest" aria-hidden="true"></span><span class="palette-name">Лес<small>Спокойные зелёные оттенки</small></span><span class="palette-check" aria-hidden="true">✓</span></label>
+            <label class="palette-option" data-choice="atelier"><input type="radio" name="dashboard-palette" value="atelier"><span class="palette-swatch atelier" aria-hidden="true"></span><span class="palette-name">Шахматный кабинет<small>Холодные оттенки и терракота</small></span><span class="palette-check" aria-hidden="true">✓</span></label>
+            <label class="palette-option" data-choice="wood"><input type="radio" name="dashboard-palette" value="wood"><span class="palette-swatch wood" aria-hidden="true"></span><span class="palette-name">Тёплое дерево<small>Природные коричневые оттенки</small></span><span class="palette-check" aria-hidden="true">✓</span></label></fieldset><p class="message palette-feedback" id="dashboard-message" role="status" aria-live="polite"></p></section>
+          </aside>
+        </div>
+        <footer class="dashboard-footer"><span>SHAHMAT.XYZ</span><span>ТВОЯ ИГРА. ТВОЙ ПУТЬ.</span></footer>
       </section>
     </main>
   </body>
