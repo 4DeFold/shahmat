@@ -6,7 +6,7 @@ import { JSDOM } from 'jsdom';
 const html = await readFile('index.html', 'utf8');
 const source = (await readFile('app.js', 'utf8')).replace(/import .*?;\n/g, '');
 const tick = () => new Promise(resolve => setTimeout(resolve, 10));
-async function setup({ existing = false, palette = 'monochrome', failSave = false, systemDark = false, initialStorage = {}, saveHandler = null, userId = 'user-1' } = {}) {
+async function setup({ existing = false, palette = 'monochrome', failSave = false, systemDark = false, initialStorage = {}, saveHandler = null, getUserHandler = null, userId = 'user-1' } = {}) {
   const dom = new JSDOM(html, { runScripts: 'outside-only', url: 'https://example.com' });
   const { window } = dom;
   let loggedIn = existing;
@@ -19,7 +19,7 @@ async function setup({ existing = false, palette = 'monochrome', failSave = fals
   const db = {
     auth: {
       getSession: async () => ({ data: { session: loggedIn ? { user: { ...user(), id: sessionUserId } } : null } }),
-      getUser: async () => ({ data: { user: loggedIn ? user() : null } }),
+      getUser: async () => getUserHandler ? getUserHandler() : ({ data: { user: loggedIn ? user() : null } }),
       signUp: async () => { signUps++; loggedIn = true; return { data: { session: { user: user() } } }; },
       signInWithPassword: async () => { loggedIn = true; return { data: { session: { user: user() } } }; },
       updateUser: async ({ data }) => { if (saveHandler) await saveHandler(data); if (failSave) return { error: new Error('save failed') }; metadata = { ...metadata, ...data }; return { data: { user: user() } }; },
@@ -32,6 +32,10 @@ async function setup({ existing = false, palette = 'monochrome', failSave = fals
   };
   let themeChange;
   const themePreference = { matches: systemDark, addEventListener: (_, handler) => { themeChange = handler; } };
+  let interval = null, intervalDelay = null;
+  window.setInterval = (callback, delay) => { interval = callback; intervalDelay = delay; return 1; };
+  window.clearInterval = () => { interval = null; };
+  const poll = async () => { interval?.(); await tick(); };
   window.matchMedia = query => query.includes('reduced-motion') ? { matches: true } : themePreference;
   const changeSystemTheme = dark => { themePreference.matches = dark; themeChange?.({ matches: dark }); };
   window.requestAnimationFrame = cb => cb();
@@ -45,7 +49,7 @@ async function setup({ existing = false, palette = 'monochrome', failSave = fals
   const click = async id => { $(id).click(); await tick(); };
   const submit = async id => { $(id).dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true })); await tick(); };
   const choose = async (container, value) => { const input = $(container).querySelector(`input[value="${value}"]`); input.checked = true; input.dispatchEvent(new window.Event('change', { bubbles: true })); await tick(); };
-  return { $, click, submit, choose, getProfile: () => storedProfile, getMetadata: () => metadata, getSignUps: () => signUps, changeSystemTheme, setFailSave: value => { failSave = value; }, setSessionUserId: value => { sessionUserId = value; }, window, document: window.document };
+  return { $, click, submit, choose, getProfile: () => storedProfile, getMetadata: () => metadata, getSignUps: () => signUps, changeSystemTheme, setFailSave: value => { failSave = value; }, setSessionUserId: value => { sessionUserId = value; }, setMetadata: value => { metadata = { ...metadata, ...value }; }, poll, getPollDelay: () => intervalDelay, hasPoll: () => !!interval, window, document: window.document };
 }
 
 test('registration requires a profile, saves chosen palette and opens dashboard', async () => {
@@ -132,6 +136,7 @@ test('startup waits for session and profile before revealing dashboard', async (
   const { window } = dom;
   let resolveSession, resolveProfile;
   window.matchMedia = () => ({ matches: true, addEventListener() {} });
+  window.setInterval = () => 1; window.clearInterval = () => {};
   window.requestAnimationFrame = cb => cb();
   window.scrollTo = () => {};
   window.createClient = () => ({
@@ -186,6 +191,7 @@ test('session errors show a retry path instead of leaving an indefinite black sc
   const dom = new JSDOM(html, { runScripts: 'outside-only', url: 'https://example.com' });
   const { window } = dom;
   window.matchMedia = () => ({ matches: true, addEventListener() {} });
+  window.setInterval = () => 1; window.clearInterval = () => {};
   window.requestAnimationFrame = cb => cb();
   window.scrollTo = () => {};
   window.createClient = () => ({ auth: { getSession: async () => ({ error: new Error('offline') }) } });
@@ -307,4 +313,56 @@ test('sidebar sign out from a blank page clears the route and opens login', asyn
   assert.equal($('dashboard-screen').hidden, true);
   assert.equal(window.location.hash, '');
   assert.equal(document.querySelector('.landing').classList.contains('palette-active'), false);
+});
+
+test('remote appearance is checked every second and applied without a local write', async () => {
+  let saves = 0;
+  const app = await setup({ existing: true, palette: 'forest', saveHandler: () => { saves++; } });
+  assert.equal(app.getPollDelay(), 1000);
+  app.setMetadata({ palette: 'wood', palette_theme: 'dark' });
+  await app.poll();
+  assert.equal(app.document.querySelector('.landing').dataset.palette, 'wood');
+  assert.equal(app.document.querySelector('.landing').dataset.paletteTheme, 'dark');
+  assert.equal(app.$('dashboard-palettes').querySelector('input[value="wood"]').checked, true);
+  assert.equal(saves, 0);
+  assert.equal(JSON.parse(app.window.localStorage.getItem('shahmat.appearance.user-1')).dirty, false);
+  app.document.querySelector('#account-menu .signout').click(); await tick();
+  assert.equal(app.hasPoll(), false);
+});
+
+test('a delayed remote response cannot override a more recent local change', async () => {
+  let resolveUser;
+  const app = await setup({ existing: true, palette: 'forest', getUserHandler: () => new Promise(resolve => { resolveUser = resolve; }) });
+  const polling = app.poll();
+  await tick();
+  await app.choose('dashboard-palettes', 'gray');
+  resolveUser({ data: { user: { id: 'user-1', user_metadata: { palette: 'wood', palette_theme: 'dark' } } } });
+  await polling;
+  assert.equal(app.document.querySelector('.landing').dataset.palette, 'gray');
+  assert.equal(app.getMetadata().palette, 'gray');
+});
+
+test('polling ignores another account and does not overwrite offline changes', async () => {
+  let reads = 0;
+  const app = await setup({ existing: true, palette: 'forest', failSave: true, getUserHandler: async () => {
+    reads++;
+    return { data: { user: { id: 'user-2', user_metadata: { palette: 'wood', palette_theme: 'dark' } } } };
+  } });
+  await app.poll();
+  assert.equal(app.document.querySelector('.landing').dataset.palette, 'forest');
+  await app.choose('dashboard-palettes', 'gray');
+  await app.poll();
+  assert.equal(reads, 1);
+  assert.equal(app.document.querySelector('.landing').dataset.palette, 'gray');
+});
+
+test('a remote response after logout cannot restore the prior account appearance', async () => {
+  let resolveUser;
+  const app = await setup({ existing: true, palette: 'forest', getUserHandler: () => new Promise(resolve => { resolveUser = resolve; }) });
+  const polling = app.poll(); await tick();
+  app.document.querySelector('#account-menu .signout').click(); await tick();
+  resolveUser({ data: { user: { id: 'user-1', user_metadata: { palette: 'wood', palette_theme: 'dark' } } } });
+  await polling;
+  assert.equal(app.$('auth-screen').hidden, false);
+  assert.equal(app.document.querySelector('.landing').dataset.palette, 'monochrome');
 });

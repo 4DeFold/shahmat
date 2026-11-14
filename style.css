@@ -508,3 +508,66 @@ textarea { resize: vertical; min-height: 92px; }
   .compact .palette-option { gap: 6px; }
   .compact .palette-name { min-width: 0; overflow-wrap: anywhere; }
 }
+
+/* Navigation controls keep their geometry while the border and colors change. */
+.sidebar-brand {
+  display: block;
+  width: 100%;
+  margin-left: 0;
+  padding: 5px 2px;
+  border: 1px solid transparent;
+  text-align: center;
+}
+.sidebar-item, .account-menu button { border: 1px solid transparent; }
+.landing.palette-active .app-sidebar .sidebar-brand,
+.landing.palette-active .app-sidebar .sidebar-item,
+.landing.palette-active .app-sidebar .account-menu button {
+  transition: color .2s ease, background-color .2s ease, border-color .2s ease, transform .2s ease;
+}
+@media (hover: hover) {
+  .sidebar-brand:hover, .sidebar-item:hover, .account-menu button:hover { border-color: var(--foreground); }
+  .sidebar-item:hover:not([aria-current='page']):not([aria-expanded='true']), .account-menu button:hover { background: transparent; }
+}
+.sidebar-brand:active, .sidebar-item:active, .account-menu button:active {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+.sidebar-brand:active .title-highlight { background: var(--accent-ink); color: var(--accent); }
+.sidebar-chevron {
+  display: block;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  margin-left: auto;
+  transform: rotate(180deg);
+}
+.landing.palette-active .app-sidebar .sidebar-chevron { transition: transform .22s ease; }
+.sidebar-account-toggle[aria-expanded='true'] .sidebar-chevron { transform: rotate(0deg); }
+.landing.palette-active .app-sidebar .account-menu {
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+  transition: opacity .2s ease, transform .2s ease, background-color 1.5s ease, border-color 1.5s ease;
+}
+.landing.palette-active .app-sidebar .account-menu.is-open { opacity: 1; transform: translateY(0); pointer-events: auto; }
+.page-enter { animation: view-entrance .3s cubic-bezier(.22, 1, .36, 1) both; }
+@keyframes view-entrance { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: translateY(0); } }
+@media (max-width: 700px) {
+  .sidebar-brand { margin: 0 0 32px; }
+  .sidebar-chevron { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing.palette-active .app-sidebar .sidebar-brand,
+  .landing.palette-active .app-sidebar .sidebar-item,
+  .landing.palette-active .app-sidebar .account-menu,
+  .landing.palette-active .app-sidebar .account-menu button,
+  .landing.palette-active .app-sidebar .sidebar-chevron { transition: none; }
+  .page-enter { animation: none; }
+}
+.landing.palette-active .app-sidebar .sidebar-brand .title-highlight,
+.landing.palette-active .app-sidebar .sidebar-item span { transition: color .2s ease, background-color .2s ease; }
+@media (prefers-reduced-motion: reduce) {
+  .landing.palette-active .app-sidebar .sidebar-brand .title-highlight,
+  .landing.palette-active .app-sidebar .sidebar-item span { transition: none; }
+}

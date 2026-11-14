@@ -31,6 +31,9 @@ let appearanceUserId = null;
 let syncingAppearance = false;
 let retryTimer = null;
 let retryDelay = 3000;
+let appearancePollTimer = null;
+let appearanceEpoch = 0;
+let appearancePollInFlight = null;
 const appearanceMemory = new Map();
 let storageUnavailable = false;
 const appearanceKey = id => `shahmat.appearance.${id}`;
@@ -90,6 +93,38 @@ async function syncAppearance() {
     }
   }
 }
+// getUser fetches the authoritative Auth user, unlike the locally cached session.
+// Serialize reads and disregard responses that raced with a local edit or account change.
+async function pollAppearance() {
+  const id = appearanceUserId;
+  const epoch = appearanceEpoch;
+  const before = id && readAppearance(id);
+  if (!id || before?.dirty || syncingAppearance || appearancePollInFlight === epoch) return;
+  appearancePollInFlight = epoch;
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    if (error || !data?.user || data.user.id !== id || appearanceUserId !== id || appearanceEpoch !== epoch) return;
+    const latest = readAppearance(id);
+    if (syncingAppearance || latest?.dirty || latest?.version !== before?.version) return;
+    const remote = data.user.user_metadata || {};
+    if (!palettes.has(remote.palette)) return;
+    const theme = remote.palette_theme === 'dark' || remote.palette_theme === 'light' ? remote.palette_theme : null;
+    if (selectedPalette !== remote.palette || selectedTheme !== theme) {
+      applyPalette(remote.palette);
+      applyTheme(theme);
+      writeAppearance(id, { palette: selectedPalette, theme: selectedTheme, dirty: false, version: latest?.version || 0 });
+    }
+  } catch { /* Keep the current appearance while offline. */ }
+  finally { if (appearancePollInFlight === epoch) appearancePollInFlight = null; }
+}
+function stopAppearancePolling() {
+  appearanceEpoch++;
+  if (appearancePollTimer !== null) { clearInterval(appearancePollTimer); appearancePollTimer = null; }
+}
+function startAppearancePolling() {
+  stopAppearancePolling();
+  appearancePollTimer = setInterval(() => void pollAppearance(), 1000);
+}
 function restoreAppearance(user) {
   appearanceUserId = user.id;
   const local = readAppearance(user.id);
@@ -101,6 +136,7 @@ function restoreAppearance(user) {
     writeAppearance(user.id, { palette: selectedPalette, theme: selectedTheme, dirty: false, version: local?.version || 0 });
   }
   void syncAppearance();
+  startAppearancePolling();
 }
 window.addEventListener('online', () => {
   if (retryTimer !== null) { clearTimeout(retryTimer); retryTimer = null; }
@@ -120,10 +156,24 @@ const accountMenu = $('account-menu');
 const accountToggle = $('account-toggle');
 const pages = new Set(['home', 'play', 'profile', 'settings', 'help']);
 
-function closeAccountMenu() {
-  accountMenu.hidden = true;
+let menuCloseTimer = null;
+function closeAccountMenu(immediate = false) {
+  if (menuCloseTimer !== null) { clearTimeout(menuCloseTimer); menuCloseTimer = null; }
   accountToggle.setAttribute('aria-expanded', 'false');
+  accountMenu.classList.remove('is-open');
+  accountMenu.inert = true;
   $('sidebar-message').textContent = '';
+  if (immediate || reducedMotion.matches || accountMenu.hidden) accountMenu.hidden = true;
+  else menuCloseTimer = setTimeout(() => { accountMenu.hidden = true; menuCloseTimer = null; }, 220);
+}
+function openAccountMenu() {
+  if (menuCloseTimer !== null) { clearTimeout(menuCloseTimer); menuCloseTimer = null; }
+  accountMenu.hidden = false;
+  accountMenu.inert = false;
+  accountToggle.setAttribute('aria-expanded', 'true');
+  requestAnimationFrame(() => {
+    if (accountToggle.getAttribute('aria-expanded') === 'true') accountMenu.classList.add('is-open');
+  });
 }
 function currentPage() {
   const name = window.location.hash.slice(1);
@@ -136,7 +186,16 @@ function showPage(name, { updateHistory = false, focus = false } = {}) {
     url.hash = name === 'home' ? '' : name;
     window.history.pushState(null, '', url);
   }
-  document.querySelectorAll('#dashboard-screen [data-view]').forEach(view => { view.hidden = view.dataset.view !== name; });
+  document.querySelectorAll('#dashboard-screen [data-view]').forEach(view => {
+    const active = view.dataset.view === name;
+    const changed = active && view.hidden;
+    view.hidden = !active;
+    if (changed && focus && !reducedMotion.matches) {
+      view.classList.remove('page-enter');
+      void view.offsetWidth;
+      view.classList.add('page-enter');
+    }
+  });
   document.querySelectorAll('#dashboard-screen [data-page]').forEach(button => {
     if (button.dataset.page === name) button.setAttribute('aria-current', 'page');
     else button.removeAttribute('aria-current');
@@ -153,14 +212,14 @@ $('dashboard-screen').querySelectorAll('[data-page]').forEach(button => button.a
   showPage(button.dataset.page, { updateHistory: true, focus: true });
 }));
 accountToggle.addEventListener('click', () => {
-  if (!accountMenu.hidden) closeAccountMenu();
-  else { accountMenu.hidden = false; accountToggle.setAttribute('aria-expanded', 'true'); }
+  if (accountToggle.getAttribute('aria-expanded') === 'true') closeAccountMenu();
+  else openAccountMenu();
 });
 document.addEventListener('click', event => {
-  if (!accountMenu.hidden && !$('sidebar-account').contains(event.target)) closeAccountMenu();
+  if (accountToggle.getAttribute('aria-expanded') === 'true' && !$('sidebar-account').contains(event.target)) closeAccountMenu();
 });
 document.addEventListener('keydown', event => {
-  if (event.key === 'Escape' && !accountMenu.hidden) { closeAccountMenu(); accountToggle.focus(); }
+  if (event.key === 'Escape' && accountToggle.getAttribute('aria-expanded') === 'true') { closeAccountMenu(); accountToggle.focus(); }
 });
 window.addEventListener('popstate', () => {
   if (screen.id === 'dashboard-screen' && !screen.hidden) showPage(currentPage(), { focus: true });
@@ -179,7 +238,7 @@ async function show(id, immediate = false) {
   next.hidden = false;
   screen = next;
   if (id === 'dashboard-screen') showPage(currentPage());
-  else closeAccountMenu();
+  else closeAccountMenu(true);
   window.scrollTo(0, 0);
   requestAnimationFrame(() => requestAnimationFrame(() => next.classList.remove('entering')));
   const focusTarget = next.querySelector('[data-view]:not([hidden]) h2') || next.querySelector('h2') || next.querySelector('.tab.active');
@@ -320,6 +379,7 @@ document.querySelectorAll('.signout').forEach(button => button.addEventListener(
   busy(button, true);
   const signedOutUser = appearanceUserId;
   appearanceUserId = null;
+  stopAppearancePolling();
   if (retryTimer !== null) { clearTimeout(retryTimer); retryTimer = null; }
   try {
     const { error } = await supabase.auth.signOut();
@@ -327,7 +387,7 @@ document.querySelectorAll('.signout').forEach(button => button.addEventListener(
     profile = null; applyPalette('monochrome'); applyTheme(null); $('auth-form').reset(); setMode('login');
     const url = new URL(window.location.href); url.hash = ''; window.history.replaceState(null, '', url);
     await show('auth-screen');
-  } catch (error) { appearanceUserId = signedOutUser; void syncAppearance(); message('sidebar-message', 'Не удалось выйти. Попробуй ещё раз.'); }
+  } catch (error) { appearanceUserId = signedOutUser; startAppearancePolling(); void syncAppearance(); message('sidebar-message', 'Не удалось выйти. Попробуй ещё раз.'); }
   finally { busy(button, false); }
 }));
 

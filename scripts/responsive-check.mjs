@@ -129,6 +129,13 @@ for (const device of devices) {
   assert.equal(await page.evaluate(() => window.getSelection().toString()), '', 'palette text should not be selected by a double click');
   await screenshot('dashboard');
   // The left rail remains available on all signed-in views.
+  const alignment = await page.locator('.app-sidebar').evaluate(sidebar => {
+    const brand = sidebar.querySelector('.sidebar-brand');
+    const range = document.createRange(); range.selectNodeContents(brand);
+    const rect = range.getBoundingClientRect(), rail = sidebar.getBoundingClientRect();
+    return Math.abs((rect.left + rect.right) / 2 - (rail.left + rail.right) / 2);
+  });
+  assert.ok(alignment < 1.5, `${device.id}: logo must be centered in the rail (offset ${alignment}px)`);
   await page.locator('#nav-play').click();
   assert.equal(await page.locator('#page-play').isVisible(), true);
   assert.equal(await page.locator('#dashboard-home').isVisible(), false);
@@ -141,6 +148,20 @@ for (const device of devices) {
   const activeColors = await page.locator('#nav-play').evaluate(el => ({ background: getComputedStyle(el).backgroundColor, color: getComputedStyle(el).color }));
   const toggleColors = await page.locator('#account-toggle').evaluate(el => ({ background: getComputedStyle(el).backgroundColor, color: getComputedStyle(el).color }));
   assert.deepEqual(toggleColors, activeColors, 'expanded profile control must remain legible on hover');
+  if (!device.touch) {
+    const centeredArrow = await page.locator('#account-toggle').evaluate(el => {
+      const button = el.getBoundingClientRect(), arrow = el.querySelector('svg').getBoundingClientRect();
+      return Math.abs((button.top + button.bottom - arrow.top - arrow.bottom) / 2);
+    });
+    assert.ok(centeredArrow < 1, `${device.id}: profile arrow is vertically misaligned`);
+    const entry = page.locator('#account-menu [data-page=profile]');
+    await entry.hover();
+    assert.notEqual(await entry.evaluate(el => getComputedStyle(el).borderTopColor), 'rgba(0, 0, 0, 0)', 'hover shows border');
+    await page.mouse.down();
+    const pressed = await entry.evaluate(el => ({ background: getComputedStyle(el).backgroundColor, color: getComputedStyle(el).color }));
+    assert.deepEqual(pressed, activeColors, 'pressed menu text and background must both invert');
+    await page.mouse.move(device.width - 5, 5); await page.mouse.up();
+  }
   await checkLayout('account menu');
   await page.screenshot({ path: `${output}/${device.id}-navigation.png`, animations: 'disabled' });
   await page.keyboard.press('Escape');
