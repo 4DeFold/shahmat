@@ -48,14 +48,21 @@ try {
   assert.equal(remote.palette_theme, 'dark');
   assert.equal(writes, 2, 'polling should not write back');
   assert.ok(reads > 0, 'clients should fetch remote metadata');
-  await desktop.locator('#account-toggle').click();
+  const collapsedHeight = await desktop.evaluate(() => {
+    document.querySelector('#account-toggle').click();
+    return document.querySelector('#account-menu').getBoundingClientRect().height;
+  });
   await desktop.waitForFunction(() => document.querySelector('#account-menu').classList.contains('is-open'));
   assert.equal(await desktop.locator('#account-toggle').getAttribute('aria-expanded'), 'true');
-  await desktop.waitForTimeout(250);
+  await desktop.waitForTimeout(80);
+  const midHeight = await desktop.locator('#account-menu').evaluate(el => el.getBoundingClientRect().height);
+  await desktop.waitForTimeout(350);
+  const fullHeight = await desktop.locator('#account-menu').evaluate(el => el.getBoundingClientRect().height);
+  assert.ok(collapsedHeight < midHeight && midHeight < fullHeight, `menu should expand gradually: ${collapsedHeight}, ${midHeight}, ${fullHeight}`);
   assert.equal(await desktop.locator('#account-menu').evaluate(el => getComputedStyle(el).opacity), '1');
   await desktop.keyboard.press('Escape');
   assert.equal(await desktop.locator('#account-menu').evaluate(el => el.inert), true);
-  await desktop.waitForTimeout(250);
+  await desktop.waitForTimeout(350);
   assert.equal(await desktop.locator('#account-menu').isHidden(), true);
   await desktop.locator('#nav-play').click();
   assert.equal(await desktop.locator('#page-play').evaluate(el => getComputedStyle(el).animationName), 'view-entrance');
@@ -68,6 +75,15 @@ try {
   assert.ok(drawerTransition.includes('0.25s'), 'mobile drawer should slide smoothly');
   await phone.waitForTimeout(300);
   assert.equal(await phone.locator('#app-sidebar').evaluate(el => getComputedStyle(el).visibility), 'visible');
+  const mobileCollapsed = await phone.evaluate(() => {
+    document.querySelector('#account-toggle').click();
+    return document.querySelector('#account-menu').getBoundingClientRect().height;
+  });
+  await phone.waitForTimeout(90);
+  const mobileMid = await phone.locator('#account-menu').evaluate(el => el.getBoundingClientRect().height);
+  await phone.waitForTimeout(350);
+  const mobileFull = await phone.locator('#account-menu').evaluate(el => el.getBoundingClientRect().height);
+  assert.ok(mobileCollapsed < mobileMid && mobileMid < mobileFull, `mobile menu should expand gradually: ${mobileCollapsed}, ${mobileMid}, ${mobileFull}`);
   await phone.locator('#sidebar-backdrop').click({ position: { x: 385, y: 100 } });
   await phone.waitForTimeout(300);
   assert.equal(await phone.locator('#app-sidebar').isHidden(), true);

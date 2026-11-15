@@ -164,6 +164,7 @@ function setSidebarOpen(open, { restoreFocus = false } = {}) {
   sidebarOpen = mobile && open;
   $('dashboard-screen').classList.toggle('sidebar-open', sidebarOpen);
   sidebar.inert = mobile && !sidebarOpen;
+  $('mobile-brand').inert = sidebarOpen;
   document.querySelectorAll('#dashboard-screen [data-view]').forEach(view => { view.inert = sidebarOpen; });
   mobileMenuToggle.setAttribute('aria-expanded', String(sidebarOpen));
   mobileMenuToggle.setAttribute('aria-label', sidebarOpen ? 'Закрыть меню' : 'Открыть меню');
@@ -172,6 +173,25 @@ function setSidebarOpen(open, { restoreFocus = false } = {}) {
 }
 mobileMenuToggle.addEventListener('click', () => setSidebarOpen(!sidebarOpen));
 $('sidebar-backdrop').addEventListener('click', () => setSidebarOpen(false, { restoreFocus: true }));
+// Close only a deliberate horizontal left swipe; vertical scrolling and taps stay native.
+let swipeStart = null;
+for (const element of [sidebar, $('sidebar-backdrop')]) {
+  element.addEventListener('touchstart', event => {
+    if (!sidebarOpen || event.touches.length !== 1) { swipeStart = null; return; }
+    const touch = event.touches[0];
+    swipeStart = { id: touch.identifier, x: touch.clientX, y: touch.clientY };
+  }, { passive: true });
+  element.addEventListener('touchend', event => {
+    if (!swipeStart || !sidebarOpen) return;
+    const touch = [...event.changedTouches].find(item => item.identifier === swipeStart.id);
+    const start = swipeStart; swipeStart = null;
+    if (!touch) return;
+    const dx = touch.clientX - start.x, dy = touch.clientY - start.y;
+    if (dx <= -50 && Math.abs(dx) > Math.abs(dy) * 1.3) setSidebarOpen(false, { restoreFocus: true });
+  }, { passive: true });
+  element.addEventListener('touchcancel', () => { swipeStart = null; }, { passive: true });
+}
+
 let sidebarMobile = isMobileSidebar();
 window.addEventListener('resize', () => {
   const mobile = isMobileSidebar();
@@ -187,13 +207,14 @@ function closeAccountMenu(immediate = false) {
   accountMenu.inert = true;
   $('sidebar-message').textContent = '';
   if (immediate || reducedMotion.matches || accountMenu.hidden) accountMenu.hidden = true;
-  else menuCloseTimer = setTimeout(() => { accountMenu.hidden = true; menuCloseTimer = null; }, 220);
+  else menuCloseTimer = setTimeout(() => { accountMenu.hidden = true; menuCloseTimer = null; }, 320);
 }
 function openAccountMenu() {
   if (menuCloseTimer !== null) { clearTimeout(menuCloseTimer); menuCloseTimer = null; }
   accountMenu.hidden = false;
   accountMenu.inert = false;
   accountToggle.setAttribute('aria-expanded', 'true');
+  void accountMenu.offsetHeight; // Commit the collapsed state before starting the expansion.
   requestAnimationFrame(() => {
     if (accountToggle.getAttribute('aria-expanded') === 'true') accountMenu.classList.add('is-open');
   });

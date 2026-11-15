@@ -136,6 +136,15 @@ for (const device of devices) {
   if (mobileDrawer) {
     assert.equal(await page.locator('#app-sidebar').isVisible(), false);
     assert.equal(await page.locator('#mobile-menu-toggle').isVisible(), true);
+    assert.equal(await page.locator('#mobile-brand').isVisible(), true);
+    assert.equal(await page.locator('.sidebar-brand').isVisible(), false);
+    assert.equal(await page.locator('#mobile-menu-toggle').evaluate(el => getComputedStyle(el).backgroundColor), 'rgba(0, 0, 0, 0)');
+    const headerLayout = await page.evaluate(() => {
+      const toggle = document.querySelector('#mobile-menu-toggle').getBoundingClientRect();
+      const brand = document.querySelector('#mobile-brand').getBoundingClientRect();
+      return { toggleRight: toggle.right, brandLeft: brand.left, brandRight: brand.right };
+    });
+    assert.ok(headerLayout.toggleRight <= headerLayout.brandLeft && headerLayout.brandRight <= device.width, 'mobile header elements should not overlap or clip');
     await openDrawer();
     assert.equal(await page.locator('#mobile-menu-toggle').getAttribute('aria-expanded'), 'true');
     assert.equal(await page.locator('#dashboard-home').evaluate(el => el.inert), true);
@@ -146,8 +155,24 @@ for (const device of devices) {
     await page.keyboard.press('Escape');
     assert.equal(await page.locator('#app-sidebar').isVisible(), false);
     assert.equal(await page.evaluate(() => document.activeElement.id), 'mobile-menu-toggle');
+    const cdp = await page.context().newCDPSession(page);
+    const swipe = async (start, end) => {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: start.x, y: start.y }] });
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: end.x, y: end.y }] });
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    };
+    await openDrawer();
+    await swipe({ x: 180, y: 150 }, { x: 170, y: 230 });
+    assert.equal(await page.locator('#mobile-menu-toggle').getAttribute('aria-expanded'), 'true', 'vertical scroll must not close the drawer');
+    const playBox = await page.locator('#nav-play').boundingBox();
+    const start = { x: playBox.x + playBox.width - 25, y: playBox.y + playBox.height / 2 };
+    await swipe(start, { x: start.x - 100, y: start.y + 5 });
+    assert.equal(await page.locator('#mobile-menu-toggle').getAttribute('aria-expanded'), 'false', 'left swipe closes the drawer');
+    assert.equal(await page.locator('#dashboard-home').isVisible(), true, 'swiping across a control must not activate it');
+    await cdp.detach();
   }
   await openDrawer();
+  if (!mobileDrawer) {
   const alignment = await page.locator('.app-sidebar').evaluate(sidebar => {
     const brand = sidebar.querySelector('.sidebar-brand');
     const range = document.createRange(); range.selectNodeContents(brand);
@@ -155,6 +180,7 @@ for (const device of devices) {
     return Math.abs((rect.left + rect.right) / 2 - (rail.left + rail.right) / 2);
   });
   assert.ok(alignment < 1.5, `${device.id}: logo must be centered in the rail (offset ${alignment}px)`);
+  }
   await page.locator('#nav-play').click();
   if (mobileDrawer) assert.equal(await page.locator('#app-sidebar').isVisible(), false);
   assert.equal(await page.locator('#page-play').isVisible(), true);
@@ -175,8 +201,15 @@ for (const device of devices) {
       return Math.abs((button.top + button.bottom - arrow.top - arrow.bottom) / 2);
     });
     assert.ok(centeredArrow < 1, `${device.id}: profile arrow is vertically misaligned`);
-    await page.locator('.sidebar-brand').hover();
-    assert.equal(await page.locator('.sidebar-brand').evaluate(el => getComputedStyle(el).borderTopColor), 'rgba(0, 0, 0, 0)', 'logo must not show a hover border');
+    const brand = page.locator('.sidebar-brand');
+    await brand.hover();
+    assert.equal(await brand.evaluate(el => getComputedStyle(el).borderTopColor), 'rgba(0, 0, 0, 0)', 'logo must not show a hover border');
+    const beforePress = await brand.evaluate(el => [getComputedStyle(el).backgroundColor, getComputedStyle(el).color, getComputedStyle(el.querySelector('.title-highlight')).backgroundColor, getComputedStyle(el.querySelector('.title-highlight')).color]);
+    await page.mouse.down();
+    const whilePressed = await brand.evaluate(el => [getComputedStyle(el).backgroundColor, getComputedStyle(el).color, getComputedStyle(el.querySelector('.title-highlight')).backgroundColor, getComputedStyle(el.querySelector('.title-highlight')).color]);
+    assert.deepEqual(whilePressed, beforePress, 'logo must not invert when pressed');
+    await page.mouse.move(device.width - 5, 5); await page.mouse.up();
+    if (await page.locator('#account-toggle').getAttribute('aria-expanded') === 'false') await page.locator('#account-toggle').click();
     const entry = page.locator('#account-menu [data-page=profile]');
     await entry.hover();
     assert.notEqual(await entry.evaluate(el => getComputedStyle(el).borderTopColor), 'rgba(0, 0, 0, 0)', 'hover shows border');
@@ -201,8 +234,8 @@ for (const device of devices) {
   }
   await page.goBack();
   await page.locator('#page-settings').waitFor({ state: 'visible' });
-  await openDrawer();
-  await page.locator('.sidebar-brand').click();
+  if (mobileDrawer) await page.locator('#mobile-brand').click();
+  else await page.locator('.sidebar-brand').click();
   assert.equal(await page.locator('#dashboard-home').isVisible(), true);
   assert.equal(new URL(page.url()).hash, '');
   // Exercise navigation from the bottom of a long screen, not only from the top.
