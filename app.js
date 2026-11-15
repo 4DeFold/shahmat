@@ -31,6 +31,9 @@ let appearanceUserId = null;
 let syncingAppearance = false;
 let retryTimer = null;
 let retryDelay = 3000;
+let appearancePollTimer = null;
+let appearanceEpoch = 0;
+let appearancePollInFlight = null;
 const appearanceMemory = new Map();
 let storageUnavailable = false;
 const appearanceKey = id => `shahmat.appearance.${id}`;
@@ -90,6 +93,38 @@ async function syncAppearance() {
     }
   }
 }
+// getUser fetches the authoritative Auth user, unlike the locally cached session.
+// Serialize reads and disregard responses that raced with a local edit or account change.
+async function pollAppearance() {
+  const id = appearanceUserId;
+  const epoch = appearanceEpoch;
+  const before = id && readAppearance(id);
+  if (!id || before?.dirty || syncingAppearance || appearancePollInFlight === epoch) return;
+  appearancePollInFlight = epoch;
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    if (error || !data?.user || data.user.id !== id || appearanceUserId !== id || appearanceEpoch !== epoch) return;
+    const latest = readAppearance(id);
+    if (syncingAppearance || latest?.dirty || latest?.version !== before?.version) return;
+    const remote = data.user.user_metadata || {};
+    if (!palettes.has(remote.palette)) return;
+    const theme = remote.palette_theme === 'dark' || remote.palette_theme === 'light' ? remote.palette_theme : null;
+    if (selectedPalette !== remote.palette || selectedTheme !== theme) {
+      applyPalette(remote.palette);
+      applyTheme(theme);
+      writeAppearance(id, { palette: selectedPalette, theme: selectedTheme, dirty: false, version: latest?.version || 0 });
+    }
+  } catch { /* Keep the current appearance while offline. */ }
+  finally { if (appearancePollInFlight === epoch) appearancePollInFlight = null; }
+}
+function stopAppearancePolling() {
+  appearanceEpoch++;
+  if (appearancePollTimer !== null) { clearInterval(appearancePollTimer); appearancePollTimer = null; }
+}
+function startAppearancePolling() {
+  stopAppearancePolling();
+  appearancePollTimer = setInterval(() => void pollAppearance(), 1000);
+}
 function restoreAppearance(user) {
   appearanceUserId = user.id;
   const local = readAppearance(user.id);
@@ -101,6 +136,7 @@ function restoreAppearance(user) {
     writeAppearance(user.id, { palette: selectedPalette, theme: selectedTheme, dirty: false, version: local?.version || 0 });
   }
   void syncAppearance();
+  startAppearancePolling();
 }
 window.addEventListener('online', () => {
   if (retryTimer !== null) { clearTimeout(retryTimer); retryTimer = null; }
@@ -116,6 +152,124 @@ document.addEventListener('visibilitychange', () => {
 let editing = false;
 let navigating = false;
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+const accountMenu = $('account-menu');
+const accountToggle = $('account-toggle');
+const pages = new Set(['home', 'play', 'profile', 'settings', 'help']);
+const sidebar = $('app-sidebar');
+const mobileMenuToggle = $('mobile-menu-toggle');
+let sidebarOpen = false;
+const isMobileSidebar = () => window.innerWidth <= 700 || (window.innerHeight <= 500 && window.matchMedia('(pointer: coarse)').matches);
+function setSidebarOpen(open, { restoreFocus = false } = {}) {
+  const mobile = isMobileSidebar();
+  sidebarOpen = mobile && open;
+  $('dashboard-screen').classList.toggle('sidebar-open', sidebarOpen);
+  sidebar.inert = mobile && !sidebarOpen;
+  document.querySelectorAll('#dashboard-screen [data-view]').forEach(view => { view.inert = sidebarOpen; });
+  mobileMenuToggle.setAttribute('aria-expanded', String(sidebarOpen));
+  mobileMenuToggle.setAttribute('aria-label', sidebarOpen ? 'Закрыть меню' : 'Открыть меню');
+  if (!sidebarOpen) closeAccountMenu(true);
+  if (restoreFocus && mobile) mobileMenuToggle.focus({ preventScroll: true });
+}
+mobileMenuToggle.addEventListener('click', () => setSidebarOpen(!sidebarOpen));
+$('sidebar-backdrop').addEventListener('click', () => setSidebarOpen(false, { restoreFocus: true }));
+// Close only a deliberate horizontal left swipe; vertical scrolling and taps stay native.
+let swipeStart = null;
+for (const element of [sidebar, $('sidebar-backdrop')]) {
+  element.addEventListener('touchstart', event => {
+    if (!sidebarOpen || event.touches.length !== 1) { swipeStart = null; return; }
+    const touch = event.touches[0];
+    swipeStart = { id: touch.identifier, x: touch.clientX, y: touch.clientY };
+  }, { passive: true });
+  element.addEventListener('touchend', event => {
+    if (!swipeStart || !sidebarOpen) return;
+    const touch = [...event.changedTouches].find(item => item.identifier === swipeStart.id);
+    const start = swipeStart; swipeStart = null;
+    if (!touch) return;
+    const dx = touch.clientX - start.x, dy = touch.clientY - start.y;
+    if (dx <= -50 && Math.abs(dx) > Math.abs(dy) * 1.3) setSidebarOpen(false, { restoreFocus: true });
+  }, { passive: true });
+  element.addEventListener('touchcancel', () => { swipeStart = null; }, { passive: true });
+}
+
+let sidebarMobile = isMobileSidebar();
+window.addEventListener('resize', () => {
+  const mobile = isMobileSidebar();
+  if (mobile !== sidebarMobile) { sidebarMobile = mobile; setSidebarOpen(false); }
+});
+
+
+let menuCloseTimer = null;
+function closeAccountMenu(immediate = false) {
+  if (menuCloseTimer !== null) { clearTimeout(menuCloseTimer); menuCloseTimer = null; }
+  accountToggle.setAttribute('aria-expanded', 'false');
+  accountMenu.classList.remove('is-open');
+  accountMenu.inert = true;
+  $('sidebar-message').textContent = '';
+  if (immediate || reducedMotion.matches || accountMenu.hidden) accountMenu.hidden = true;
+  else menuCloseTimer = setTimeout(() => { accountMenu.hidden = true; menuCloseTimer = null; }, 320);
+}
+function openAccountMenu() {
+  if (menuCloseTimer !== null) { clearTimeout(menuCloseTimer); menuCloseTimer = null; }
+  accountMenu.hidden = false;
+  accountMenu.inert = false;
+  accountToggle.setAttribute('aria-expanded', 'true');
+  void accountMenu.offsetHeight; // Commit the collapsed state before starting the expansion.
+  requestAnimationFrame(() => {
+    if (accountToggle.getAttribute('aria-expanded') === 'true') accountMenu.classList.add('is-open');
+  });
+}
+function currentPage() {
+  const name = window.location.hash.slice(1);
+  return pages.has(name) ? name : 'home';
+}
+function showPage(name, { updateHistory = false, focus = false } = {}) {
+  if (!pages.has(name)) name = 'home';
+  if (updateHistory && currentPage() !== name) {
+    const url = new URL(window.location.href);
+    url.hash = name === 'home' ? '' : name;
+    window.history.pushState(null, '', url);
+  }
+  document.querySelectorAll('#dashboard-screen [data-view]').forEach(view => {
+    const active = view.dataset.view === name;
+    const changed = active && view.hidden;
+    view.hidden = !active;
+    if (changed && focus && !reducedMotion.matches) {
+      view.classList.remove('page-enter');
+      void view.offsetWidth;
+      view.classList.add('page-enter');
+    }
+  });
+  document.querySelectorAll('#dashboard-screen [data-page]').forEach(button => {
+    if (button.dataset.page === name) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
+  });
+  closeAccountMenu();
+  if (focus) {
+    window.scrollTo(0, 0);
+    const heading = name === 'home' ? $('dashboard-title') : $('page-' + name + '-title');
+    heading.setAttribute('tabindex', '-1');
+    heading.focus({ preventScroll: true });
+  }
+}
+$('dashboard-screen').querySelectorAll('[data-page]').forEach(button => button.addEventListener('click', () => {
+  setSidebarOpen(false);
+  showPage(button.dataset.page, { updateHistory: true, focus: true });
+}));
+accountToggle.addEventListener('click', () => {
+  if (accountToggle.getAttribute('aria-expanded') === 'true') closeAccountMenu();
+  else openAccountMenu();
+});
+document.addEventListener('click', event => {
+  if (accountToggle.getAttribute('aria-expanded') === 'true' && !$('sidebar-account').contains(event.target)) closeAccountMenu();
+});
+document.addEventListener('keydown', event => {
+  if (event.key !== 'Escape') return;
+  if (accountToggle.getAttribute('aria-expanded') === 'true') { closeAccountMenu(); accountToggle.focus(); }
+  else if (sidebarOpen) setSidebarOpen(false, { restoreFocus: true });
+});
+window.addEventListener('popstate', () => {
+  if (screen.id === 'dashboard-screen' && !screen.hidden) showPage(currentPage(), { focus: true });
+});
 
 async function show(id, immediate = false) {
   if (navigating || (screen.id === id && !screen.hidden)) return;
@@ -129,9 +283,11 @@ async function show(id, immediate = false) {
   if (!immediate) next.classList.add('entering');
   next.hidden = false;
   screen = next;
+  if (id === 'dashboard-screen') { setSidebarOpen(false); showPage(currentPage()); }
+  else closeAccountMenu(true);
   window.scrollTo(0, 0);
   requestAnimationFrame(() => requestAnimationFrame(() => next.classList.remove('entering')));
-  const focusTarget = next.querySelector('h2') || next.querySelector('.tab.active');
+  const focusTarget = next.querySelector('[data-view]:not([hidden]) h2') || next.querySelector('h2') || next.querySelector('.tab.active');
   if (focusTarget) {
     if (focusTarget.tagName === 'H2') focusTarget.setAttribute('tabindex', '-1');
     focusTarget.focus({ preventScroll: true });
@@ -269,12 +425,15 @@ document.querySelectorAll('.signout').forEach(button => button.addEventListener(
   busy(button, true);
   const signedOutUser = appearanceUserId;
   appearanceUserId = null;
+  stopAppearancePolling();
   if (retryTimer !== null) { clearTimeout(retryTimer); retryTimer = null; }
   try {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
-    profile = null; applyPalette('monochrome'); applyTheme(null); $('auth-form').reset(); setMode('login'); await show('auth-screen');
-  } catch (error) { appearanceUserId = signedOutUser; void syncAppearance(); message('dashboard-message', 'Не удалось выйти. Попробуй ещё раз.'); }
+    profile = null; applyPalette('monochrome'); applyTheme(null); $('auth-form').reset(); setMode('login');
+    const url = new URL(window.location.href); url.hash = ''; window.history.replaceState(null, '', url);
+    await show('auth-screen');
+  } catch (error) { appearanceUserId = signedOutUser; startAppearancePolling(); void syncAppearance(); message('sidebar-message', 'Не удалось выйти. Попробуй ещё раз.'); }
   finally { busy(button, false); }
 }));
 

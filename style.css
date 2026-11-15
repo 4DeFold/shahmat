@@ -407,3 +407,261 @@ textarea { resize: vertical; min-height: 92px; }
 @media (pointer: coarse) {
   .text-button, .tab, .dashboard-link { min-height: 44px; }
 }
+
+/* The signed-in area has a persistent left rail; landing and onboarding stay unchanged. */
+.landing:has(.dashboard:not([hidden])) {
+  padding: 40px 40px 40px 248px;
+  align-items: flex-start;
+}
+.dashboard { min-width: 0; }
+.app-sidebar {
+  position: fixed;
+  z-index: 20;
+  inset: 0 auto 0 0;
+  width: 208px;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: 28px 14px 16px;
+  border-right: 1px solid var(--line);
+  background: var(--surface-raised);
+  color: var(--ink);
+  font-family: 'Charis SIL', Georgia, serif;
+}
+.sidebar-brand {
+  width: fit-content;
+  margin: 0 0 38px 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--foreground);
+  text-align: left;
+  font-size: 25px;
+  white-space: nowrap;
+}
+.sidebar-nav { display: grid; gap: 6px; }
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  padding: 8px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  font-size: 17px;
+}
+.sidebar-icon { width: 26px; flex: 0 0 26px; text-align: center; font: 29px/1 Georgia, serif; }
+.sidebar-item[aria-current='page'], .sidebar-account-toggle[aria-expanded='true'] { background: var(--accent); color: var(--accent-ink); }
+@media (hover: hover) { .sidebar-item:hover:not([aria-current='page']):not([aria-expanded='true']), .account-menu button:hover { background: var(--surface); } }
+.sidebar-account { position: relative; margin-top: auto; }
+.sidebar-chevron { margin-left: auto; font: 18px/1 Arial, sans-serif; }
+.account-menu {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  width: 100%;
+  min-width: 180px;
+  display: grid;
+  grid-template-rows: 0fr;
+  padding: 0;
+  border: 1px solid var(--line);
+  background: var(--surface-raised);
+  box-shadow: 0 8px 24px #0003;
+}
+.account-menu-content { min-height: 0; overflow: hidden; padding: 8px 6px; }
+.account-menu button {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  margin: 0;
+  padding: 9px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  font-size: 16px;
+  opacity: 1;
+}
+#sidebar-message { margin: 0; padding: 0 12px; font-size: 12px; line-height: 1.4; }
+#sidebar-message:empty { display: none; }
+.sidebar-brand:focus-visible, .sidebar-item:focus-visible, .account-menu button:focus-visible { outline: 2px solid var(--foreground); outline-offset: 2px; }
+.empty-page { min-height: calc(100svh - 80px); padding-top: 55px; }
+@media (max-width: 700px) {
+  .landing:has(.dashboard:not([hidden])) { padding: 24px 18px 24px 86px; }
+  .app-sidebar { width: 68px; padding: 24px 5px 12px; }
+  .sidebar-brand { margin: 0 auto 32px; font-size: 10px; }
+  .sidebar-item { flex-direction: column; justify-content: center; gap: 3px; padding: 7px 2px; font-size: 10px; text-align: center; }
+  .sidebar-icon { flex: 0 0 auto; font-size: 26px; }
+  .sidebar-chevron { display: none; }
+  .account-menu { left: 0; width: 180px; }
+  .empty-page { min-height: calc(100svh - 48px); padding-top: 45px; }
+}
+@media (max-width: 700px) {
+  .dashboard-layout, .dashboard-sidebar { grid-template-columns: minmax(0, 1fr); }
+  .dashboard-main, .dashboard-sidebar, .dashboard-card { min-width: 0; }
+}
+@media (max-width: 360px) {
+  .dashboard-stats { grid-template-columns: 1fr; }
+  .dashboard-stats > div + div { padding-left: 0; border-left: 0; border-top: 1px solid var(--line); }
+  .dashboard-card { padding: 16px; }
+  .compact .palette-option { gap: 6px; }
+  .compact .palette-name { min-width: 0; overflow-wrap: anywhere; }
+}
+
+/* Navigation controls keep their geometry while the border and colors change. */
+.sidebar-brand {
+  display: block;
+  width: 100%;
+  margin-left: 0;
+  padding: 5px 2px;
+  border: 1px solid transparent;
+  text-align: center;
+}
+.sidebar-item, .account-menu button { border: 1px solid transparent; }
+.landing.palette-active .app-sidebar .sidebar-brand,
+.landing.palette-active .app-sidebar .sidebar-item,
+.landing.palette-active .app-sidebar .account-menu button {
+  transition: color .2s ease, background-color .2s ease, border-color .2s ease, transform .2s ease;
+}
+@media (hover: hover) {
+  .sidebar-brand:hover, .sidebar-item:hover, .account-menu button:hover { border-color: var(--foreground); }
+  .sidebar-item:hover:not([aria-current='page']):not([aria-expanded='true']), .account-menu button:hover { background: transparent; }
+}
+.sidebar-item:active, .account-menu button:active {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+.sidebar-chevron {
+  display: block;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  margin-left: auto;
+  transform: rotate(180deg);
+}
+.landing.palette-active .app-sidebar .sidebar-chevron { transition: transform .22s ease; }
+.sidebar-account-toggle[aria-expanded='true'] .sidebar-chevron { transform: rotate(0deg); }
+.landing.palette-active .app-sidebar .account-menu {
+  opacity: 0;
+  grid-template-rows: 0fr;
+  pointer-events: none;
+  transition: grid-template-rows .3s cubic-bezier(.22, 1, .36, 1), opacity .22s ease, background-color 1.5s ease, border-color 1.5s ease;
+}
+.landing.palette-active .app-sidebar .account-menu.is-open { opacity: 1; grid-template-rows: 1fr; pointer-events: auto; }
+.page-enter { animation: view-entrance .3s cubic-bezier(.22, 1, .36, 1) both; }
+@keyframes view-entrance { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: translateY(0); } }
+@media (max-width: 700px) {
+  .sidebar-brand { margin: 0 0 32px; }
+  .sidebar-chevron { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing.palette-active .app-sidebar .sidebar-brand,
+  .landing.palette-active .app-sidebar .sidebar-item,
+  .landing.palette-active .app-sidebar .account-menu,
+  .landing.palette-active .app-sidebar .account-menu button,
+  .landing.palette-active .app-sidebar .sidebar-chevron { transition: none; }
+  .page-enter { animation: none; }
+}
+.landing.palette-active .app-sidebar .sidebar-brand .title-highlight,
+.landing.palette-active .app-sidebar .sidebar-item span { transition: color .2s ease, background-color .2s ease; }
+@media (prefers-reduced-motion: reduce) {
+  .landing.palette-active .app-sidebar .sidebar-brand .title-highlight,
+  .landing.palette-active .app-sidebar .sidebar-item span { transition: none; }
+}
+
+/* Navigation hover borders do not change control dimensions. */
+.sidebar-item, .account-menu button { border-width: 2px; }
+@media (hover: hover) { .sidebar-brand:hover { border-color: transparent; } }
+.sidebar-brand:active { border-color: transparent; }
+.mobile-menu-toggle, .mobile-header, .sidebar-backdrop { display: none; }
+@media (max-width: 700px), (max-height: 500px) and (pointer: coarse) {
+  .landing:has(.dashboard:not([hidden])) { padding: 76px 20px 24px; }
+  .mobile-menu-toggle {
+    display: grid;
+    place-items: center;
+    position: fixed;
+    z-index: 61;
+    top: 12px;
+    left: 12px;
+    width: 44px;
+    height: 44px;
+    padding: 9px;
+    border: 2px solid transparent;
+    background: transparent;
+    color: var(--ink);
+  }
+  .mobile-menu-toggle svg { width: 24px; height: 24px; }
+  .mobile-menu-toggle:active { background: transparent; }
+  .mobile-menu-toggle:focus-visible { outline: 2px solid var(--foreground); outline-offset: 2px; }
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    z-index: 40;
+    inset: 68px 0 0;
+    background: #0009;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+  }
+  .landing.palette-active .dashboard .sidebar-backdrop { transition: opacity .25s ease, visibility 0s linear .25s; }
+  .landing.palette-active .dashboard.sidebar-open .sidebar-backdrop { opacity: 1; visibility: visible; pointer-events: auto; transition-delay: 0s; }
+  .landing.palette-active .dashboard .app-sidebar {
+    z-index: 50;
+    inset: 68px auto 0 0;
+    width: min(260px, 85vw);
+    height: calc(100vh - 68px);
+    height: calc(100dvh - 68px);
+    min-height: 0;
+    padding: 14px 14px 16px;
+    overflow-y: auto;
+    touch-action: pan-y;
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition: transform .25s cubic-bezier(.22, 1, .36, 1), visibility 0s linear .25s, background-color 1.5s ease, color 1.5s ease, border-color 1.5s ease;
+  }
+  .landing.palette-active .dashboard.sidebar-open .app-sidebar { transform: translateX(0); visibility: visible; transition-delay: 0s; }
+  .sidebar-brand { display: none; }
+  .mobile-header {
+    display: flex;
+    align-items: center;
+    position: fixed;
+    z-index: 60;
+    inset: 0 0 auto;
+    height: 68px;
+    padding-left: 64px;
+    background: var(--page-background);
+    pointer-events: none;
+  }
+  .mobile-brand {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--foreground);
+    font-size: 25px;
+    white-space: nowrap;
+    pointer-events: auto;
+  }
+  .mobile-brand:focus-visible { outline: 2px solid var(--foreground); outline-offset: 4px; }
+  .sidebar-item { flex-direction: row; justify-content: flex-start; gap: 12px; padding: 8px 12px; font-size: 17px; text-align: left; }
+  .sidebar-icon { flex: 0 0 26px; font-size: 29px; }
+  .sidebar-chevron { display: block; }
+  .account-menu { width: 100%; }
+  .empty-page { min-height: calc(100svh - 100px); padding-top: 20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing.palette-active .dashboard .app-sidebar,
+  .landing.palette-active .dashboard .sidebar-backdrop { transition: none; }
+}
+
+/* On short touch screens, let the expanded account menu push the controls
+   apart instead of covering navigation; the drawer can scroll if necessary. */
+@media (max-height: 450px) and (pointer: coarse) {
+  .landing.palette-active .dashboard .sidebar-nav,
+  .landing.palette-active .dashboard .sidebar-account { flex-shrink: 0; }
+  .landing.palette-active .dashboard .account-menu { position: static; margin-bottom: 8px; }
+}

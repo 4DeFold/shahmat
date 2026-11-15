@@ -7,7 +7,8 @@
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
     "test": "node --test",
-    "test:responsive": "node scripts/responsive-check.mjs"
+    "test:responsive": "node scripts/responsive-check.mjs",
+    "test:sync": "node scripts/appearance-sync-check.mjs"
   },
   "repository": {
     "type": "git",

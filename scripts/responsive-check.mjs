@@ -49,7 +49,7 @@ for (const device of devices) {
   });
   async function checkLayout(screen) {
     const metrics = await page.evaluate(() => {
-      const visible = [...document.querySelectorAll('.screen:not([hidden]) button, .screen:not([hidden]) input, .screen:not([hidden]) textarea, .screen:not([hidden]) .palette-option')].filter(el => el.getClientRects().length);
+      const visible = [...document.querySelectorAll('.screen:not([hidden]) button, .screen:not([hidden]) input, .screen:not([hidden]) textarea, .screen:not([hidden]) .palette-option')].filter(el => el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden');
       return {
         viewport: innerWidth, pageWidth: document.documentElement.scrollWidth,
         screenTop: document.querySelector('.screen:not([hidden])').getBoundingClientRect().top,
@@ -128,6 +128,144 @@ for (const device of devices) {
   await paletteName.dblclick();
   assert.equal(await page.evaluate(() => window.getSelection().toString()), '', 'palette text should not be selected by a double click');
   await screenshot('dashboard');
+  // Mobile navigation starts closed and is opened by the menu button.
+  const mobileDrawer = device.width <= 700 || (device.touch && device.height <= 500);
+  const openDrawer = async () => {
+    if (mobileDrawer && await page.locator('#mobile-menu-toggle').getAttribute('aria-expanded') !== 'true') await page.locator('#mobile-menu-toggle').click();
+  };
+  if (mobileDrawer) {
+    assert.equal(await page.locator('#app-sidebar').isVisible(), false);
+    assert.equal(await page.locator('#mobile-menu-toggle').isVisible(), true);
+    assert.equal(await page.locator('#mobile-brand').isVisible(), true);
+    assert.equal(await page.locator('.sidebar-brand').isVisible(), false);
+    assert.equal(await page.locator('#mobile-menu-toggle').evaluate(el => getComputedStyle(el).backgroundColor), 'rgba(0, 0, 0, 0)');
+    const headerLayout = await page.evaluate(() => {
+      const toggle = document.querySelector('#mobile-menu-toggle').getBoundingClientRect();
+      const brand = document.querySelector('#mobile-brand').getBoundingClientRect();
+      return { toggleRight: toggle.right, brandLeft: brand.left, brandRight: brand.right };
+    });
+    assert.ok(headerLayout.toggleRight <= headerLayout.brandLeft && headerLayout.brandRight <= device.width, 'mobile header elements should not overlap or clip');
+    await openDrawer();
+    assert.equal(await page.locator('#mobile-menu-toggle').getAttribute('aria-expanded'), 'true');
+    const openHeader = await page.evaluate(() => {
+      const brand = document.querySelector('#mobile-brand'), rect = brand.getBoundingClientRect();
+      const hit = document.elementFromPoint((rect.left + rect.right) / 2, (rect.top + rect.bottom) / 2);
+      const sidebar = document.querySelector('#app-sidebar').getBoundingClientRect();
+      const header = document.querySelector('.mobile-header').getBoundingClientRect();
+      return { brandLeft: rect.left, brandRight: rect.right, hitLogo: brand.contains(hit), brandInert: brand.inert, sidebarTop: sidebar.top, headerBottom: header.bottom };
+    });
+    assert.equal(openHeader.brandLeft, headerLayout.brandLeft, 'logo position should not change when opening the drawer');
+    assert.equal(openHeader.brandRight, headerLayout.brandRight);
+    assert.equal(openHeader.hitLogo, true, 'logo must remain visible and clickable above the drawer');
+    assert.equal(openHeader.brandInert, false);
+    assert.ok(openHeader.sidebarTop >= openHeader.headerBottom - 1, 'drawer should start below the mobile header');
+    assert.equal(await page.locator('#dashboard-home').evaluate(el => el.inert), true);
+    await page.locator('#mobile-brand').click();
+    assert.equal(await page.locator('#app-sidebar').isVisible(), false, 'logo closes the drawer and returns home');
+    assert.equal(await page.locator('#dashboard-home').isVisible(), true);
+    await openDrawer();
+    await page.locator('#sidebar-backdrop').click({ position: { x: device.width - 5, y: 100 } });
+    assert.equal(await page.locator('#app-sidebar').isVisible(), false);
+    assert.equal(await page.locator('#dashboard-home').evaluate(el => el.inert), false);
+    await openDrawer();
+    await page.keyboard.press('Escape');
+    assert.equal(await page.locator('#app-sidebar').isVisible(), false);
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'mobile-menu-toggle');
+    const cdp = await page.context().newCDPSession(page);
+    const swipe = async (start, end) => {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: start.x, y: start.y }] });
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: end.x, y: end.y }] });
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    };
+    await openDrawer();
+    await swipe({ x: 180, y: 150 }, { x: 170, y: 230 });
+    assert.equal(await page.locator('#mobile-menu-toggle').getAttribute('aria-expanded'), 'true', 'vertical scroll must not close the drawer');
+    const playBox = await page.locator('#nav-play').boundingBox();
+    const start = { x: playBox.x + playBox.width - 25, y: playBox.y + playBox.height / 2 };
+    await swipe(start, { x: start.x - 100, y: start.y + 5 });
+    assert.equal(await page.locator('#mobile-menu-toggle').getAttribute('aria-expanded'), 'false', 'left swipe closes the drawer');
+    assert.equal(await page.locator('#dashboard-home').isVisible(), true, 'swiping across a control must not activate it');
+    await cdp.detach();
+  }
+  await openDrawer();
+  if (!mobileDrawer) {
+  const alignment = await page.locator('.app-sidebar').evaluate(sidebar => {
+    const brand = sidebar.querySelector('.sidebar-brand');
+    const range = document.createRange(); range.selectNodeContents(brand);
+    const rect = range.getBoundingClientRect(), rail = sidebar.getBoundingClientRect();
+    return Math.abs((rect.left + rect.right) / 2 - (rail.left + rail.right) / 2);
+  });
+  assert.ok(alignment < 1.5, `${device.id}: logo must be centered in the rail (offset ${alignment}px)`);
+  }
+  await page.locator('#nav-play').click();
+  if (mobileDrawer) assert.equal(await page.locator('#app-sidebar').isVisible(), false);
+  assert.equal(await page.locator('#page-play').isVisible(), true);
+  assert.equal(await page.locator('#dashboard-home').isVisible(), false);
+  assert.equal(new URL(page.url()).hash, '#play');
+  await checkLayout('play');
+  await page.reload();
+  await page.locator('#page-play').waitFor({ state: 'visible' });
+  await openDrawer();
+  await page.locator('#account-toggle').click();
+  assert.equal(await page.locator('#account-toggle').getAttribute('aria-expanded'), 'true');
+  const activeColors = await page.locator('#nav-play').evaluate(el => ({ background: getComputedStyle(el).backgroundColor, color: getComputedStyle(el).color }));
+  const toggleColors = await page.locator('#account-toggle').evaluate(el => ({ background: getComputedStyle(el).backgroundColor, color: getComputedStyle(el).color }));
+  assert.deepEqual(toggleColors, activeColors, 'expanded profile control must remain legible on hover');
+  const menuSpacing = await page.locator('#account-menu').evaluate(el => {
+    const rect = el.getBoundingClientRect(), buttons = el.querySelectorAll('button');
+    return { top: buttons[0].getBoundingClientRect().top - rect.top, bottom: rect.bottom - buttons[buttons.length - 1].getBoundingClientRect().bottom };
+  });
+  assert.ok(menuSpacing.top >= 8 && menuSpacing.bottom >= 8, `${device.id}: profile menu needs vertical padding ${JSON.stringify(menuSpacing)}`);
+  if (mobileDrawer) {
+    const separation = await page.evaluate(() => ({
+      playBottom: document.querySelector('#nav-play').getBoundingClientRect().bottom,
+      menuTop: document.querySelector('#account-menu').getBoundingClientRect().top,
+    }));
+    assert.ok(separation.menuTop >= separation.playBottom, `${device.id}: profile menu must not cover the play button`);
+  }
+  if (!device.touch) {
+    const centeredArrow = await page.locator('#account-toggle').evaluate(el => {
+      const button = el.getBoundingClientRect(), arrow = el.querySelector('svg').getBoundingClientRect();
+      return Math.abs((button.top + button.bottom - arrow.top - arrow.bottom) / 2);
+    });
+    assert.ok(centeredArrow < 1, `${device.id}: profile arrow is vertically misaligned`);
+    const brand = page.locator('.sidebar-brand');
+    await brand.hover();
+    assert.equal(await brand.evaluate(el => getComputedStyle(el).borderTopColor), 'rgba(0, 0, 0, 0)', 'logo must not show a hover border');
+    const beforePress = await brand.evaluate(el => [getComputedStyle(el).backgroundColor, getComputedStyle(el).color, getComputedStyle(el.querySelector('.title-highlight')).backgroundColor, getComputedStyle(el.querySelector('.title-highlight')).color]);
+    await page.mouse.down();
+    const whilePressed = await brand.evaluate(el => [getComputedStyle(el).backgroundColor, getComputedStyle(el).color, getComputedStyle(el.querySelector('.title-highlight')).backgroundColor, getComputedStyle(el.querySelector('.title-highlight')).color]);
+    assert.deepEqual(whilePressed, beforePress, 'logo must not invert when pressed');
+    await page.mouse.move(device.width - 5, 5); await page.mouse.up();
+    if (await page.locator('#account-toggle').getAttribute('aria-expanded') === 'false') await page.locator('#account-toggle').click();
+    const entry = page.locator('#account-menu [data-page=profile]');
+    await entry.hover();
+    assert.notEqual(await entry.evaluate(el => getComputedStyle(el).borderTopColor), 'rgba(0, 0, 0, 0)', 'hover shows border');
+    assert.equal(await entry.evaluate(el => getComputedStyle(el).borderTopWidth), '2px', 'hover border is twice as thick');
+    await page.mouse.down();
+    const pressed = await entry.evaluate(el => ({ background: getComputedStyle(el).backgroundColor, color: getComputedStyle(el).color }));
+    assert.deepEqual(pressed, activeColors, 'pressed menu text and background must both invert');
+    await page.mouse.move(device.width - 5, 5); await page.mouse.up();
+  }
+  await checkLayout('account menu');
+  await page.screenshot({ path: `${output}/${device.id}-navigation.png`, animations: 'disabled' });
+  await page.keyboard.press('Escape');
+  assert.equal(await page.locator('#account-menu').isVisible(), false);
+  for (const name of ['profile', 'settings', 'help']) {
+    await openDrawer();
+    await page.locator('#account-toggle').click();
+    await page.locator(`#account-menu [data-page=${name}]`).click();
+    assert.equal(await page.locator(`#page-${name}`).isVisible(), true);
+    assert.equal(await page.locator('#account-menu').isVisible(), false);
+    assert.equal(new URL(page.url()).hash, `#${name}`);
+    await checkLayout(name);
+  }
+  await page.goBack();
+  await page.locator('#page-settings').waitFor({ state: 'visible' });
+  if (mobileDrawer) await page.locator('#mobile-brand').click();
+  else await page.locator('.sidebar-brand').click();
+  assert.equal(await page.locator('#dashboard-home').isVisible(), true);
+  assert.equal(new URL(page.url()).hash, '');
   // Exercise navigation from the bottom of a long screen, not only from the top.
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
   await page.locator('#edit-profile').click(); await atTop('profile-screen');
@@ -146,6 +284,8 @@ for (const device of devices) {
     await page.locator(`#dashboard-palettes label[data-choice=${palette}]`).click();
     assert.equal(await page.locator('.landing').getAttribute('data-palette-theme'), 'light');
   }
+  await openDrawer();
+  await page.locator('#account-toggle').click();
   await page.locator('.signout').click(); await atTop('auth-screen');
   assert.deepEqual(errors, [], `${device.id}: browser errors`);
   results.push({ ...device, hero });
