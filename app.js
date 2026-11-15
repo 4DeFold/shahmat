@@ -6,6 +6,12 @@ const supabase = createClient('https://eswyxbyddkajysogtglp.supabase.co', 'sb_pu
 const $ = id => document.getElementById(id);
 let screen = $('landing-screen');
 let mode = 'login';
+// This deployment flag is an operational gate, not a replacement for server-side confirmation.
+const emailOtpReady = import.meta.env.VITE_EMAIL_OTP_READY === 'true';
+let verification = null;
+const recoveryKey = 'shahmat.recovery-pending';
+const setRecoveryPending = value => { try { if (value) sessionStorage.setItem(recoveryKey, '1'); else sessionStorage.removeItem(recoveryKey); } catch { /* Recovery still works without reload persistence. */ } };
+const recoveryPending = () => { try { return sessionStorage.getItem(recoveryKey) === '1'; } catch { return false; } };
 let profile = null;
 let selectedPalette = 'monochrome';
 let selectedTheme = null;
@@ -312,6 +318,9 @@ function setMode(value) {
     tab.setAttribute('aria-pressed', String(mode === name));
   }
   $('password').autocomplete = mode === 'login' ? 'current-password' : 'new-password';
+  $('password').minLength = mode === 'login' ? 6 : 8;
+  $('password').placeholder = mode === 'login' ? 'Не менее 6 символов' : 'Не менее 8 символов';
+  $('forgot-password').hidden = mode !== 'login';
   $('auth-submit').innerHTML = mode === 'login' ? 'Войти <span>↗</span>' : 'Создать аккаунт <span>↗</span>';
   message('auth-message');
   if (changed && !reducedMotion.matches) {
@@ -357,20 +366,142 @@ $('play').addEventListener('click', async () => {
 $('tab-login').addEventListener('click', () => setMode('login'));
 $('tab-signup').addEventListener('click', () => setMode('signup'));
 document.querySelector('[data-action="home"]').addEventListener('click', () => show('landing-screen'));
+const unavailableMessage = 'Подтверждение по почте временно недоступно. Попробуй позже.';
+async function openVerification(email, kind, alreadySent = true) {
+  verification = { email, kind };
+  $('verify-code').value = '';
+  $('verify-description').textContent = kind === 'signup'
+    ? (alreadySent ? `Мы отправили код на ${email}. Введи его, чтобы подтвердить почту.` : `Введи код для ${email} или запроси новый.`)
+    : 'Если аккаунт существует, код отправлен на указанную почту.';
+  message('verify-message');
+  await show('verify-screen');
+}
 $('auth-form').addEventListener('submit', async event => {
   event.preventDefault();
   const button = $('auth-submit');
   if (button.disabled) return;
+  if (mode === 'signup' && !emailOtpReady) { message('auth-message', unavailableMessage); return; }
   busy(button, true); message('auth-message');
   try {
     const credentials = { email: $('email').value.trim(), password: $('password').value };
+    if (mode === 'signup' && credentials.password.length < 8) { message('auth-message', 'Пароль должен содержать не менее 8 символов.'); return; }
     const { data, error } = mode === 'signup' ? await supabase.auth.signUp(credentials) : await supabase.auth.signInWithPassword(credentials);
-    if (error) throw error;
-    if (!data.session) throw new Error('Session missing');
+    if (error) {
+      if (mode === 'login' && emailOtpReady && (error.code === 'email_not_confirmed' || error.message?.toLowerCase().includes('email not confirmed'))) {
+        $('password').value = '';
+        await openVerification(credentials.email, 'signup', false);
+        return;
+      }
+      throw error;
+    }
     $('password').value = '';
-    await loadProfile(data.session.user);
+    if (mode === 'signup') {
+      if (data.session) {
+        // Fail closed if the server was accidentally left in auto-confirm mode.
+        await supabase.auth.signOut({ scope: 'local' });
+        message('auth-message', unavailableMessage);
+        return;
+      }
+      await openVerification(credentials.email, 'signup');
+    } else {
+      if (!data.session) throw new Error('Session missing');
+      await loadProfile(data.session.user);
+    }
   } catch (error) { message('auth-message', describe(error)); }
   finally { busy(button, false); }
+});
+$('forgot-password').addEventListener('click', async () => {
+  $('recovery-email').value = $('email').value.trim();
+  message('recovery-message');
+  await show('recovery-screen');
+});
+async function returnToLogin() {
+  verification = null;
+  $('verify-code').value = '';
+  setMode('login');
+  await show('auth-screen');
+}
+$('verify-back').addEventListener('click', returnToLogin);
+$('recovery-back').addEventListener('click', returnToLogin);
+$('recovery-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const button = $('recovery-submit');
+  if (button.disabled) return;
+  if (!emailOtpReady) { message('recovery-message', unavailableMessage); return; }
+  busy(button, true); message('recovery-message');
+  try {
+    const email = $('recovery-email').value.trim();
+    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    if (error) throw error;
+    await openVerification(email, 'recovery');
+  } catch (error) { message('recovery-message', describe(error)); }
+  finally { busy(button, false); }
+});
+$('resend-code').addEventListener('click', async () => {
+  if (!verification) return;
+  const button = $('resend-code');
+  if (button.disabled) return;
+  busy(button, true); message('verify-message');
+  try {
+    const { error } = verification.kind === 'signup'
+      ? await supabase.auth.resend({ type: 'signup', email: verification.email })
+      : await supabase.auth.resetPasswordForEmail(verification.email);
+    if (error) throw error;
+    message('verify-message', verification.kind === 'signup' ? 'Код отправлен повторно.' : 'Если аккаунт существует, код отправлен повторно.');
+  } catch (error) { message('verify-message', describe(error)); }
+  finally { busy(button, false); }
+});
+$('verify-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const button = $('verify-submit');
+  if (button.disabled || !verification) return;
+  const token = $('verify-code').value.trim();
+  if (!/^[0-9]{6}$/.test(token)) { message('verify-message', 'Введи шестизначный код.'); return; }
+  busy(button, true); message('verify-message');
+  try {
+    const { data, error } = await supabase.auth.verifyOtp({ email: verification.email, token, type: verification.kind === 'signup' ? 'email' : 'recovery' });
+    if (error || !data.session) throw error || new Error('Session missing');
+    $('verify-code').value = '';
+    if (verification.kind === 'recovery') {
+      setRecoveryPending(true);
+      $('reset-password-form').reset();
+      message('reset-password-message');
+      await show('reset-password-screen');
+    } else {
+      try { await loadProfile(data.session.user); }
+      catch {
+        await returnToLogin();
+        message('auth-message', 'Почта подтверждена, но профиль не загрузился. Войди ещё раз.');
+      }
+    }
+    verification = null;
+  } catch { message('verify-message', 'Неверный или просроченный код. Проверь его или запроси новый.'); }
+  finally { busy(button, false); }
+});
+$('reset-password-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const button = $('reset-password-submit');
+  if (button.disabled) return;
+  const password = $('new-password').value;
+  if (password.length < 8) { message('reset-password-message', 'Пароль должен содержать не менее 8 символов.'); return; }
+  if (password !== $('confirm-password').value) { message('reset-password-message', 'Пароли не совпадают.'); return; }
+  busy(button, true); message('reset-password-message');
+  try {
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) throw error;
+    $('reset-password-form').reset();
+    setRecoveryPending(false);
+    await supabase.auth.signOut({ scope: 'local' });
+    await returnToLogin();
+    message('auth-message', 'Пароль изменён. Теперь можно войти.');
+  } catch (error) { message('reset-password-message', describe(error)); }
+  finally { busy(button, false); }
+});
+$('reset-cancel').addEventListener('click', async () => {
+  setRecoveryPending(false);
+  $('reset-password-form').reset();
+  await supabase.auth.signOut({ scope: 'local' });
+  await returnToLogin();
 });
 $('profile-form').addEventListener('submit', async event => {
   event.preventDefault();
@@ -442,8 +573,9 @@ async function initialize() {
   try {
     const { data, error } = await supabase.auth.getSession();
     if (error) throw error;
-    if (data.session) await loadProfile(data.session.user, true);
-    else await show('landing-screen', true);
+    if (data.session && recoveryPending()) await show('reset-password-screen', true);
+    else if (data.session) await loadProfile(data.session.user, true);
+    else { setRecoveryPending(false); await show('landing-screen', true); }
   } catch (error) {
     await show('auth-screen', true);
     message('auth-message', 'Не удалось проверить сессию. Проверь соединение и попробуй войти.');

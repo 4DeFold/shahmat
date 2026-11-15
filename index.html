@@ -22,8 +22,44 @@
         <form id="auth-form">
           <label for="email">Электронная почта</label><input id="email" type="email" autocomplete="email" placeholder="you@example.com" required maxlength="254">
           <label for="password">Пароль</label><input id="password" type="password" autocomplete="current-password" placeholder="Не менее 6 символов" required minlength="6" maxlength="72">
+          <button class="text-button auth-forgot" id="forgot-password" type="button">Забыли пароль?</button>
           <p class="message" id="auth-message" role="status" aria-live="polite"></p>
           <button class="primary" id="auth-submit" type="submit">Войти <span>↗</span></button>
+        </form>
+      </section>
+
+      <section class="screen panel" id="verify-screen" hidden aria-labelledby="verify-title">
+        <div class="panel-top"><button class="text-button" id="verify-back" type="button">← К входу</button></div>
+        <div class="wordmark"><span class="title-highlight">shah</span>mat.xyz</div>
+        <div class="section-head"><h2 id="verify-title">Проверь почту.</h2><p class="subtle" id="verify-description"></p></div>
+        <form id="verify-form">
+          <label for="verify-code">Шестизначный код</label>
+          <input id="verify-code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required>
+          <p class="message" id="verify-message" role="status" aria-live="polite"></p>
+          <button class="primary" id="verify-submit" type="submit">Подтвердить <span>→</span></button>
+          <button class="text-button auth-secondary" id="resend-code" type="button">Отправить код ещё раз</button>
+        </form>
+      </section>
+
+      <section class="screen panel" id="recovery-screen" hidden aria-labelledby="recovery-title">
+        <div class="panel-top"><button class="text-button" id="recovery-back" type="button">← К входу</button></div>
+        <div class="wordmark"><span class="title-highlight">shah</span>mat.xyz</div>
+        <div class="section-head"><h2 id="recovery-title">Восстановление.</h2><p class="subtle">Укажи почту аккаунта. Если аккаунт существует, мы отправим код для смены пароля.</p></div>
+        <form id="recovery-form">
+          <label for="recovery-email">Электронная почта</label><input id="recovery-email" type="email" autocomplete="email" required maxlength="254">
+          <p class="message" id="recovery-message" role="status" aria-live="polite"></p>
+          <button class="primary" id="recovery-submit" type="submit">Получить код <span>→</span></button>
+        </form>
+      </section>
+
+      <section class="screen panel" id="reset-password-screen" hidden aria-labelledby="reset-password-title">
+        <div class="panel-top"><span class="wordmark small"><span class="title-highlight">shah</span>mat.xyz</span><button class="text-button" id="reset-cancel" type="button">Отмена</button></div>
+        <div class="section-head"><h2 id="reset-password-title">Новый пароль.</h2><p class="subtle">Придумай новый пароль для аккаунта.</p></div>
+        <form id="reset-password-form">
+          <label for="new-password">Новый пароль</label><input id="new-password" type="password" autocomplete="new-password" required minlength="8" maxlength="72" placeholder="Не менее 8 символов">
+          <label for="confirm-password">Повтори пароль</label><input id="confirm-password" type="password" autocomplete="new-password" required minlength="8" maxlength="72">
+          <p class="message" id="reset-password-message" role="status" aria-live="polite"></p>
+          <button class="primary" id="reset-password-submit" type="submit">Сохранить пароль <span>→</span></button>
         </form>
       </section>
 

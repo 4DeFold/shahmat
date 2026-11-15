@@ -670,3 +670,7 @@ textarea { resize: vertical; min-height: 92px; }
   .landing.palette-active .dashboard .sidebar-account { flex-shrink: 0; }
   .landing.palette-active .dashboard .account-menu { position: static; margin-bottom: 8px; }
 }
+
+/* Secondary authentication actions follow the existing monochrome form style. */
+.auth-forgot, .auth-secondary { display: block; margin: 16px 0 0; }
+@media (pointer: coarse) { .auth-forgot, .auth-secondary { min-height: 44px; } }

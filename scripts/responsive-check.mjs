@@ -32,7 +32,10 @@ for (const device of devices) {
   let profile = null;
   await page.route('https://eswyxbyddkajysogtglp.supabase.co/**', async route => {
     const request = route.request(), path = new URL(request.url()).pathname;
-    if (path === '/auth/v1/signup' || path === '/auth/v1/token') {
+    if (path === '/auth/v1/signup') return route.fulfill({ json: { user, session: null } });
+    if (path === '/auth/v1/recover' || path === '/auth/v1/resend') return route.fulfill({ json: {} });
+    if (path === '/auth/v1/verify' && JSON.parse(request.postData()).token !== '123456') return route.fulfill({ status: 403, json: { code: 'otp_expired', msg: 'Invalid code' } });
+    if (path === '/auth/v1/verify' || path === '/auth/v1/token') {
       const token = ['e30', Buffer.from(JSON.stringify({ sub: user.id, exp: Math.floor(Date.now() / 1000) + 3600, role: 'authenticated' })).toString('base64url'), 'x'].join('.');
       return route.fulfill({ json: { access_token: token, token_type: 'bearer', expires_in: 3600, refresh_token: 'fixture-refresh-token', user } });
     }
@@ -106,9 +109,26 @@ for (const device of devices) {
   await page.locator('#tab-login').click();
   await page.locator('[data-action=home]').click(); await atTop('landing-screen');
   await page.locator('#play').click(); await atTop('auth-screen');
+  await page.locator('#forgot-password').click(); await atTop('recovery-screen');
+  await page.locator('#recovery-email').fill('preview@example.com');
+  await page.locator('#recovery-submit').click(); await atTop('verify-screen');
+  await screenshot('verification');
+  await page.locator('#verify-code').fill('000000'); await page.locator('#verify-submit').click();
+  await page.waitForFunction(() => document.querySelector('#verify-message').textContent.includes('Неверный'));
+  assert.match(await page.locator('#verify-message').innerText(), /Неверный/);
+  await page.locator('#verify-code').fill('123456'); await page.locator('#verify-submit').click(); await atTop('reset-password-screen');
+  await page.reload(); await atTop('reset-password-screen');
+  await page.locator('#new-password').fill('newpassword'); await page.locator('#confirm-password').fill('otherpassword');
+  await page.locator('#reset-password-submit').click();
+  assert.match(await page.locator('#reset-password-message').innerText(), /не совпадают/);
+  await page.locator('#confirm-password').fill('newpassword');
+  await page.locator('#reset-password-submit').click(); await atTop('auth-screen');
+  assert.match(await page.locator('#auth-message').innerText(), /Пароль изменён/);
   await page.locator('#tab-signup').click();
   await page.locator('#email').fill('preview@example.com'); await page.locator('#password').fill('password123');
-  await page.locator('#auth-submit').click(); await atTop('profile-screen');
+  await page.locator('#auth-submit').click(); await atTop('verify-screen');
+  await page.locator('#verify-code').fill('123456');
+  await page.locator('#verify-submit').click(); await atTop('profile-screen');
   assert.equal(await page.locator('#profile-cancel').isVisible(), false);
   await screenshot('profile');
   await page.locator('#username').fill('LongPlayerName_123456789');
