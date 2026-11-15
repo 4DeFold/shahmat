@@ -147,7 +147,23 @@ for (const device of devices) {
     assert.ok(headerLayout.toggleRight <= headerLayout.brandLeft && headerLayout.brandRight <= device.width, 'mobile header elements should not overlap or clip');
     await openDrawer();
     assert.equal(await page.locator('#mobile-menu-toggle').getAttribute('aria-expanded'), 'true');
+    const openHeader = await page.evaluate(() => {
+      const brand = document.querySelector('#mobile-brand'), rect = brand.getBoundingClientRect();
+      const hit = document.elementFromPoint((rect.left + rect.right) / 2, (rect.top + rect.bottom) / 2);
+      const sidebar = document.querySelector('#app-sidebar').getBoundingClientRect();
+      const header = document.querySelector('.mobile-header').getBoundingClientRect();
+      return { brandLeft: rect.left, brandRight: rect.right, hitLogo: brand.contains(hit), brandInert: brand.inert, sidebarTop: sidebar.top, headerBottom: header.bottom };
+    });
+    assert.equal(openHeader.brandLeft, headerLayout.brandLeft, 'logo position should not change when opening the drawer');
+    assert.equal(openHeader.brandRight, headerLayout.brandRight);
+    assert.equal(openHeader.hitLogo, true, 'logo must remain visible and clickable above the drawer');
+    assert.equal(openHeader.brandInert, false);
+    assert.ok(openHeader.sidebarTop >= openHeader.headerBottom - 1, 'drawer should start below the mobile header');
     assert.equal(await page.locator('#dashboard-home').evaluate(el => el.inert), true);
+    await page.locator('#mobile-brand').click();
+    assert.equal(await page.locator('#app-sidebar').isVisible(), false, 'logo closes the drawer and returns home');
+    assert.equal(await page.locator('#dashboard-home').isVisible(), true);
+    await openDrawer();
     await page.locator('#sidebar-backdrop').click({ position: { x: device.width - 5, y: 100 } });
     assert.equal(await page.locator('#app-sidebar').isVisible(), false);
     assert.equal(await page.locator('#dashboard-home').evaluate(el => el.inert), false);
@@ -195,6 +211,18 @@ for (const device of devices) {
   const activeColors = await page.locator('#nav-play').evaluate(el => ({ background: getComputedStyle(el).backgroundColor, color: getComputedStyle(el).color }));
   const toggleColors = await page.locator('#account-toggle').evaluate(el => ({ background: getComputedStyle(el).backgroundColor, color: getComputedStyle(el).color }));
   assert.deepEqual(toggleColors, activeColors, 'expanded profile control must remain legible on hover');
+  const menuSpacing = await page.locator('#account-menu').evaluate(el => {
+    const rect = el.getBoundingClientRect(), buttons = el.querySelectorAll('button');
+    return { top: buttons[0].getBoundingClientRect().top - rect.top, bottom: rect.bottom - buttons[buttons.length - 1].getBoundingClientRect().bottom };
+  });
+  assert.ok(menuSpacing.top >= 8 && menuSpacing.bottom >= 8, `${device.id}: profile menu needs vertical padding ${JSON.stringify(menuSpacing)}`);
+  if (mobileDrawer) {
+    const separation = await page.evaluate(() => ({
+      playBottom: document.querySelector('#nav-play').getBoundingClientRect().bottom,
+      menuTop: document.querySelector('#account-menu').getBoundingClientRect().top,
+    }));
+    assert.ok(separation.menuTop >= separation.playBottom, `${device.id}: profile menu must not cover the play button`);
+  }
   if (!device.touch) {
     const centeredArrow = await page.locator('#account-toggle').evaluate(el => {
       const button = el.getBoundingClientRect(), arrow = el.querySelector('svg').getBoundingClientRect();

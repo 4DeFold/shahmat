@@ -472,7 +472,7 @@ textarea { resize: vertical; min-height: 92px; }
   background: var(--surface-raised);
   box-shadow: 0 8px 24px #0003;
 }
-.account-menu-content { min-height: 0; overflow: hidden; padding: 0 6px; }
+.account-menu-content { min-height: 0; overflow: hidden; padding: 8px 6px; }
 .account-menu button {
   display: block;
   width: 100%;
@@ -585,7 +585,7 @@ textarea { resize: vertical; min-height: 92px; }
     display: grid;
     place-items: center;
     position: fixed;
-    z-index: 52;
+    z-index: 61;
     top: 12px;
     left: 12px;
     width: 44px;
@@ -602,7 +602,7 @@ textarea { resize: vertical; min-height: 92px; }
     display: block;
     position: fixed;
     z-index: 40;
-    inset: 0;
+    inset: 68px 0 0;
     background: #0009;
     opacity: 0;
     visibility: hidden;
@@ -612,11 +612,12 @@ textarea { resize: vertical; min-height: 92px; }
   .landing.palette-active .dashboard.sidebar-open .sidebar-backdrop { opacity: 1; visibility: visible; pointer-events: auto; transition-delay: 0s; }
   .landing.palette-active .dashboard .app-sidebar {
     z-index: 50;
+    inset: 68px auto 0 0;
     width: min(260px, 85vw);
-    height: 100vh;
-    height: 100dvh;
+    height: calc(100vh - 68px);
+    height: calc(100dvh - 68px);
     min-height: 0;
-    padding: 76px 14px 16px;
+    padding: 14px 14px 16px;
     overflow-y: auto;
     touch-action: pan-y;
     transform: translateX(-100%);
@@ -629,7 +630,7 @@ textarea { resize: vertical; min-height: 92px; }
     display: flex;
     align-items: center;
     position: fixed;
-    z-index: 30;
+    z-index: 60;
     inset: 0 0 auto;
     height: 68px;
     padding-left: 64px;
@@ -655,4 +656,12 @@ textarea { resize: vertical; min-height: 92px; }
 @media (prefers-reduced-motion: reduce) {
   .landing.palette-active .dashboard .app-sidebar,
   .landing.palette-active .dashboard .sidebar-backdrop { transition: none; }
+}
+
+/* On short touch screens, let the expanded account menu push the controls
+   apart instead of covering navigation; the drawer can scroll if necessary. */
+@media (max-height: 450px) and (pointer: coarse) {
+  .landing.palette-active .dashboard .sidebar-nav,
+  .landing.palette-active .dashboard .sidebar-account { flex-shrink: 0; }
+  .landing.palette-active .dashboard .account-menu { position: static; margin-bottom: 8px; }
 }

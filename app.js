@@ -164,7 +164,6 @@ function setSidebarOpen(open, { restoreFocus = false } = {}) {
   sidebarOpen = mobile && open;
   $('dashboard-screen').classList.toggle('sidebar-open', sidebarOpen);
   sidebar.inert = mobile && !sidebarOpen;
-  $('mobile-brand').inert = sidebarOpen;
   document.querySelectorAll('#dashboard-screen [data-view]').forEach(view => { view.inert = sidebarOpen; });
   mobileMenuToggle.setAttribute('aria-expanded', String(sidebarOpen));
   mobileMenuToggle.setAttribute('aria-label', sidebarOpen ? 'Закрыть меню' : 'Открыть меню');
