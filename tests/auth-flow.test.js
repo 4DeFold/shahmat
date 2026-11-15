@@ -6,8 +6,8 @@ import { JSDOM } from 'jsdom';
 const html = await readFile('index.html', 'utf8');
 const source = (await readFile('app.js', 'utf8')).replace(/import .*?;\n/g, '');
 const tick = () => new Promise(resolve => setTimeout(resolve, 10));
-async function setup({ existing = false, palette = 'monochrome', failSave = false, systemDark = false, initialStorage = {}, saveHandler = null, getUserHandler = null, userId = 'user-1' } = {}) {
-  const dom = new JSDOM(html, { runScripts: 'outside-only', url: 'https://example.com' });
+async function setup({ existing = false, palette = 'monochrome', failSave = false, systemDark = false, initialStorage = {}, saveHandler = null, getUserHandler = null, userId = 'user-1', otpReady = true, autoConfirm = false, url = 'https://example.com', accessToken = null } = {}) {
+  const dom = new JSDOM(html, { runScripts: 'outside-only', url });
   const { window } = dom;
   let loggedIn = existing;
   let sessionUserId = userId;
@@ -15,14 +15,17 @@ async function setup({ existing = false, palette = 'monochrome', failSave = fals
   for (const [key, value] of Object.entries(initialStorage)) window.localStorage.setItem(key, value);
   const user = () => ({ id: userId, user_metadata: { ...metadata } });
   let storedProfile = existing ? { username: 'Player', bio: '', palette: 'monochrome' } : null;
-  let signUps = 0;
+  let signUps = 0, resetRequests = 0, resends = 0, lastVerification = null, newPassword = null;
   const db = {
     auth: {
-      getSession: async () => ({ data: { session: loggedIn ? { user: { ...user(), id: sessionUserId } } : null } }),
+      getSession: async () => ({ data: { session: loggedIn ? { user: { ...user(), id: sessionUserId }, access_token: accessToken } : null } }),
       getUser: async () => getUserHandler ? getUserHandler() : ({ data: { user: loggedIn ? user() : null } }),
-      signUp: async () => { signUps++; loggedIn = true; return { data: { session: { user: user() } } }; },
+      signUp: async () => { signUps++; loggedIn = autoConfirm; return { data: { session: autoConfirm ? { user: user() } : null } }; },
+      resetPasswordForEmail: async () => { resetRequests++; return { error: null }; },
+      resend: async () => { resends++; return { error: null }; },
+      verifyOtp: async values => { lastVerification = values; if (values.token !== '123456') return { data: { session: null }, error: new Error('invalid') }; loggedIn = true; return { data: { session: { user: user() } }, error: null }; },
       signInWithPassword: async () => { loggedIn = true; return { data: { session: { user: user() } } }; },
-      updateUser: async ({ data }) => { if (saveHandler) await saveHandler(data); if (failSave) return { error: new Error('save failed') }; metadata = { ...metadata, ...data }; return { data: { user: user() } }; },
+      updateUser: async ({ data, password }) => { if (password) { newPassword = password; return { error: null }; } if (saveHandler) await saveHandler(data); if (failSave) return { error: new Error('save failed') }; metadata = { ...metadata, ...data }; return { data: { user: user() } }; },
       signOut: async () => { loggedIn = false; return {}; }
     },
     from: () => ({
@@ -43,20 +46,21 @@ async function setup({ existing = false, palette = 'monochrome', failSave = fals
   const realSetTimeout = window.setTimeout.bind(window);
   window.setTimeout = (cb, delay, ...args) => delay >= 3000 ? 1 : realSetTimeout(cb, delay, ...args);
   window.createClient = () => db;
-  window.eval(source);
+  window.eval(source.replace("import.meta.env.VITE_EMAIL_OTP_READY === 'true'", String(otpReady)));
   await tick();
   const $ = id => window.document.getElementById(id);
   const click = async id => { $(id).click(); await tick(); };
   const submit = async id => { $(id).dispatchEvent(new window.Event('submit', { bubbles: true, cancelable: true })); await tick(); };
   const choose = async (container, value) => { const input = $(container).querySelector(`input[value="${value}"]`); input.checked = true; input.dispatchEvent(new window.Event('change', { bubbles: true })); await tick(); };
-  return { $, click, submit, choose, getProfile: () => storedProfile, getMetadata: () => metadata, getSignUps: () => signUps, changeSystemTheme, setFailSave: value => { failSave = value; }, setSessionUserId: value => { sessionUserId = value; }, setMetadata: value => { metadata = { ...metadata, ...value }; }, poll, getPollDelay: () => intervalDelay, hasPoll: () => !!interval, window, document: window.document };
+  return { $, click, submit, choose, getProfile: () => storedProfile, getMetadata: () => metadata, getSignUps: () => signUps, getResetRequests: () => resetRequests, getResends: () => resends, getLastVerification: () => lastVerification, getNewPassword: () => newPassword, changeSystemTheme, setFailSave: value => { failSave = value; }, setSessionUserId: value => { sessionUserId = value; }, setMetadata: value => { metadata = { ...metadata, ...value }; }, poll, getPollDelay: () => intervalDelay, hasPoll: () => !!interval, window, document: window.document };
 }
 
 test('registration requires a profile, saves chosen palette and opens dashboard', async () => {
   const { $, click, submit, choose, getProfile, getMetadata, getSignUps, document } = await setup();
   await click('play'); assert.equal($('auth-screen').hidden, false);
   await click('tab-signup'); $('email').value = 'player@example.com'; $('password').value = 'secret123';
-  await submit('auth-form'); assert.equal(getSignUps(), 1); assert.equal($('profile-screen').hidden, false);
+  await submit('auth-form'); assert.equal(getSignUps(), 1); assert.equal($('verify-screen').hidden, false);
+  $('verify-code').value = '123456'; await submit('verify-form'); assert.equal($('profile-screen').hidden, false);
   assert.equal($('username').required, true);
   assert.equal($('profile-screen').querySelector('.signout'), null);
   $('username').value = 'Player_1'; $('bio').value = 'Chess'; await submit('profile-form');
@@ -143,7 +147,7 @@ test('startup waits for session and profile before revealing dashboard', async (
     auth: { getSession: () => new Promise(resolve => { resolveSession = resolve; }) },
     from: () => ({ select: () => ({ eq: () => ({ maybeSingle: () => new Promise(resolve => { resolveProfile = resolve; }) }) }) })
   });
-  window.eval(source);
+  window.eval(source.replace("import.meta.env.VITE_EMAIL_OTP_READY === 'true'", 'true'));
   const doc = window.document;
   assert.equal(doc.body.classList.contains('startup-ready'), false);
   assert.equal(doc.getElementById('landing-screen').hidden, true);
@@ -169,6 +173,7 @@ test('onboarding repeat click changes theme and saves it on confirmation', async
   const { $, click, submit, getMetadata, document } = await setup();
   await click('play'); await click('tab-signup');
   $('email').value = 'new@example.com'; $('password').value = 'secret123'; await submit('auth-form');
+  $('verify-code').value = '123456'; await submit('verify-form');
   $('username').value = 'Player_1'; await submit('profile-form');
   $('onboarding-palettes').querySelector('input[value="monochrome"]').click();
   assert.equal(document.querySelector('.landing').dataset.paletteTheme, 'dark');
@@ -195,7 +200,7 @@ test('session errors show a retry path instead of leaving an indefinite black sc
   window.requestAnimationFrame = cb => cb();
   window.scrollTo = () => {};
   window.createClient = () => ({ auth: { getSession: async () => ({ error: new Error('offline') }) } });
-  window.eval(source); await tick();
+  window.eval(source.replace("import.meta.env.VITE_EMAIL_OTP_READY === 'true'", 'true')); await tick();
   assert.equal(window.document.body.classList.contains('startup-ready'), true);
   assert.equal(window.document.getElementById('auth-screen').hidden, false);
   assert.match(window.document.getElementById('auth-message').textContent, /Не удалось проверить сессию/);
@@ -249,6 +254,7 @@ test('onboarding continues while background sync is unresolved', async () => {
   const { $, click, submit, choose } = await setup({ saveHandler: () => new Promise(() => {}) });
   await click('play'); await click('tab-signup');
   $('email').value = 'new@example.com'; $('password').value = 'secret123'; await submit('auth-form');
+  $('verify-code').value = '123456'; await submit('verify-form');
   $('username').value = 'Player_1'; await submit('profile-form');
   await choose('onboarding-palettes', 'gray'); await submit('palette-form');
   assert.equal($('dashboard-screen').hidden, false);
@@ -275,10 +281,13 @@ test('profile editing can be cancelled without saving changes', async () => {
   assert.equal(getProfile().bio, '');
 });
 
-test('sidebar navigates between empty pages and back to the existing home', async () => {
+test('sidebar navigates between pages, moves the dashboard to profile and returns to empty home', async () => {
   const { $, click, document, window } = await setup({ existing: true, palette: 'forest' });
   const pageButton = name => document.querySelector(`#dashboard-screen [data-page="${name}"]`);
   assert.equal($('dashboard-home').hidden, false);
+  assert.equal($('dashboard-home').textContent.trim(), 'Главная');
+  assert.equal($('page-profile').hidden, true);
+  assert.ok($('page-profile').contains($('dashboard-palettes')));
   await click('nav-play');
   assert.equal($('dashboard-home').hidden, true);
   assert.equal($('page-play').hidden, false);
@@ -290,6 +299,10 @@ test('sidebar navigates between empty pages and back to the existing home', asyn
     if ($('account-menu').hidden) await click('account-toggle');
     pageButton(name).click(); await tick();
     assert.equal($(`page-${name}`).hidden, false);
+    if (name === 'profile') {
+      assert.equal(document.activeElement, $('dashboard-title'));
+      assert.equal($('dashboard-title').textContent, 'Привет, Player.');
+    }
     assert.equal($('account-menu').hidden, true);
     assert.equal(window.location.hash, `#${name}`);
     assert.equal(document.querySelector('.landing').dataset.palette, 'forest');
@@ -297,7 +310,8 @@ test('sidebar navigates between empty pages and back to the existing home', asyn
   document.querySelector('.sidebar-brand').click(); await tick();
   assert.equal($('dashboard-home').hidden, false);
   assert.equal(window.location.hash, '');
-  assert.equal($('dashboard-title').textContent, 'Привет, Player.');
+  assert.equal(document.activeElement, $('page-home-title'));
+  assert.equal($('page-profile').hidden, true);
   await click('account-toggle');
   document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
   assert.equal($('account-menu').hidden, true);
@@ -365,4 +379,71 @@ test('a remote response after logout cannot restore the prior account appearance
   await polling;
   assert.equal(app.$('auth-screen').hidden, false);
   assert.equal(app.document.querySelector('.landing').dataset.palette, 'monochrome');
+});
+
+
+test('registration requires the correct code, supports resend and fails closed on misconfiguration', async () => {
+  const app = await setup();
+  await app.click('play'); await app.click('tab-signup');
+  app.$('email').value = 'new@example.com'; app.$('password').value = 'secret123';
+  await app.submit('auth-form');
+  assert.equal(app.$('verify-screen').hidden, false);
+  assert.equal(app.$('profile-screen').hidden, true);
+  assert.equal(app.$('password').value, '');
+  await app.click('resend-code'); assert.equal(app.getResends(), 1);
+  app.$('verify-code').value = '000000'; await app.submit('verify-form');
+  assert.match(app.$('verify-message').textContent, /Неверный/);
+  assert.equal(app.$('profile-screen').hidden, true);
+  app.$('verify-code').value = '123456'; await app.submit('verify-form');
+  assert.deepEqual({ ...app.getLastVerification() }, { email: 'new@example.com', token: '123456', type: 'email' });
+  assert.equal(app.$('profile-screen').hidden, false);
+  const broken = await setup({ autoConfirm: true });
+  await broken.click('play'); await broken.click('tab-signup');
+  broken.$('email').value = 'new@example.com'; broken.$('password').value = 'secret123'; await broken.submit('auth-form');
+  assert.equal(broken.$('auth-screen').hidden, false);
+  assert.match(broken.$('auth-message').textContent, /временно недоступно/);
+  assert.equal(broken.$('dashboard-screen').hidden, true);
+});
+
+test('unconfigured OTP deployment does not send registration or recovery requests', async () => {
+  const app = await setup({ otpReady: false });
+  await app.click('play'); await app.click('tab-signup');
+  app.$('email').value = 'new@example.com'; app.$('password').value = 'secret123'; await app.submit('auth-form');
+  assert.equal(app.getSignUps(), 0); assert.match(app.$('auth-message').textContent, /временно недоступно/);
+  await app.click('tab-login'); await app.click('forgot-password');
+  app.$('recovery-email').value = 'new@example.com'; await app.submit('recovery-form');
+  assert.equal(app.getResetRequests(), 0); assert.match(app.$('recovery-message').textContent, /временно недоступно/);
+});
+
+test('recovery verifies a code before allowing a matching new password', async () => {
+  const app = await setup();
+  await app.click('play'); await app.click('forgot-password');
+  app.$('recovery-email').value = 'player@example.com'; await app.submit('recovery-form');
+  assert.equal(app.getResetRequests(), 1); assert.equal(app.$('verify-screen').hidden, false);
+  assert.match(app.$('verify-description').textContent, /Если аккаунт существует/);
+  await app.click('resend-code'); assert.equal(app.getResetRequests(), 2);
+  app.$('verify-code').value = '000000'; await app.submit('verify-form');
+  assert.equal(app.$('reset-password-screen').hidden, true);
+  app.$('verify-code').value = '123456'; await app.submit('verify-form');
+  assert.equal(app.getLastVerification().type, 'recovery');
+  assert.equal(app.$('reset-password-screen').hidden, false);
+  assert.equal(app.window.sessionStorage.getItem('shahmat.recovery-pending'), '1');
+  app.$('new-password').value = 'newpassword'; app.$('confirm-password').value = 'wrongpassword';
+  await app.submit('reset-password-form'); assert.equal(app.getNewPassword(), null);
+  app.$('confirm-password').value = 'newpassword'; await app.submit('reset-password-form');
+  assert.equal(app.getNewPassword(), 'newpassword');
+  assert.equal(app.$('auth-screen').hidden, false);
+  assert.equal(app.window.sessionStorage.getItem('shahmat.recovery-pending'), null);
+  assert.match(app.$('auth-message').textContent, /Пароль изменён/);
+});
+
+
+test('a recovery link opens password reset only for its matching session', async () => {
+  const app = await setup({ existing: true, url: 'https://example.com/#access_token=valid-token&type=recovery', accessToken: 'valid-token' });
+  assert.equal(app.$('reset-password-screen').hidden, false);
+  assert.equal(app.$('dashboard-screen').hidden, true);
+  assert.equal(app.window.sessionStorage.getItem('shahmat.recovery-pending'), '1');
+  const stale = await setup({ existing: true, url: 'https://example.com/#access_token=invalid-token&type=recovery', accessToken: 'existing-session-token' });
+  assert.equal(stale.$('reset-password-screen').hidden, true);
+  assert.equal(stale.$('dashboard-screen').hidden, false);
 });

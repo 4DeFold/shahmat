@@ -32,7 +32,10 @@ for (const device of devices) {
   let profile = null;
   await page.route('https://eswyxbyddkajysogtglp.supabase.co/**', async route => {
     const request = route.request(), path = new URL(request.url()).pathname;
-    if (path === '/auth/v1/signup' || path === '/auth/v1/token') {
+    if (path === '/auth/v1/signup') return route.fulfill({ json: { user, session: null } });
+    if (path === '/auth/v1/recover' || path === '/auth/v1/resend') return route.fulfill({ json: {} });
+    if (path === '/auth/v1/verify' && JSON.parse(request.postData()).token !== '123456') return route.fulfill({ status: 403, json: { code: 'otp_expired', msg: 'Invalid code' } });
+    if (path === '/auth/v1/verify' || path === '/auth/v1/token') {
       const token = ['e30', Buffer.from(JSON.stringify({ sub: user.id, exp: Math.floor(Date.now() / 1000) + 3600, role: 'authenticated' })).toString('base64url'), 'x'].join('.');
       return route.fulfill({ json: { access_token: token, token_type: 'bearer', expires_in: 3600, refresh_token: 'fixture-refresh-token', user } });
     }
@@ -106,9 +109,26 @@ for (const device of devices) {
   await page.locator('#tab-login').click();
   await page.locator('[data-action=home]').click(); await atTop('landing-screen');
   await page.locator('#play').click(); await atTop('auth-screen');
+  await page.locator('#forgot-password').click(); await atTop('recovery-screen');
+  await page.locator('#recovery-email').fill('preview@example.com');
+  await page.locator('#recovery-submit').click(); await atTop('verify-screen');
+  await screenshot('verification');
+  await page.locator('#verify-code').fill('000000'); await page.locator('#verify-submit').click();
+  await page.waitForFunction(() => document.querySelector('#verify-message').textContent.includes('Неверный'));
+  assert.match(await page.locator('#verify-message').innerText(), /Неверный/);
+  await page.locator('#verify-code').fill('123456'); await page.locator('#verify-submit').click(); await atTop('reset-password-screen');
+  await page.reload(); await atTop('reset-password-screen');
+  await page.locator('#new-password').fill('newpassword'); await page.locator('#confirm-password').fill('otherpassword');
+  await page.locator('#reset-password-submit').click();
+  assert.match(await page.locator('#reset-password-message').innerText(), /не совпадают/);
+  await page.locator('#confirm-password').fill('newpassword');
+  await page.locator('#reset-password-submit').click(); await atTop('auth-screen');
+  assert.match(await page.locator('#auth-message').innerText(), /Пароль изменён/);
   await page.locator('#tab-signup').click();
   await page.locator('#email').fill('preview@example.com'); await page.locator('#password').fill('password123');
-  await page.locator('#auth-submit').click(); await atTop('profile-screen');
+  await page.locator('#auth-submit').click(); await atTop('verify-screen');
+  await page.locator('#verify-code').fill('123456');
+  await page.locator('#verify-submit').click(); await atTop('profile-screen');
   assert.equal(await page.locator('#profile-cancel').isVisible(), false);
   await screenshot('profile');
   await page.locator('#username').fill('LongPlayerName_123456789');
@@ -119,14 +139,10 @@ for (const device of devices) {
   await page.locator('#onboarding-palettes label[data-choice=forest]').click();
   assert.equal(await page.locator('.landing').getAttribute('data-palette'), 'forest');
   await page.locator('#palette-submit').click(); await atTop('dashboard-screen');
-  assert.match(await page.locator('#dashboard-title').innerText(), /LongPlayerName_123456789/);
-  assert.equal(await page.evaluate(() => document.activeElement.id), 'dashboard-title', 'navigation should keep accessible focus');
-  assert.equal(await page.locator('#dashboard-title').evaluate(el => getComputedStyle(el).outlineStyle), 'none', 'programmatic heading focus should not be outlined');
-  assert.equal(await page.locator('#dashboard-title').evaluate(el => getComputedStyle(el).userSelect), 'none');
-  const paletteName = page.locator('#dashboard-palettes label[data-choice=gray] .palette-name');
-  assert.equal(await paletteName.evaluate(el => getComputedStyle(el).userSelect), 'none');
-  await paletteName.dblclick();
-  assert.equal(await page.evaluate(() => window.getSelection().toString()), '', 'palette text should not be selected by a double click');
+  assert.equal(await page.locator('#dashboard-home').isVisible(), true);
+  assert.equal(await page.locator('#page-home-title').innerText(), 'Главная');
+  assert.equal(await page.locator('#page-profile').isVisible(), false);
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'page-home-title', 'home heading receives focus');
   await screenshot('dashboard');
   // Mobile navigation starts closed and is opened by the menu button.
   const mobileDrawer = device.width <= 700 || (device.touch && device.height <= 500);
@@ -266,27 +282,67 @@ for (const device of devices) {
   else await page.locator('.sidebar-brand').click();
   assert.equal(await page.locator('#dashboard-home').isVisible(), true);
   assert.equal(new URL(page.url()).hash, '');
+  await openDrawer();
+  await page.locator('#account-toggle').click();
+  await page.locator('#account-menu [data-page=profile]').click();
+  assert.equal(await page.locator('#page-profile').isVisible(), true);
+  assert.equal(await page.locator('#dashboard-home').isVisible(), false);
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'dashboard-title');
+  assert.match(await page.locator('#dashboard-title').innerText(), /LongPlayerName_123456789/);
+  assert.equal(await page.locator('#dashboard-title').evaluate(el => getComputedStyle(el).outlineStyle), 'none');
+  assert.equal(await page.locator('#dashboard-title').evaluate(el => getComputedStyle(el).userSelect), 'none');
+  const paletteName = page.locator('#dashboard-palettes label[data-choice=gray] .palette-name');
+  assert.equal(await paletteName.evaluate(el => getComputedStyle(el).userSelect), 'none');
+  await paletteName.dblclick();
+  assert.equal(await page.evaluate(() => window.getSelection().toString()), '');
+  await page.reload();
+  await page.locator('#page-profile').waitFor({ state: 'visible' });
+  assert.equal(new URL(page.url()).hash, '#profile', 'profile route survives reload');
+  assert.match(await page.locator('#dashboard-title').innerText(), /LongPlayerName_123456789/);
+  await screenshot('dashboard-profile');
   // Exercise navigation from the bottom of a long screen, not only from the top.
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
   await page.locator('#edit-profile').click(); await atTop('profile-screen');
   assert.equal(await page.locator('#profile-cancel').isVisible(), true);
   await page.locator('#bio').fill('Не сохранять');
   await page.locator('#profile-cancel').click(); await atTop('dashboard-screen');
+  assert.equal(await page.locator('#page-profile').isVisible(), true, 'cancel returns to profile');
   assert.equal(await page.locator('#dashboard-bio').innerText(), 'Люблю шахматы.');
-  for (const palette of ['gray', 'wood', 'atelier', 'monochrome']) {
+  await page.locator('#edit-profile').click(); await atTop('profile-screen');
+  await page.locator('#bio').fill('Обновлено');
+  await page.locator('#profile-submit').click(); await atTop('dashboard-screen');
+  assert.equal(await page.locator('#page-profile').isVisible(), true, 'saving returns to profile');
+  assert.equal(await page.locator('#dashboard-bio').innerText(), 'Обновлено');
+  if (await page.locator('.landing').getAttribute('data-palette-theme') === 'dark') {
+    const currentPalette = await page.locator('.landing').getAttribute('data-palette');
+    await page.locator(`#dashboard-palettes label[data-choice=${currentPalette}]`).click();
+  }
+  for (const palette of ['forest', 'gray', 'wood', 'atelier', 'monochrome']) {
     await page.locator(`#dashboard-palettes label[data-choice=${palette}]`).click();
     assert.equal(await page.locator('.landing').getAttribute('data-palette'), palette);
     await checkLayout('dashboard-screen');
     await page.locator(`#dashboard-palettes label[data-choice=${palette}]`).click();
     assert.equal(await page.locator('.landing').getAttribute('data-palette-theme'), 'dark');
+    const backgrounds = await page.evaluate(() => [document.documentElement, document.body, document.querySelector('.landing')].map(el => getComputedStyle(el).backgroundColor));
+    assert.equal(backgrounds[0], backgrounds[2], `${device.id}: canvas must match the page in ${palette} dark`);
+    assert.equal(backgrounds[1], backgrounds[2], `${device.id}: body must match the page in ${palette} dark`);
     await checkLayout('dashboard-screen');
     if (palette === 'monochrome') await screenshot('dashboard-dark');
     await page.locator(`#dashboard-palettes label[data-choice=${palette}]`).click();
     assert.equal(await page.locator('.landing').getAttribute('data-palette-theme'), 'light');
+    assert.deepEqual(await page.evaluate(() => [document.documentElement, document.body, document.querySelector('.landing')].map(el => getComputedStyle(el).backgroundColor)), Array(3).fill(await page.locator('.landing').evaluate(el => getComputedStyle(el).backgroundColor)), `${device.id}: light canvas must match the page`);
   }
   await openDrawer();
   await page.locator('#account-toggle').click();
   await page.locator('.signout').click(); await atTop('auth-screen');
+  // Exercise a recovery link issued by Supabase, not just the typed-code flow.
+  const recoveryToken = ['e30', Buffer.from(JSON.stringify({ sub: user.id, exp: Math.floor(Date.now() / 1000) + 3600, role: 'authenticated' })).toString('base64url'), 'x'].join('.');
+  // Navigate away first: a hash-only navigation would not reload the application.
+  await page.goto('about:blank');
+  await page.goto(`${baseURL}/#access_token=${recoveryToken}&refresh_token=fixture-refresh-token&expires_in=3600&token_type=bearer&type=recovery`);
+  await atTop('reset-password-screen');
+  assert.equal(await page.evaluate(() => sessionStorage.getItem('shahmat.recovery-pending')), '1');
+  await page.locator('#reset-cancel').click(); await atTop('auth-screen');
   assert.deepEqual(errors, [], `${device.id}: browser errors`);
   results.push({ ...device, hero });
   console.log(`✓ ${device.label} ${device.width}×${device.height} · PLAY/заголовок ${(hero.ratio * 100).toFixed(1)}%`);
