@@ -155,6 +155,29 @@ const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const accountMenu = $('account-menu');
 const accountToggle = $('account-toggle');
 const pages = new Set(['home', 'play', 'profile', 'settings', 'help']);
+const sidebar = $('app-sidebar');
+const mobileMenuToggle = $('mobile-menu-toggle');
+let sidebarOpen = false;
+const isMobileSidebar = () => window.innerWidth <= 700 || (window.innerHeight <= 500 && window.matchMedia('(pointer: coarse)').matches);
+function setSidebarOpen(open, { restoreFocus = false } = {}) {
+  const mobile = isMobileSidebar();
+  sidebarOpen = mobile && open;
+  $('dashboard-screen').classList.toggle('sidebar-open', sidebarOpen);
+  sidebar.inert = mobile && !sidebarOpen;
+  document.querySelectorAll('#dashboard-screen [data-view]').forEach(view => { view.inert = sidebarOpen; });
+  mobileMenuToggle.setAttribute('aria-expanded', String(sidebarOpen));
+  mobileMenuToggle.setAttribute('aria-label', sidebarOpen ? 'Закрыть меню' : 'Открыть меню');
+  if (!sidebarOpen) closeAccountMenu(true);
+  if (restoreFocus && mobile) mobileMenuToggle.focus({ preventScroll: true });
+}
+mobileMenuToggle.addEventListener('click', () => setSidebarOpen(!sidebarOpen));
+$('sidebar-backdrop').addEventListener('click', () => setSidebarOpen(false, { restoreFocus: true }));
+let sidebarMobile = isMobileSidebar();
+window.addEventListener('resize', () => {
+  const mobile = isMobileSidebar();
+  if (mobile !== sidebarMobile) { sidebarMobile = mobile; setSidebarOpen(false); }
+});
+
 
 let menuCloseTimer = null;
 function closeAccountMenu(immediate = false) {
@@ -209,6 +232,7 @@ function showPage(name, { updateHistory = false, focus = false } = {}) {
   }
 }
 $('dashboard-screen').querySelectorAll('[data-page]').forEach(button => button.addEventListener('click', () => {
+  setSidebarOpen(false);
   showPage(button.dataset.page, { updateHistory: true, focus: true });
 }));
 accountToggle.addEventListener('click', () => {
@@ -219,7 +243,9 @@ document.addEventListener('click', event => {
   if (accountToggle.getAttribute('aria-expanded') === 'true' && !$('sidebar-account').contains(event.target)) closeAccountMenu();
 });
 document.addEventListener('keydown', event => {
-  if (event.key === 'Escape' && accountToggle.getAttribute('aria-expanded') === 'true') { closeAccountMenu(); accountToggle.focus(); }
+  if (event.key !== 'Escape') return;
+  if (accountToggle.getAttribute('aria-expanded') === 'true') { closeAccountMenu(); accountToggle.focus(); }
+  else if (sidebarOpen) setSidebarOpen(false, { restoreFocus: true });
 });
 window.addEventListener('popstate', () => {
   if (screen.id === 'dashboard-screen' && !screen.hidden) showPage(currentPage(), { focus: true });
@@ -237,7 +263,7 @@ async function show(id, immediate = false) {
   if (!immediate) next.classList.add('entering');
   next.hidden = false;
   screen = next;
-  if (id === 'dashboard-screen') showPage(currentPage());
+  if (id === 'dashboard-screen') { setSidebarOpen(false); showPage(currentPage()); }
   else closeAccountMenu(true);
   window.scrollTo(0, 0);
   requestAnimationFrame(() => requestAnimationFrame(() => next.classList.remove('entering')));

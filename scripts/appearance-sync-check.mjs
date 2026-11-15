@@ -59,10 +59,20 @@ try {
   assert.equal(await desktop.locator('#account-menu').isHidden(), true);
   await desktop.locator('#nav-play').click();
   assert.equal(await desktop.locator('#page-play').evaluate(el => getComputedStyle(el).animationName), 'view-entrance');
+  await phone.locator('#mobile-menu-toggle').click();
   await phone.locator('#nav-play').click();
   assert.equal(await phone.locator('#page-play').evaluate(el => getComputedStyle(el).animationName), 'none');
+  await phone.emulateMedia({ reducedMotion: 'no-preference' });
+  await phone.locator('#mobile-menu-toggle').click();
+  const drawerTransition = await phone.locator('#app-sidebar').evaluate(el => getComputedStyle(el).transitionDuration);
+  assert.ok(drawerTransition.includes('0.25s'), 'mobile drawer should slide smoothly');
+  await phone.waitForTimeout(300);
+  assert.equal(await phone.locator('#app-sidebar').evaluate(el => getComputedStyle(el).visibility), 'visible');
+  await phone.locator('#sidebar-backdrop').click({ position: { x: 385, y: 100 } });
+  await phone.waitForTimeout(300);
+  assert.equal(await phone.locator('#app-sidebar').isHidden(), true);
   console.log('✓ Two isolated sessions synchronize palette and theme without reload (mock Supabase)');
-  console.log('✓ Menu and page animations work; reduced motion disables them');
+  console.log('✓ Menu, page and mobile drawer animations work; reduced motion disables them');
 } finally {
   for (const browser of browsers) await browser.close();
 }

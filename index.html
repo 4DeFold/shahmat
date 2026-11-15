@@ -52,7 +52,9 @@
       </section>
 
       <section class="screen dashboard" id="dashboard-screen" hidden aria-label="Личный кабинет">
-        <aside class="app-sidebar" aria-label="Навигация">
+        <button class="mobile-menu-toggle" id="mobile-menu-toggle" type="button" aria-label="Открыть меню" aria-controls="app-sidebar" aria-expanded="false"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+        <div class="sidebar-backdrop" id="sidebar-backdrop" aria-hidden="true"></div>
+        <aside class="app-sidebar" id="app-sidebar" aria-label="Навигация">
           <button class="sidebar-brand wordmark" type="button" data-page="home" aria-label="shahmat.xyz — главная"><span class="title-highlight">shah</span>mat.xyz</button>
           <nav class="sidebar-nav" aria-label="Основная навигация">
             <button class="sidebar-item" id="nav-play" type="button" data-page="play"><span class="sidebar-icon" aria-hidden="true">♞</span><span>Играть</span></button>

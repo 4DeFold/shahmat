@@ -49,7 +49,7 @@ for (const device of devices) {
   });
   async function checkLayout(screen) {
     const metrics = await page.evaluate(() => {
-      const visible = [...document.querySelectorAll('.screen:not([hidden]) button, .screen:not([hidden]) input, .screen:not([hidden]) textarea, .screen:not([hidden]) .palette-option')].filter(el => el.getClientRects().length);
+      const visible = [...document.querySelectorAll('.screen:not([hidden]) button, .screen:not([hidden]) input, .screen:not([hidden]) textarea, .screen:not([hidden]) .palette-option')].filter(el => el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden');
       return {
         viewport: innerWidth, pageWidth: document.documentElement.scrollWidth,
         screenTop: document.querySelector('.screen:not([hidden])').getBoundingClientRect().top,
@@ -128,7 +128,26 @@ for (const device of devices) {
   await paletteName.dblclick();
   assert.equal(await page.evaluate(() => window.getSelection().toString()), '', 'palette text should not be selected by a double click');
   await screenshot('dashboard');
-  // The left rail remains available on all signed-in views.
+  // Mobile navigation starts closed and is opened by the menu button.
+  const mobileDrawer = device.width <= 700 || (device.touch && device.height <= 500);
+  const openDrawer = async () => {
+    if (mobileDrawer && await page.locator('#mobile-menu-toggle').getAttribute('aria-expanded') !== 'true') await page.locator('#mobile-menu-toggle').click();
+  };
+  if (mobileDrawer) {
+    assert.equal(await page.locator('#app-sidebar').isVisible(), false);
+    assert.equal(await page.locator('#mobile-menu-toggle').isVisible(), true);
+    await openDrawer();
+    assert.equal(await page.locator('#mobile-menu-toggle').getAttribute('aria-expanded'), 'true');
+    assert.equal(await page.locator('#dashboard-home').evaluate(el => el.inert), true);
+    await page.locator('#sidebar-backdrop').click({ position: { x: device.width - 5, y: 100 } });
+    assert.equal(await page.locator('#app-sidebar').isVisible(), false);
+    assert.equal(await page.locator('#dashboard-home').evaluate(el => el.inert), false);
+    await openDrawer();
+    await page.keyboard.press('Escape');
+    assert.equal(await page.locator('#app-sidebar').isVisible(), false);
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'mobile-menu-toggle');
+  }
+  await openDrawer();
   const alignment = await page.locator('.app-sidebar').evaluate(sidebar => {
     const brand = sidebar.querySelector('.sidebar-brand');
     const range = document.createRange(); range.selectNodeContents(brand);
@@ -137,12 +156,14 @@ for (const device of devices) {
   });
   assert.ok(alignment < 1.5, `${device.id}: logo must be centered in the rail (offset ${alignment}px)`);
   await page.locator('#nav-play').click();
+  if (mobileDrawer) assert.equal(await page.locator('#app-sidebar').isVisible(), false);
   assert.equal(await page.locator('#page-play').isVisible(), true);
   assert.equal(await page.locator('#dashboard-home').isVisible(), false);
   assert.equal(new URL(page.url()).hash, '#play');
   await checkLayout('play');
   await page.reload();
   await page.locator('#page-play').waitFor({ state: 'visible' });
+  await openDrawer();
   await page.locator('#account-toggle').click();
   assert.equal(await page.locator('#account-toggle').getAttribute('aria-expanded'), 'true');
   const activeColors = await page.locator('#nav-play').evaluate(el => ({ background: getComputedStyle(el).backgroundColor, color: getComputedStyle(el).color }));
@@ -154,9 +175,12 @@ for (const device of devices) {
       return Math.abs((button.top + button.bottom - arrow.top - arrow.bottom) / 2);
     });
     assert.ok(centeredArrow < 1, `${device.id}: profile arrow is vertically misaligned`);
+    await page.locator('.sidebar-brand').hover();
+    assert.equal(await page.locator('.sidebar-brand').evaluate(el => getComputedStyle(el).borderTopColor), 'rgba(0, 0, 0, 0)', 'logo must not show a hover border');
     const entry = page.locator('#account-menu [data-page=profile]');
     await entry.hover();
     assert.notEqual(await entry.evaluate(el => getComputedStyle(el).borderTopColor), 'rgba(0, 0, 0, 0)', 'hover shows border');
+    assert.equal(await entry.evaluate(el => getComputedStyle(el).borderTopWidth), '2px', 'hover border is twice as thick');
     await page.mouse.down();
     const pressed = await entry.evaluate(el => ({ background: getComputedStyle(el).backgroundColor, color: getComputedStyle(el).color }));
     assert.deepEqual(pressed, activeColors, 'pressed menu text and background must both invert');
@@ -167,6 +191,7 @@ for (const device of devices) {
   await page.keyboard.press('Escape');
   assert.equal(await page.locator('#account-menu').isVisible(), false);
   for (const name of ['profile', 'settings', 'help']) {
+    await openDrawer();
     await page.locator('#account-toggle').click();
     await page.locator(`#account-menu [data-page=${name}]`).click();
     assert.equal(await page.locator(`#page-${name}`).isVisible(), true);
@@ -176,6 +201,7 @@ for (const device of devices) {
   }
   await page.goBack();
   await page.locator('#page-settings').waitFor({ state: 'visible' });
+  await openDrawer();
   await page.locator('.sidebar-brand').click();
   assert.equal(await page.locator('#dashboard-home').isVisible(), true);
   assert.equal(new URL(page.url()).hash, '');
@@ -197,6 +223,7 @@ for (const device of devices) {
     await page.locator(`#dashboard-palettes label[data-choice=${palette}]`).click();
     assert.equal(await page.locator('.landing').getAttribute('data-palette-theme'), 'light');
   }
+  await openDrawer();
   await page.locator('#account-toggle').click();
   await page.locator('.signout').click(); await atTop('auth-screen');
   assert.deepEqual(errors, [], `${device.id}: browser errors`);
