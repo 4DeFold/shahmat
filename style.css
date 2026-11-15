@@ -50,6 +50,11 @@ html, body {
   min-height: 100%;
 }
 
+/* Match the canvas behind overscroll to the active page, including palettes. */
+html { background: var(--page-background); transition: background-color 1.5s ease; }
+body { transition: background-color 1.5s ease; }
+@media (prefers-reduced-motion: reduce) { html, body { transition: none; } }
+
 body {
   background: var(--page-background);
   /* Interface copy should not be accidentally selected during taps or drags. */
@@ -248,7 +253,7 @@ textarea { resize: vertical; min-height: 92px; }
 }
 
 /* Palettes are scoped to the signed-in area, never to the landing or auth. */
-.landing.palette-active {
+:is(.landing.palette-active, :root:has(.landing.palette-active)) {
   --surface: var(--page-background);
   --surface-raised: var(--page-background);
   --ink: var(--foreground);
@@ -258,28 +263,28 @@ textarea { resize: vertical; min-height: 92px; }
   --board-light: #f5f5f5;
   --board-dark: #999;
 }
-.landing.palette-active[data-palette='gray'] {
+:is(.landing.palette-active[data-palette='gray'], :root:has(.landing.palette-active[data-palette='gray'])) {
   --page-background: #f8f9fa; --foreground: #212529;
   --button-background: #343a40; --button-text: #f8f9fa;
   --surface: #f8f9fa; --surface-raised: #e9ecef; --ink: #212529;
   --line: #6c757d; --accent: #343a40; --accent-ink: #f8f9fa;
   --board-light: #dee2e6; --board-dark: #6c757d;
 }
-.landing.palette-active[data-palette='forest'] {
+:is(.landing.palette-active[data-palette='forest'], :root:has(.landing.palette-active[data-palette='forest'])) {
   --page-background: #f8f6f0; --foreground: #26362e;
   --button-background: #3d5a40; --button-text: #f8f6f0;
   --surface: #f8f6f0; --surface-raised: #eeeed2; --ink: #26362e;
   --line: #769656; --accent: #3d5a40; --accent-ink: #f8f6f0;
   --board-light: #eeeed2; --board-dark: #769656;
 }
-.landing.palette-active[data-palette='atelier'] {
+:is(.landing.palette-active[data-palette='atelier'], :root:has(.landing.palette-active[data-palette='atelier'])) {
   --page-background: #f6f1e7; --foreground: #26343b;
   --button-background: #314f58; --button-text: #f6f1e7;
   --surface: #f6f1e7; --surface-raised: #e9dcc7; --ink: #26343b;
   --line: #6f858a; --accent: #314f58; --accent-ink: #f6f1e7;
   --board-light: #e9dcc7; --board-dark: #6f858a;
 }
-.landing.palette-active[data-palette='wood'] {
+:is(.landing.palette-active[data-palette='wood'], :root:has(.landing.palette-active[data-palette='wood'])) {
   --page-background: #ede0d4; --foreground: #7f5539;
   --button-background: #7f5539; --button-text: #ede0d4;
   --surface: #ede0d4; --surface-raised: #e6ccb2; --ink: #7f5539;
@@ -287,24 +292,24 @@ textarea { resize: vertical; min-height: 92px; }
   --board-light: #ddb892; --board-dark: #b08968;
 }
 /* User theme applies only within the signed-in area. */
-.landing.palette-active[data-palette='monochrome'][data-palette-theme='light'] { --page-background: #fff; --foreground: #000; --button-background: #000; --button-text: #fff; color-scheme: light; }
-.landing.palette-active[data-palette='monochrome'][data-palette-theme='dark'] { --page-background: #000; --foreground: #fff; --button-background: #fff; --button-text: #000; color-scheme: dark; }
-.landing.palette-active[data-palette-theme='light'] { color-scheme: light; }
-.landing.palette-active[data-palette-theme='dark'] { color-scheme: dark; }
+:is(.landing.palette-active[data-palette='monochrome'][data-palette-theme='light'], :root:has(.landing.palette-active[data-palette='monochrome'][data-palette-theme='light'])) { --page-background: #fff; --foreground: #000; --button-background: #000; --button-text: #fff; color-scheme: light; }
+:is(.landing.palette-active[data-palette='monochrome'][data-palette-theme='dark'], :root:has(.landing.palette-active[data-palette='monochrome'][data-palette-theme='dark'])) { --page-background: #000; --foreground: #fff; --button-background: #fff; --button-text: #000; color-scheme: dark; }
+:is(.landing.palette-active[data-palette-theme='light'], :root:has(.landing.palette-active[data-palette-theme='light'])) { color-scheme: light; }
+:is(.landing.palette-active[data-palette-theme='dark'], :root:has(.landing.palette-active[data-palette-theme='dark'])) { color-scheme: dark; }
 .landing.palette-active[data-palette-theme='dark'] .board-squares span { color: var(--accent-ink); }
-.landing.palette-active[data-palette='gray'][data-palette-theme='dark'] {
+:is(.landing.palette-active[data-palette='gray'][data-palette-theme='dark'], :root:has(.landing.palette-active[data-palette='gray'][data-palette-theme='dark'])) {
   --page-background: #212529; --foreground: #f8f9fa; --button-background: #e9ecef; --button-text: #212529;
   --surface: #343a40; --surface-raised: #495057; --ink: #f8f9fa; --line: #adb5bd; --accent: #dee2e6; --accent-ink: #212529; --board-light: #dee2e6; --board-dark: #6c757d;
 }
-.landing.palette-active[data-palette='forest'][data-palette-theme='dark'] {
+:is(.landing.palette-active[data-palette='forest'][data-palette-theme='dark'], :root:has(.landing.palette-active[data-palette='forest'][data-palette-theme='dark'])) {
   --page-background: #26362e; --foreground: #f8f6f0; --button-background: #eeeed2; --button-text: #26362e;
   --surface: #3d5a40; --surface-raised: #3d5a40; --ink: #f8f6f0; --line: #769656; --accent: #eeeed2; --accent-ink: #26362e; --board-light: #eeeed2; --board-dark: #769656;
 }
-.landing.palette-active[data-palette='atelier'][data-palette-theme='dark'] {
+:is(.landing.palette-active[data-palette='atelier'][data-palette-theme='dark'], :root:has(.landing.palette-active[data-palette='atelier'][data-palette-theme='dark'])) {
   --page-background: #26343b; --foreground: #f6f1e7; --button-background: #e9dcc7; --button-text: #26343b;
   --surface: #314f58; --surface-raised: #314f58; --ink: #f6f1e7; --line: #6f858a; --accent: #e9dcc7; --accent-ink: #26343b; --board-light: #e9dcc7; --board-dark: #6f858a;
 }
-.landing.palette-active[data-palette='wood'][data-palette-theme='dark'] {
+:is(.landing.palette-active[data-palette='wood'][data-palette-theme='dark'], :root:has(.landing.palette-active[data-palette='wood'][data-palette-theme='dark'])) {
   --page-background: #7f5539; --foreground: #ede0d4; --button-background: #ede0d4; --button-text: #7f5539;
   --surface: #7f5539; --surface-raised: #9c6644; --ink: #ede0d4; --line: #ddb892; --accent: #ede0d4; --accent-ink: #7f5539; --board-light: #e6ccb2; --board-dark: #b08968;
 }

@@ -246,7 +246,7 @@ function showPage(name, { updateHistory = false, focus = false } = {}) {
   closeAccountMenu();
   if (focus) {
     window.scrollTo(0, 0);
-    const heading = name === 'home' ? $('dashboard-title') : $('page-' + name + '-title');
+    const heading = name === 'profile' ? $('dashboard-title') : $('page-' + name + '-title');
     heading.setAttribute('tabindex', '-1');
     heading.focus({ preventScroll: true });
   }

@@ -275,10 +275,13 @@ test('profile editing can be cancelled without saving changes', async () => {
   assert.equal(getProfile().bio, '');
 });
 
-test('sidebar navigates between empty pages and back to the existing home', async () => {
+test('sidebar navigates between pages, moves the dashboard to profile and returns to empty home', async () => {
   const { $, click, document, window } = await setup({ existing: true, palette: 'forest' });
   const pageButton = name => document.querySelector(`#dashboard-screen [data-page="${name}"]`);
   assert.equal($('dashboard-home').hidden, false);
+  assert.equal($('dashboard-home').textContent.trim(), 'Главная');
+  assert.equal($('page-profile').hidden, true);
+  assert.ok($('page-profile').contains($('dashboard-palettes')));
   await click('nav-play');
   assert.equal($('dashboard-home').hidden, true);
   assert.equal($('page-play').hidden, false);
@@ -290,6 +293,10 @@ test('sidebar navigates between empty pages and back to the existing home', asyn
     if ($('account-menu').hidden) await click('account-toggle');
     pageButton(name).click(); await tick();
     assert.equal($(`page-${name}`).hidden, false);
+    if (name === 'profile') {
+      assert.equal(document.activeElement, $('dashboard-title'));
+      assert.equal($('dashboard-title').textContent, 'Привет, Player.');
+    }
     assert.equal($('account-menu').hidden, true);
     assert.equal(window.location.hash, `#${name}`);
     assert.equal(document.querySelector('.landing').dataset.palette, 'forest');
@@ -297,7 +304,8 @@ test('sidebar navigates between empty pages and back to the existing home', asyn
   document.querySelector('.sidebar-brand').click(); await tick();
   assert.equal($('dashboard-home').hidden, false);
   assert.equal(window.location.hash, '');
-  assert.equal($('dashboard-title').textContent, 'Привет, Player.');
+  assert.equal(document.activeElement, $('page-home-title'));
+  assert.equal($('page-profile').hidden, true);
   await click('account-toggle');
   document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
   assert.equal($('account-menu').hidden, true);

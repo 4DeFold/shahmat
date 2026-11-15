@@ -71,7 +71,8 @@
             <button class="sidebar-item sidebar-account-toggle" id="account-toggle" type="button" aria-expanded="false" aria-controls="account-menu"><span class="sidebar-icon" aria-hidden="true">♟</span><span>Профиль</span><svg class="sidebar-chevron" aria-hidden="true" viewBox="0 0 16 16" fill="none"><path d="m4 10 4-4 4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
           </div>
         </aside>
-        <div class="dashboard-home" id="dashboard-home" data-view="home">
+        <section class="empty-page" id="dashboard-home" data-view="home" aria-labelledby="page-home-title"><h2 id="page-home-title" tabindex="-1">Главная</h2></section>
+        <div class="dashboard-home" id="page-profile" data-view="profile" hidden>
         <div class="dashboard-layout">
           <div class="dashboard-main">
             <div class="welcome"><p class="dashboard-overline"><span class="status-dot"></span> ТВОЁ ПРОСТРАНСТВО</p><h2 id="dashboard-title">Привет.</h2><p class="dashboard-intro">Здесь начинается твоя шахматная история.</p></div>
@@ -94,7 +95,6 @@
         <footer class="dashboard-footer"><span>SHAHMAT.XYZ</span><span>ТВОЯ ИГРА. ТВОЙ ПУТЬ.</span></footer>
         </div>
         <section class="empty-page" id="page-play" data-view="play" hidden aria-labelledby="page-play-title"><h2 id="page-play-title" tabindex="-1">Играть</h2></section>
-        <section class="empty-page" id="page-profile" data-view="profile" hidden aria-labelledby="page-profile-title"><h2 id="page-profile-title" tabindex="-1">Профиль</h2></section>
         <section class="empty-page" id="page-settings" data-view="settings" hidden aria-labelledby="page-settings-title"><h2 id="page-settings-title" tabindex="-1">Настройки</h2></section>
         <section class="empty-page" id="page-help" data-view="help" hidden aria-labelledby="page-help-title"><h2 id="page-help-title" tabindex="-1">Помощь</h2></section>
       </section>
