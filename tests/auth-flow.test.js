@@ -6,8 +6,8 @@ import { JSDOM } from 'jsdom';
 const html = await readFile('index.html', 'utf8');
 const source = (await readFile('app.js', 'utf8')).replace(/import .*?;\n/g, '');
 const tick = () => new Promise(resolve => setTimeout(resolve, 10));
-async function setup({ existing = false, palette = 'monochrome', failSave = false, systemDark = false, initialStorage = {}, saveHandler = null, getUserHandler = null, userId = 'user-1', otpReady = true, autoConfirm = false } = {}) {
-  const dom = new JSDOM(html, { runScripts: 'outside-only', url: 'https://example.com' });
+async function setup({ existing = false, palette = 'monochrome', failSave = false, systemDark = false, initialStorage = {}, saveHandler = null, getUserHandler = null, userId = 'user-1', otpReady = true, autoConfirm = false, url = 'https://example.com', accessToken = null } = {}) {
+  const dom = new JSDOM(html, { runScripts: 'outside-only', url });
   const { window } = dom;
   let loggedIn = existing;
   let sessionUserId = userId;
@@ -18,7 +18,7 @@ async function setup({ existing = false, palette = 'monochrome', failSave = fals
   let signUps = 0, resetRequests = 0, resends = 0, lastVerification = null, newPassword = null;
   const db = {
     auth: {
-      getSession: async () => ({ data: { session: loggedIn ? { user: { ...user(), id: sessionUserId } } : null } }),
+      getSession: async () => ({ data: { session: loggedIn ? { user: { ...user(), id: sessionUserId }, access_token: accessToken } : null } }),
       getUser: async () => getUserHandler ? getUserHandler() : ({ data: { user: loggedIn ? user() : null } }),
       signUp: async () => { signUps++; loggedIn = autoConfirm; return { data: { session: autoConfirm ? { user: user() } : null } }; },
       resetPasswordForEmail: async () => { resetRequests++; return { error: null }; },
@@ -435,4 +435,15 @@ test('recovery verifies a code before allowing a matching new password', async (
   assert.equal(app.$('auth-screen').hidden, false);
   assert.equal(app.window.sessionStorage.getItem('shahmat.recovery-pending'), null);
   assert.match(app.$('auth-message').textContent, /Пароль изменён/);
+});
+
+
+test('a recovery link opens password reset only for its matching session', async () => {
+  const app = await setup({ existing: true, url: 'https://example.com/#access_token=valid-token&type=recovery', accessToken: 'valid-token' });
+  assert.equal(app.$('reset-password-screen').hidden, false);
+  assert.equal(app.$('dashboard-screen').hidden, true);
+  assert.equal(app.window.sessionStorage.getItem('shahmat.recovery-pending'), '1');
+  const stale = await setup({ existing: true, url: 'https://example.com/#access_token=invalid-token&type=recovery', accessToken: 'existing-session-token' });
+  assert.equal(stale.$('reset-password-screen').hidden, true);
+  assert.equal(stale.$('dashboard-screen').hidden, false);
 });

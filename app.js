@@ -1,6 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 import './theme.js';
 
+// Preserve the callback type before Supabase consumes and clears the URL fragment.
+const callbackParams = new URLSearchParams(window.location.hash.slice(1));
+const recoveryLinkToken = callbackParams.get('type') === 'recovery' ? callbackParams.get('access_token') : null;
 // Publishable key is intended for browser use; database access is restricted by RLS.
 const supabase = createClient('https://eswyxbyddkajysogtglp.supabase.co', 'sb_publishable_w9pinHWr8XK5F9CflsSJmQ_4KFMKzHS');
 const $ = id => document.getElementById(id);
@@ -573,8 +576,11 @@ async function initialize() {
   try {
     const { data, error } = await supabase.auth.getSession();
     if (error) throw error;
-    if (data.session && recoveryPending()) await show('reset-password-screen', true);
-    else if (data.session) await loadProfile(data.session.user, true);
+    const verifiedRecoveryLink = recoveryLinkToken && data.session?.access_token === recoveryLinkToken;
+    if (data.session && (recoveryPending() || verifiedRecoveryLink)) {
+      setRecoveryPending(true);
+      await show('reset-password-screen', true);
+    } else if (data.session) await loadProfile(data.session.user, true);
     else { setRecoveryPending(false); await show('landing-screen', true); }
   } catch (error) {
     await show('auth-screen', true);

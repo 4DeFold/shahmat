@@ -335,6 +335,14 @@ for (const device of devices) {
   await openDrawer();
   await page.locator('#account-toggle').click();
   await page.locator('.signout').click(); await atTop('auth-screen');
+  // Exercise a recovery link issued by Supabase, not just the typed-code flow.
+  const recoveryToken = ['e30', Buffer.from(JSON.stringify({ sub: user.id, exp: Math.floor(Date.now() / 1000) + 3600, role: 'authenticated' })).toString('base64url'), 'x'].join('.');
+  // Navigate away first: a hash-only navigation would not reload the application.
+  await page.goto('about:blank');
+  await page.goto(`${baseURL}/#access_token=${recoveryToken}&refresh_token=fixture-refresh-token&expires_in=3600&token_type=bearer&type=recovery`);
+  await atTop('reset-password-screen');
+  assert.equal(await page.evaluate(() => sessionStorage.getItem('shahmat.recovery-pending')), '1');
+  await page.locator('#reset-cancel').click(); await atTop('auth-screen');
   assert.deepEqual(errors, [], `${device.id}: browser errors`);
   results.push({ ...device, hero });
   console.log(`✓ ${device.label} ${device.width}×${device.height} · PLAY/заголовок ${(hero.ratio * 100).toFixed(1)}%`);

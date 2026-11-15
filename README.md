@@ -34,15 +34,16 @@ Before enabling the build flag for an environment:
 1. Configure a custom SMTP provider under Supabase Authentication → Emails →
    SMTP Settings, including a verified sender. The built-in sender only delivers
    to authorized team addresses and has a small shared email limit.
-2. In Authentication → Email Templates, replace the **Confirm signup** and
-   **Reset password** email bodies with `supabase/templates/confirmation.html`
-   and `supabase/templates/recovery.html`. Both must include `{{ .Token }}`;
-   the UI consumes codes, not links. Configure an email OTP length of **6**
-   (this project's current value is 8) and an expiry no longer than 3600 seconds
-   in the Auth email settings or the Supabase Management API.
-3. Enable **Confirm email** for the Email provider (the existing project currently
-   auto-confirms), and check the server's verification/email rate limits. A
-   minimum password length of at least 8 in Auth settings is recommended too.
+2. In Authentication → Email Templates, use the **Confirm signup** and
+   **Reset password** bodies in `supabase/templates/confirmation.html` and
+   `supabase/templates/recovery.html`, or custom templates with `{{ .Token }}`.
+   Links using `{{ .ConfirmationURL }}` are supported as well. Configure a
+   **6-digit** email OTP and an expiry no longer than 3600 seconds in the Auth
+   email settings or the Supabase Management API. Set the Auth Site URL to the
+   production site so email links lead to the deployed application.
+3. Enable **Confirm email** for the Email provider and check the server's
+   verification/email rate limits. A minimum password length of at least 8 in
+   Auth settings is recommended too.
 4. Set `VITE_EMAIL_OTP_READY=true` in the relevant Vercel environment and
    redeploy. Do not enable it while Supabase auto-confirm is on: the frontend
    cannot prevent direct API clients from bypassing verification. If Auth still
