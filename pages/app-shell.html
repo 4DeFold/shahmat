@@ -1,0 +1,94 @@
+      <section class="screen panel" id="auth-screen" hidden aria-label="Вход и регистрация">
+        <div class="panel-top"><button class="text-button back" type="button" data-action="home">← На главную</button></div>
+        <div class="wordmark"><span class="title-highlight">shah</span>mat.xyz</div>
+        <div class="auth-tabs" aria-label="Авторизация"><button type="button" id="tab-login" class="tab active" aria-pressed="true">Вход</button><button type="button" id="tab-signup" class="tab" aria-pressed="false">Регистрация</button></div>
+        <form id="auth-form">
+          <label for="email">Электронная почта</label><input id="email" type="email" autocomplete="email" placeholder="you@example.com" required maxlength="254">
+          <label for="password">Пароль</label><input id="password" type="password" autocomplete="current-password" placeholder="Не менее 6 символов" required minlength="6" maxlength="72">
+          <button class="text-button auth-forgot" id="forgot-password" type="button">Забыли пароль?</button>
+          <p class="message" id="auth-message" role="status" aria-live="polite"></p>
+          <button class="primary" id="auth-submit" type="submit">Войти <span>↗</span></button>
+        </form>
+      </section>
+
+      <section class="screen panel" id="verify-screen" hidden aria-labelledby="verify-title">
+        <div class="panel-top"><button class="text-button" id="verify-back" type="button">← К входу</button></div>
+        <div class="wordmark"><span class="title-highlight">shah</span>mat.xyz</div>
+        <div class="section-head"><h2 id="verify-title">Проверь почту.</h2><p class="subtle" id="verify-description"></p></div>
+        <form id="verify-form">
+          <label for="verify-code">Шестизначный код</label>
+          <input id="verify-code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required>
+          <p class="message" id="verify-message" role="status" aria-live="polite"></p>
+          <button class="primary" id="verify-submit" type="submit">Подтвердить <span>→</span></button>
+          <button class="text-button auth-secondary" id="resend-code" type="button">Отправить код ещё раз</button>
+        </form>
+      </section>
+
+      <section class="screen panel" id="recovery-screen" hidden aria-labelledby="recovery-title">
+        <div class="panel-top"><button class="text-button" id="recovery-back" type="button">← К входу</button></div>
+        <div class="wordmark"><span class="title-highlight">shah</span>mat.xyz</div>
+        <div class="section-head"><h2 id="recovery-title">Восстановление.</h2><p class="subtle">Укажи почту аккаунта. Если аккаунт существует, мы отправим код для смены пароля.</p></div>
+        <form id="recovery-form">
+          <label for="recovery-email">Электронная почта</label><input id="recovery-email" type="email" autocomplete="email" required maxlength="254">
+          <p class="message" id="recovery-message" role="status" aria-live="polite"></p>
+          <button class="primary" id="recovery-submit" type="submit">Получить код <span>→</span></button>
+        </form>
+      </section>
+
+      <section class="screen panel" id="reset-password-screen" hidden aria-labelledby="reset-password-title">
+        <div class="panel-top"><span class="wordmark small"><span class="title-highlight">shah</span>mat.xyz</span><button class="text-button" id="reset-cancel" type="button">Отмена</button></div>
+        <div class="section-head"><h2 id="reset-password-title">Новый пароль.</h2><p class="subtle">Придумай новый пароль для аккаунта.</p></div>
+        <form id="reset-password-form">
+          <label for="new-password">Новый пароль</label><input id="new-password" type="password" autocomplete="new-password" required minlength="8" maxlength="72" placeholder="Не менее 8 символов">
+          <label for="confirm-password">Повтори пароль</label><input id="confirm-password" type="password" autocomplete="new-password" required minlength="8" maxlength="72">
+          <p class="message" id="reset-password-message" role="status" aria-live="polite"></p>
+          <button class="primary" id="reset-password-submit" type="submit">Сохранить пароль <span>→</span></button>
+        </form>
+      </section>
+
+      <section class="screen panel" id="profile-screen" hidden aria-labelledby="profile-title">
+        <div class="panel-top"><span class="wordmark small"><span class="title-highlight">shah</span>mat.xyz</span><button class="text-button" id="profile-cancel" type="button" hidden>Отмена</button></div>
+        <div class="section-head"><h2 id="profile-title">Это ты.</h2><p class="subtle">Выбери имя, под которым тебя узнают другие игроки.</p></div>
+        <form id="profile-form">
+          <label for="username">Имя пользователя <span class="required">*</span></label><input id="username" autocomplete="nickname" placeholder="например, shahmatplayer" required minlength="3" maxlength="24" pattern="[A-Za-z0-9_]{3,24}" aria-describedby="username-help"><p class="hint" id="username-help">3–24 символа: латинские буквы, цифры и _</p>
+          <label for="bio">О себе <span class="optional">необязательно</span></label><textarea id="bio" maxlength="280" rows="3" placeholder="Пара слов о тебе и шахматах"></textarea>
+          <p class="message" id="profile-message" role="status" aria-live="polite"></p>
+          <button class="primary" type="submit" id="profile-submit">Продолжить <span>→</span></button>
+        </form>
+      </section>
+
+      <section class="screen panel" id="palette-screen" hidden aria-labelledby="palette-title">
+        <div class="panel-top"><span class="wordmark small"><span class="title-highlight">shah</span>mat.xyz</span></div>
+        <div class="section-head"><h2 id="palette-title">Твой стиль.</h2><p class="subtle">Выбери палитру. Повторное нажатие меняет светлую и тёмную тему.</p></div>
+        <form id="palette-form">
+          <fieldset class="palette-list" id="onboarding-palettes"><legend class="visually-hidden">Выбери палитру</legend>            <label class="palette-option" data-choice="monochrome"><input type="radio" name="onboarding-palette" value="monochrome" checked><span class="palette-swatch monochrome" aria-hidden="true"></span><span class="palette-name">Монохром<small>Классическая палитра</small></span><span class="palette-check" aria-hidden="true">✓</span></label>
+            <label class="palette-option" data-choice="gray"><input type="radio" name="onboarding-palette" value="gray"><span class="palette-swatch gray" aria-hidden="true"></span><span class="palette-name">Графит<small>Мягкие оттенки серого</small></span><span class="palette-check" aria-hidden="true">✓</span></label>
+            <label class="palette-option" data-choice="forest"><input type="radio" name="onboarding-palette" value="forest"><span class="palette-swatch forest" aria-hidden="true"></span><span class="palette-name">Лес<small>Спокойные зелёные оттенки</small></span><span class="palette-check" aria-hidden="true">✓</span></label>
+            <label class="palette-option" data-choice="atelier"><input type="radio" name="onboarding-palette" value="atelier"><span class="palette-swatch atelier" aria-hidden="true"></span><span class="palette-name">Шахматный кабинет<small>Холодные оттенки и терракота</small></span><span class="palette-check" aria-hidden="true">✓</span></label>
+            <label class="palette-option" data-choice="wood"><input type="radio" name="onboarding-palette" value="wood"><span class="palette-swatch wood" aria-hidden="true"></span><span class="palette-name">Тёплое дерево<small>Природные коричневые оттенки</small></span><span class="palette-check" aria-hidden="true">✓</span></label></fieldset>
+          <button class="primary" id="palette-submit" type="submit">Готово <span>↗</span></button>
+        </form>
+      </section>
+
+      <section class="screen dashboard" id="dashboard-screen" hidden aria-label="Личный кабинет">
+        <div class="mobile-header"><a class="mobile-brand wordmark" id="mobile-brand" href="/home" data-page="home" aria-label="shahmat.xyz — главная"><span class="title-highlight">shah</span>mat.xyz</a></div>
+        <button class="mobile-menu-toggle" id="mobile-menu-toggle" type="button" aria-label="Открыть меню" aria-controls="app-sidebar" aria-expanded="false"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+        <div class="sidebar-backdrop" id="sidebar-backdrop" aria-hidden="true"></div>
+        <aside class="app-sidebar" id="app-sidebar" aria-label="Навигация">
+          <a class="sidebar-brand wordmark" href="/home" data-page="home" aria-label="shahmat.xyz — главная"><span class="title-highlight">shah</span>mat.xyz</a>
+          <nav class="sidebar-nav" aria-label="Основная навигация">
+            <a class="sidebar-item" id="nav-play" href="/play" data-page="play"><span class="sidebar-icon" aria-hidden="true">♞</span><span>Играть</span></a>
+          </nav>
+          <div class="sidebar-account" id="sidebar-account">
+            <div class="account-menu" id="account-menu" hidden><div class="account-menu-content">
+              <a href="/profile" data-page="profile">Профиль</a>
+              <a href="/settings" data-page="settings">Настройки</a>
+              <a href="/help" data-page="help">Помощь</a>
+              <button class="signout" type="button">Выйти</button>
+              <p id="sidebar-message" role="alert"></p>
+            </div></div>
+            <button class="sidebar-item sidebar-account-toggle" id="account-toggle" type="button" aria-expanded="false" aria-controls="account-menu"><span class="sidebar-icon" aria-hidden="true">♟</span><span>Профиль</span><svg class="sidebar-chevron" aria-hidden="true" viewBox="0 0 16 16" fill="none"><path d="m4 10 4-4 4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          </div>
+        </aside>
+        <div id="page-content"></div>
+      </section>

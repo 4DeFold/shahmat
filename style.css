@@ -179,7 +179,15 @@ body.startup-ready .play-button {
 }
 
 @media (max-width: 480px) {
-  .landing__content { --hero-size: clamp(2.6rem, 10vw, 4.8rem); }
+  /* The wordmark occupies roughly 90% of the viewport; controls keep their own size. */
+  .landing:has(.landing__content:not([hidden])) { padding-inline: 5vw; }
+  .landing__content { --hero-size: 16vw; }
+  .landing__content h1 { white-space: nowrap; }
+  .landing__content .play-button {
+    width: clamp(120px, 36vw, 160px);
+    height: 48px;
+    font-size: 18px;
+  }
 }
 
 @font-face {
@@ -461,7 +469,7 @@ textarea { resize: vertical; min-height: 92px; }
 }
 .sidebar-icon { width: 26px; flex: 0 0 26px; text-align: center; font: 29px/1 Georgia, serif; }
 .sidebar-item[aria-current='page'], .sidebar-account-toggle[aria-expanded='true'] { background: var(--accent); color: var(--accent-ink); }
-@media (hover: hover) { .sidebar-item:hover:not([aria-current='page']):not([aria-expanded='true']), .account-menu button:hover { background: var(--surface); } }
+@media (hover: hover) { .sidebar-item:hover:not([aria-current='page']):not([aria-expanded='true']), .account-menu :is(button, a):hover { background: var(--surface); } }
 .sidebar-account { position: relative; margin-top: auto; }
 .sidebar-chevron { margin-left: auto; font: 18px/1 Arial, sans-serif; }
 .account-menu {
@@ -478,7 +486,7 @@ textarea { resize: vertical; min-height: 92px; }
   box-shadow: 0 8px 24px #0003;
 }
 .account-menu-content { min-height: 0; overflow: hidden; padding: 8px 6px; }
-.account-menu button {
+.account-menu :is(button, a) {
   display: block;
   width: 100%;
   min-height: 44px;
@@ -493,7 +501,7 @@ textarea { resize: vertical; min-height: 92px; }
 }
 #sidebar-message { margin: 0; padding: 0 12px; font-size: 12px; line-height: 1.4; }
 #sidebar-message:empty { display: none; }
-.sidebar-brand:focus-visible, .sidebar-item:focus-visible, .account-menu button:focus-visible { outline: 2px solid var(--foreground); outline-offset: 2px; }
+.sidebar-brand:focus-visible, .sidebar-item:focus-visible, .account-menu :is(button, a):focus-visible { outline: 2px solid var(--foreground); outline-offset: 2px; }
 .empty-page { min-height: calc(100svh - 80px); padding-top: 55px; }
 @media (max-width: 700px) {
   .landing:has(.dashboard:not([hidden])) { padding: 24px 18px 24px 86px; }
@@ -526,17 +534,17 @@ textarea { resize: vertical; min-height: 92px; }
   border: 1px solid transparent;
   text-align: center;
 }
-.sidebar-item, .account-menu button { border: 1px solid transparent; }
+.sidebar-item, .account-menu :is(button, a) { border: 1px solid transparent; }
 .landing.palette-active .app-sidebar .sidebar-brand,
 .landing.palette-active .app-sidebar .sidebar-item,
-.landing.palette-active .app-sidebar .account-menu button {
+.landing.palette-active .app-sidebar .account-menu :is(button, a) {
   transition: color .2s ease, background-color .2s ease, border-color .2s ease, transform .2s ease;
 }
 @media (hover: hover) {
-  .sidebar-brand:hover, .sidebar-item:hover, .account-menu button:hover { border-color: var(--foreground); }
-  .sidebar-item:hover:not([aria-current='page']):not([aria-expanded='true']), .account-menu button:hover { background: transparent; }
+  .sidebar-brand:hover, .sidebar-item:hover, .account-menu :is(button, a):hover { border-color: var(--foreground); }
+  .sidebar-item:hover:not([aria-current='page']):not([aria-expanded='true']), .account-menu :is(button, a):hover { background: transparent; }
 }
-.sidebar-item:active, .account-menu button:active {
+.sidebar-item:active, .account-menu :is(button, a):active {
   background: var(--accent);
   color: var(--accent-ink);
   border-color: var(--accent);
@@ -568,7 +576,7 @@ textarea { resize: vertical; min-height: 92px; }
   .landing.palette-active .app-sidebar .sidebar-brand,
   .landing.palette-active .app-sidebar .sidebar-item,
   .landing.palette-active .app-sidebar .account-menu,
-  .landing.palette-active .app-sidebar .account-menu button,
+  .landing.palette-active .app-sidebar .account-menu :is(button, a),
   .landing.palette-active .app-sidebar .sidebar-chevron { transition: none; }
   .page-enter { animation: none; }
 }
@@ -580,7 +588,7 @@ textarea { resize: vertical; min-height: 92px; }
 }
 
 /* Navigation hover borders do not change control dimensions. */
-.sidebar-item, .account-menu button { border-width: 2px; }
+.sidebar-item, .account-menu :is(button, a) { border-width: 2px; }
 @media (hover: hover) { .sidebar-brand:hover { border-color: transparent; } }
 .sidebar-brand:active { border-color: transparent; }
 .mobile-menu-toggle, .mobile-header, .sidebar-backdrop { display: none; }
@@ -674,3 +682,6 @@ textarea { resize: vertical; min-height: 92px; }
 /* Secondary authentication actions follow the existing monochrome form style. */
 .auth-forgot, .auth-secondary { display: block; margin: 16px 0 0; }
 @media (pointer: coarse) { .auth-forgot, .auth-secondary { min-height: 44px; } }
+
+/* Real links support opening pages in a new tab and retain navigation styling. */
+.sidebar-brand, .mobile-brand, .sidebar-item, .account-menu a { text-decoration: none; cursor: pointer; font-family: inherit; }

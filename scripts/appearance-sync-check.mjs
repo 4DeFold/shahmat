@@ -68,9 +68,11 @@ try {
   await desktop.waitForTimeout(350);
   assert.equal(await desktop.locator('#account-menu').isHidden(), true);
   await desktop.locator('#nav-play').click();
+  await desktop.locator('#page-play').waitFor({ state: 'visible' });
   assert.equal(await desktop.locator('#page-play').evaluate(el => getComputedStyle(el).animationName), 'view-entrance');
   await phone.locator('#mobile-menu-toggle').click();
   await phone.locator('#nav-play').click();
+  await phone.locator('#page-play').waitFor({ state: 'visible' });
   assert.equal(await phone.locator('#page-play').evaluate(el => getComputedStyle(el).animationName), 'none');
   await phone.emulateMedia({ reducedMotion: 'no-preference' });
   await phone.locator('#mobile-menu-toggle').click();

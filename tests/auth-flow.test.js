@@ -3,10 +3,14 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { JSDOM } from 'jsdom';
 
-const html = await readFile('index.html', 'utf8');
-const source = (await readFile('app.js', 'utf8')).replace(/import .*?;\n/g, '');
+const rootHtml = await readFile('index.html', 'utf8');
+const shellHtml = await readFile('pages/app-shell.html', 'utf8');
+const pageHtml = (await Promise.all(['home', 'play', 'profile', 'settings', 'help'].map(name => readFile(`pages/${name}.html`, 'utf8')))).join('');
+// Unit tests preload views; browser checks verify the actual lazy loading.
+const html = rootHtml.replace('    </main>', shellHtml.replace('<div id="page-content"></div>', `<div id="page-content">${pageHtml}</div>`) + '    </main>');
+const source = (await readFile('app.js', 'utf8')).replace(/import .*?;\n/g, '').replace('export const appReady = initialize();', 'initialize();');
 const tick = () => new Promise(resolve => setTimeout(resolve, 10));
-async function setup({ existing = false, palette = 'monochrome', failSave = false, systemDark = false, initialStorage = {}, saveHandler = null, getUserHandler = null, userId = 'user-1', otpReady = true, autoConfirm = false, url = 'https://example.com', accessToken = null } = {}) {
+async function setup({ existing = false, palette = 'monochrome', failSave = false, systemDark = false, initialStorage = {}, saveHandler = null, getUserHandler = null, userId = 'user-1', otpReady = true, autoConfirm = false, signupError = null, url = 'https://example.com', accessToken = null } = {}) {
   const dom = new JSDOM(html, { runScripts: 'outside-only', url });
   const { window } = dom;
   let loggedIn = existing;
@@ -20,7 +24,7 @@ async function setup({ existing = false, palette = 'monochrome', failSave = fals
     auth: {
       getSession: async () => ({ data: { session: loggedIn ? { user: { ...user(), id: sessionUserId }, access_token: accessToken } : null } }),
       getUser: async () => getUserHandler ? getUserHandler() : ({ data: { user: loggedIn ? user() : null } }),
-      signUp: async () => { signUps++; loggedIn = autoConfirm; return { data: { session: autoConfirm ? { user: user() } : null } }; },
+      signUp: async () => { signUps++; if (signupError) return { data: null, error: signupError }; loggedIn = autoConfirm; return { data: { session: autoConfirm ? { user: user() } : null } }; },
       resetPasswordForEmail: async () => { resetRequests++; return { error: null }; },
       resend: async () => { resends++; return { error: null }; },
       verifyOtp: async values => { lastVerification = values; if (values.token !== '123456') return { data: { session: null }, error: new Error('invalid') }; loggedIn = true; return { data: { session: { user: user() } }, error: null }; },
@@ -291,7 +295,7 @@ test('sidebar navigates between pages, moves the dashboard to profile and return
   await click('nav-play');
   assert.equal($('dashboard-home').hidden, true);
   assert.equal($('page-play').hidden, false);
-  assert.equal(window.location.hash, '#play');
+  assert.equal(window.location.pathname, '/play');
   assert.equal($('nav-play').getAttribute('aria-current'), 'page');
   await click('account-toggle');
   assert.equal($('account-toggle').getAttribute('aria-expanded'), 'true');
@@ -304,12 +308,12 @@ test('sidebar navigates between pages, moves the dashboard to profile and return
       assert.equal($('dashboard-title').textContent, 'Привет, Player.');
     }
     assert.equal($('account-menu').hidden, true);
-    assert.equal(window.location.hash, `#${name}`);
+    assert.equal(window.location.pathname, `/${name}`);
     assert.equal(document.querySelector('.landing').dataset.palette, 'forest');
   }
   document.querySelector('.sidebar-brand').click(); await tick();
   assert.equal($('dashboard-home').hidden, false);
-  assert.equal(window.location.hash, '');
+  assert.equal(window.location.pathname, '/home');
   assert.equal(document.activeElement, $('page-home-title'));
   assert.equal($('page-profile').hidden, true);
   await click('account-toggle');
@@ -446,4 +450,23 @@ test('a recovery link opens password reset only for its matching session', async
   const stale = await setup({ existing: true, url: 'https://example.com/#access_token=invalid-token&type=recovery', accessToken: 'existing-session-token' });
   assert.equal(stale.$('reset-password-screen').hidden, true);
   assert.equal(stale.$('dashboard-screen').hidden, false);
+});
+
+test('signup errors give actionable messages without exposing server details', async () => {
+  for (const [error, expected] of [
+    [{ code: 'email_send_failed', message: 'private SMTP detail' }, /Не удалось отправить письмо/],
+    [{ code: 'unexpected_failure', message: 'Error sending confirmation email' }, /Не удалось отправить письмо/],
+    [{ code: 'over_email_send_rate_limit', status: 429 }, /Слишком много попыток/],
+    [{ name: 'AuthRetryableFetchError', message: 'Failed to fetch' }, /связаться с сервером/],
+    [{ code: 'email_address_invalid' }, /Проверь адрес/],
+    [{ code: 'unknown', message: 'private server detail' }, /Не получилось выполнить действие/],
+  ]) {
+    const app = await setup({ signupError: error });
+    await app.click('play'); await app.click('tab-signup');
+    app.$('email').value = 'player@example.com'; app.$('password').value = 'password123';
+    await app.submit('auth-form');
+    assert.match(app.$('auth-message').textContent, expected);
+    assert.doesNotMatch(app.$('auth-message').textContent, /private/);
+    assert.equal(app.$('verify-screen').hidden, true);
+  }
 });
