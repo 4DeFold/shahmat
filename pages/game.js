@@ -6,10 +6,10 @@ import './game-theme.js';
 
 const supabase = createClient('https://eswyxbyddkajysogtglp.supabase.co', 'sb_publishable_w9pinHWr8XK5F9CflsSJmQ_4KFMKzHS');
 const ui = createMemberGame({ document, opponentName: async gameId => {
-  const { data, error } = await supabase.functions.invoke('match-opponent', { body: { gameId } });
+  const { data, error } = await supabase.functions.invoke('match-opponent', { body: { gameId }, timeout: 8000 });
   return error ? null : data?.username;
 }, api: async body => {
-  const { data, error } = await supabase.functions.invoke('matchplay', { body });
+  const { data, error } = await supabase.functions.invoke('matchplay', { body, timeout: 8000 });
   if (error || data?.error) throw new Error(data?.error || 'Сервис недоступен');
   return data;
 } });

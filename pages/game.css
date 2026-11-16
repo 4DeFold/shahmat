@@ -99,3 +99,9 @@ html, body { width: 100%; height: 100%; overflow: hidden; }
 
 .clock[data-color='neutral'] { background: var(--surface-alt); color: var(--ink); border-color: var(--line); }
 @media (prefers-reduced-motion: reduce) { .board .piece, .board .coord { transition: none; } }
+/* The dragged original stays in place but invisible; only the pointer ghost moves. */
+.board .square.dragging > .piece { visibility: hidden; }
+.drag-ghost { top: 0; left: 0; will-change: transform; }
+.sound-toggle { border: 0; padding: 5px 0; background: transparent; color: var(--muted); font: 12px Arial, sans-serif; cursor: pointer; }
+.sound-toggle:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+@media (hover: hover) { .sound-toggle:hover { color: var(--ink); } }

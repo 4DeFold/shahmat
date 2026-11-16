@@ -167,3 +167,70 @@ test('drag submits a legal move and illegal premove is cancelled on the next pos
   app.ui.hide(); app.ui.show(); await flush();
   assert.equal(calls.length, 1); assert.match(app.$('status').textContent, /отменён/);
 });
+
+test('optimistic move and its confirmation keep squares and pieces stable', async t => {
+  let finishMove;
+  const app = setup(async body => {
+    if (body.action === 'move') return new Promise(resolve => { finishMove = resolve; });
+    return { game:game() };
+  }); t.after(() => app.close());
+  await app.ui.open(A); await flush();
+  const board = app.$('board'), from = board.querySelector('[data-square=e2]'), to = board.querySelector('[data-square=e4]');
+  const pawn = from.querySelector('img'), neighbor = board.querySelector('[data-square=d2] img');
+  from.click(); to.click();
+  assert.equal(to.querySelector('img'), pawn);
+  finishMove({ game:game({ moves:['e4'], turn:'b' }) }); await flush();
+  assert.equal(board.querySelector('[data-square=e2]'), from);
+  assert.equal(board.querySelector('[data-square=e4]'), to);
+  assert.equal(to.querySelector('img'), pawn);
+  assert.equal(board.querySelector('[data-square=d2] img'), neighbor);
+});
+
+test('premove may be entered during a slow move acknowledgement and executes on reply', async t => {
+  let finishFirst, position = game(), sent = [];
+  const app = setup(async body => {
+    if (body.action === 'move') {
+      sent.push(body);
+      if (sent.length === 1) return new Promise(resolve => { finishFirst = resolve; });
+      position = game({ moves:['e4','e5','Nf3'], turn:'b' }); return { game:position };
+    }
+    return { game:position };
+  }); t.after(() => app.close());
+  await app.ui.open(A); await flush();
+  const click = square => app.$('board').querySelector(`[data-square="${square}"]`).click();
+  click('e2'); click('e4'); click('g1'); click('f3');
+  assert.equal(app.$('board').querySelector('[data-square=f3]').classList.contains('premove'), true);
+  position = game({ moves:['e4','e5'], turn:'w' });
+  finishFirst({ game:game({ moves:['e4'], turn:'b' }) });
+  await flush(); await flush();
+  assert.equal(sent.length, 2); assert.equal(sent[1].from, 'g1'); assert.equal(sent[1].to, 'f3');
+});
+
+test('lost move response reconciles before rollback and keeps a committed piece in place', async t => {
+  let committed = false;
+  const app = setup(async body => {
+    if (body.action === 'move') { committed = true; throw Error('response lost'); }
+    if (body.action === 'snapshot' && committed) return { game:game({ moves:['e4'], turn:'b' }) };
+    return { game:game() };
+  }); t.after(() => app.close());
+  await app.ui.open(A); await flush();
+  const board = app.$('board'), pawn = board.querySelector('[data-square=e2] img');
+  board.querySelector('[data-square=e2]').click(); board.querySelector('[data-square=e4]').click(); await flush();
+  assert.equal(board.querySelector('[data-square=e4] img'), pawn);
+  assert.equal(board.querySelector('[data-square=e2] img'), null);
+});
+
+test('hiding during a move ignores stale replies and reconciles on return', async t => {
+  let finish, position = game();
+  const app = setup(async body => {
+    if (body.action === 'move') return new Promise(resolve => { finish = resolve; });
+    return { game:position };
+  }); t.after(() => app.close());
+  await app.ui.open(A); await flush();
+  const board = app.$('board'); board.querySelector('[data-square=e2]').click(); board.querySelector('[data-square=e4]').click();
+  app.ui.hide(); position = game({ moves:['e4','e5'], turn:'w' });
+  finish({ game:game({ moves:['e4'], turn:'b' }) }); await flush(); app.ui.show(); await flush();
+  assert.equal(board.querySelector('[data-square=e4] img').getAttribute('src'), '/pieces/cburnett/wP.svg');
+  assert.equal(board.querySelector('[data-square=e5] img').getAttribute('src'), '/pieces/cburnett/bP.svg');
+  assert.match(app.$('status').textContent, /Ваш ход/);
+});
