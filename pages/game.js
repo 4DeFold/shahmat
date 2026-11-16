@@ -13,6 +13,8 @@ const ui = createMemberGame({ document, opponentName: async gameId => {
   if (error || data?.error) throw new Error(data?.error || 'Сервис недоступен');
   return data;
 } });
+// A preloaded embedded game stays paused until its parent shows the view.
+if (window.parent !== window) ui.hide();
 let cachedId = null;
 try { cachedId = cachedUserId(window.localStorage); } catch { /* Storage may be blocked. */ }
 startSessionMonitor({

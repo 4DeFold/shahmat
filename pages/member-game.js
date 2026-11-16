@@ -280,7 +280,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
       finally { ready = true; modeControls(); }
     },
     hide() { const wasVisible = isVisible(); viewVisible = false; if (wasVisible) pause(); },
-    show() { const wasVisible = isVisible(); viewVisible = true; if (!wasVisible && isVisible()) { board.classList.remove('ready'); setTimeout(() => board.classList.add('ready'), 500); resume(); } },
+    show() { const wasVisible = isVisible(); viewVisible = true; if (!wasVisible && isVisible()) { board.classList.add('ready'); resume(); } },
     browserVisibility(value) { const wasVisible = isVisible(); browserVisible = value; if (wasVisible && !isVisible()) pause(); else if (!wasVisible && isVisible()) resume(); },
     destroy() { generation++; cancelTimer(); clearInterval(clockInterval); clearInterval(nameTimer); void audio?.close(); },
   };

@@ -39,10 +39,16 @@ try {
   await page.locator('#auth-submit').click();
   await page.locator('#dashboard-home').waitFor({ state: 'visible' });
   assert.equal(new URL(page.url()).pathname, '/home');
-  assert.equal(await page.locator('#page-profile').count(), 0, 'profile is not loaded on home');
-  assert.ok(!requests.some(path => /\/assets\/profile-/.test(path)), 'profile chunk is requested only on visit');
-  assert.equal(await page.locator('#page-settings').count(), 0, 'settings is not loaded on home');
-  assert.ok(!requests.some(path => /\/assets\/settings-/.test(path)), 'settings chunk is requested only on visit');
+  // Independent page chunks and the game iframe warm in the background after auth.
+  await page.locator('#page-profile').waitFor({ state: 'attached' });
+  await page.locator('#page-settings').waitFor({ state: 'attached' });
+  await page.locator('#page-help').waitFor({ state: 'attached' });
+  await page.locator('#member-game-frame').waitFor({ state: 'attached' });
+  await page.waitForFunction(() => document.querySelector('#member-game-frame')?.contentDocument?.querySelectorAll('#board .square').length === 64);
+  assert.equal(await page.locator('#page-game').isHidden(), true);
+  await page.locator('[data-page=game]').first().click();
+  await page.locator('#page-game').waitFor({ state: 'visible' });
+  assert.equal(await page.frameLocator('#member-game-frame').locator('#board .square').count(), 64);
   for (const name of ['settings', 'help', 'profile']) {
     await page.goto(`${base}/${name}`);
     await page.locator(`#page-${name}`).waitFor({ state: 'visible' });
@@ -67,6 +73,26 @@ try {
   await page.locator('#page-settings').waitFor({ state: 'visible' });
   await page.goForward();
   await page.locator('#page-help').waitFor({ state: 'visible' });
+  // A slow game document must not reveal an empty iframe during a quick click.
+  const slowContext = await browser.newContext({ reducedMotion: 'reduce' });
+  const slow = await slowContext.newPage();
+  await mock(slow);
+  let releaseGame, gameRequested;
+  const gameRequest = new Promise(resolve => { gameRequested = resolve; });
+  const release = new Promise(resolve => { releaseGame = resolve; });
+  await slow.route('**/pages/game.html', async route => { gameRequested(); await release; await route.continue(); });
+  await slow.goto(base); await slow.locator('#login').click();
+  await slow.locator('#email').fill('test@example.com'); await slow.locator('#password').fill('password123');
+  await slow.locator('#auth-submit').click(); await slow.locator('#dashboard-home').waitFor({ state: 'visible' });
+  await gameRequest;
+  await slow.locator('[data-page=game]').first().click();
+  assert.equal(await slow.locator('#dashboard-home').isVisible(), true);
+  assert.equal(await slow.locator('#page-game').isHidden(), true);
+  releaseGame();
+  await slow.locator('#page-game').waitFor({ state: 'visible' });
+  assert.equal(await slow.frameLocator('#member-game-frame').locator('#board .square').count(), 64);
+  assert.equal(await slow.frameLocator('#member-game-frame').locator('#board img').evaluateAll(images => images.every(img => img.complete && img.naturalWidth > 0)), true);
+  await slowContext.close();
   const guest = await browser.newPage({ reducedMotion: 'reduce' });
   await mock(guest);
   // Some single-process Chromium builds share storage between contexts.
@@ -79,6 +105,6 @@ try {
   await guest.locator('#auth-submit').click();
   await guest.locator('#page-profile').waitFor({ state: 'visible' });
   assert.equal(new URL(guest.url()).pathname, '/profile', 'sign-in should preserve the requested destination');
-  console.log('✓ Production landing lazy-loads authentication and individual page chunks');
+  console.log('✓ Guest landing stays lightweight; dashboard pages preload after authentication');
   console.log('✓ Direct routes, refresh, browser history, legacy links and guest guard work (mock Supabase)');
 } finally { await browser.close(); }

@@ -32,6 +32,10 @@ try {
     const initial = await page.locator('#auth-screen').evaluate(el => el.getBoundingClientRect().height);
     await page.locator('#tab-signup').click();
     assert.equal(await page.locator('#tab-signup').evaluate(el => getComputedStyle(el).outlineStyle), 'none');
+    assert.equal(await page.locator('#auth-submit .auth-submit-label').textContent(), 'Создать аккаунт');
+    assert.ok(await page.locator('#auth-submit .auth-submit-label').evaluate(el => el.getAnimations().length > 0));
+    assert.equal(await page.locator('#play').evaluate(el => getComputedStyle(el, '::before').content), 'none');
+    assert.equal(await page.locator('#play').evaluate(el => getComputedStyle(el, '::after').content), 'none');
     assert.equal(await page.locator('#auth-screen').evaluate(el => el.getAnimations().some(a => a.effect.getKeyframes().some(k => k.height))), true);
     await page.waitForTimeout(130);
     const middle = await page.locator('#auth-screen').evaluate(el => el.getBoundingClientRect().height);
@@ -43,7 +47,11 @@ try {
     // Older accounts remain sign-in eligible on the signup tab.
     await page.locator('#password').fill('secret');
     assert.equal(await page.locator('#password').evaluate(el => el.validity.tooShort), false);
-    await page.locator('#tab-login').click(); await page.waitForTimeout(100); await page.locator('#tab-signup').click();
+    await page.locator('#tab-login').click();
+    assert.equal(await page.locator('#forgot-password').evaluate(el => getComputedStyle(el).filter), 'none');
+    assert.equal(await page.locator('#auth-submit .auth-submit-label').textContent(), 'Войти');
+    assert.ok(await page.locator('#auth-submit .auth-submit-label').evaluate(el => el.getAnimations().length > 0));
+    await page.waitForTimeout(100); await page.locator('#tab-signup').click();
     await page.waitForTimeout(500);
     assert.equal(await page.locator('#auth-screen').evaluate(el => el.getAnimations().length), 0);
     assert.deepEqual(errors, []); await page.close();

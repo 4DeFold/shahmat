@@ -227,7 +227,7 @@ function openAccountMenu() {
     if (accountToggle.getAttribute('aria-expanded') === 'true') accountMenu.classList.add('is-open');
   });
 }
-// Each view is an independent, lazy-loaded page. Its chunk is requested only when visited.
+// Independent pages stay out of the guest landing; preload them after entering the dashboard.
 const pageLoaders = {
   home: () => import('./pages/home.html?raw'),
   game: () => import('./pages/game-view.html?raw'),
@@ -237,6 +237,35 @@ const pageLoaders = {
 };
 let pageRequest = 0;
 const viewId = name => name === 'home' ? 'dashboard-home' : `page-${name}`;
+const viewLoads = new Map();
+let frameReady = null;
+let dashboardPreloadEnabled = false;
+async function loadView(name) {
+  if ($(viewId(name))) return;
+  if (viewLoads.has(name)) return viewLoads.get(name);
+  const pending = (async () => {
+    const { default: html } = await pageLoaders[name]();
+    if (!dashboardPreloadEnabled || $('dashboard-screen').hidden || $(viewId(name))) return;
+    $('page-content').insertAdjacentHTML('beforeend', html);
+    if (name === 'profile' && profile) displayProfile();
+    if (name === 'settings') applyPalette(selectedPalette);
+    if (name === 'game') {
+      const frame = $('member-game-frame');
+      frameReady = new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Game load timed out')), 15000);
+        frame.addEventListener('load', () => { clearTimeout(timeout); resolve(); }, { once: true });
+        frame.addEventListener('error', () => { clearTimeout(timeout); reject(new Error('Game load failed')); }, { once: true });
+      });
+      // Prevent an unhandled rejection if a background load fails before navigation.
+      frameReady.catch(() => {});
+    }
+  })();
+  viewLoads.set(name, pending);
+  try { await pending; } finally { viewLoads.delete(name); }
+}
+function preloadDashboard() {
+  for (const name of ['game', 'profile', 'settings', 'help']) void loadView(name).catch(() => {});
+}
 function currentPage() {
   const name = window.location.pathname.replace(/^\/+|\/+$/g, '');
   return pages.has(name) ? name : 'home';
@@ -246,14 +275,15 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
   const request = ++pageRequest;
   if (updateHistory && currentPage() !== name) window.history.pushState(null, '', `/${name}`);
   try {
-    if (!$(viewId(name))) {
-      const { default: html } = await pageLoaders[name]();
-      if (!$(viewId(name))) $('page-content').insertAdjacentHTML('beforeend', html);
-      if (name === 'profile' && profile) displayProfile();
-      if (name === 'settings') applyPalette(selectedPalette);
+    if (!$('page-content').querySelector('[data-view]:not([hidden])')) {
+      $('page-load-error')?.remove();
+      $('page-content').insertAdjacentHTML('beforeend', '<section class="empty-page" id="page-loading" role="status">Загрузка…</section>');
     }
+    await loadView(name);
+    if (name === 'game' && frameReady) await frameReady;
     if (request !== pageRequest) return;
     $('page-load-error')?.remove();
+    $('page-loading')?.remove();
     $('member-game-frame')?.contentWindow?.postMessage({ type: name === 'game' ? 'shahmat-game-shown' : 'shahmat-game-hidden' }, window.location.origin);
     document.querySelectorAll('#dashboard-screen [data-view]').forEach(view => {
       const active = view.dataset.view === name;
@@ -278,18 +308,22 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
   } catch {
     if (request !== pageRequest) return;
     document.querySelectorAll('#dashboard-screen [data-view]').forEach(view => { view.hidden = true; });
-    $('page-load-error')?.remove();
+    $('page-load-error')?.remove(); $('page-loading')?.remove();
+    if (name === 'game') { $('page-game')?.remove(); frameReady = null; }
     $('page-content').insertAdjacentHTML('beforeend', '<section class="empty-page" id="page-load-error" role="alert"><h2>Страница не загрузилась.</h2><p>Проверь соединение и обнови страницу.</p></section>');
   }
 }
-// The game document remains a separate lazy-loaded page. Only messages from
-// our own game frame receives appearance settings.
+// The game remains a separate page; send appearance only to our own frame.
 function syncGameAppearance() {
   const frame = $('member-game-frame');
   if (!frame?.contentWindow) return;
   const style = getComputedStyle(landing);
   const names = ['--page-background', '--foreground', '--surface', '--surface-raised', '--line', '--button-background', '--button-text', '--board-light', '--board-dark'];
   const colors = Object.fromEntries(names.map(name => [name, style.getPropertyValue(name).trim()]));
+  // Apply synchronously before revealing the frame; postMessage keeps its own
+  // appearance listener in sync as the palette changes later.
+  const targets = { '--page-background': '--bg', '--foreground': '--ink', '--surface': '--surface', '--surface-raised': '--surface-alt', '--line': '--line', '--button-background': '--control', '--button-text': '--control-ink', '--board-light': '--board-light', '--board-dark': '--board-dark' };
+  try { for (const [name, target] of Object.entries(targets)) if (colors[name]) frame.contentDocument?.documentElement.style.setProperty(target, colors[name]); } catch { /* Frame may still be navigating. */ }
   frame.contentWindow.postMessage({ type: 'shahmat-appearance', colors }, window.location.origin);
 }
 new MutationObserver(syncGameAppearance).observe(landing, { attributes: true, attributeFilter: ['data-palette', 'data-palette-theme', 'class'] });
@@ -322,13 +356,14 @@ async function show(id, immediate = false) {
   const next = $(id);
   screen.classList.add('leaving');
   if (!immediate && !reducedMotion.matches) await new Promise(resolve => setTimeout(resolve, 300));
+  if (screen.id === 'dashboard-screen') $('member-game-frame')?.contentWindow?.postMessage({ type: 'shahmat-game-hidden' }, window.location.origin);
   screen.hidden = true;
   screen.classList.remove('leaving');
   landing.classList.toggle('palette-active', ['profile-screen', 'palette-screen', 'dashboard-screen'].includes(id));
   if (!immediate) next.classList.add('entering');
   next.hidden = false;
   screen = next;
-  if (id === 'dashboard-screen') { setSidebarOpen(false); await showPage(currentPage()); }
+  if (id === 'dashboard-screen') { dashboardPreloadEnabled = true; setSidebarOpen(false); await showPage(currentPage()); preloadDashboard(); }
   else closeAccountMenu(true);
   window.scrollTo(0, 0);
   requestAnimationFrame(() => requestAnimationFrame(() => next.classList.remove('entering')));
@@ -385,7 +420,14 @@ function setMode(value) {
   $('password').minLength = mode === 'login' ? 8 : 6;
   $('password').placeholder = 'Не менее 8 символов';
   $('forgot-password').hidden = mode !== 'login';
-  $('auth-submit').innerHTML = mode === 'login' ? 'Войти <span>↗</span>' : 'Создать аккаунт <span>↗</span>';
+  const label = submit.querySelector('.auth-submit-label');
+  label.textContent = mode === 'login' ? 'Войти' : 'Создать аккаунт';
+  if (animateLayout && typeof label.animate === 'function') {
+    label.getAnimations().forEach(animation => animation.cancel());
+    label.animate([{ opacity: 0, filter: 'blur(4px)', transform: 'translateY(6px)' },
+      { opacity: 1, filter: 'blur(0)', transform: 'translateY(0)' }],
+      { duration: 400, easing: 'cubic-bezier(.22, 1, .36, 1)' });
+  }
   message('auth-message');
   $('auth-register-suggestion').hidden = true;
   if (animateLayout) {
@@ -657,7 +699,8 @@ document.querySelectorAll('.signout').forEach(button => button.addEventListener(
   try {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
-    $('page-game')?.remove(); // Discard the prior account's game frame on logout.
+    dashboardPreloadEnabled = false; pageRequest++;
+    $('page-game')?.remove(); frameReady = null; // Discard the prior account's game frame on logout.
     profile = null; applyPalette('monochrome'); applyTheme(null); $('auth-form').reset(); setMode('login');
     window.history.replaceState(null, '', '/');
     await show('auth-screen');

@@ -11,6 +11,7 @@ for (const width of [280, 390, 1440]) {
   const browser = await chromium.launch(options);
   try {
     const page = await browser.newPage({ viewport: { width, height: 850 }, reducedMotion: 'reduce' });
+    await page.addInitScript(() => { Math.random = () => .1; });
     const errors = [], requests = [];
     page.on('pageerror', error => errors.push(error.message));
     page.on('request', request => requests.push(request.url()));
@@ -69,6 +70,27 @@ for (const width of [280, 390, 1440]) {
       assert.equal(await page.locator('#move-list li').count(), 0);
     }
     assert.deepEqual(errors, []);
+  } finally { await browser.close(); }
+}
+// Exercise the other random side in a real browser, including reload persistence.
+{
+  const browser = await chromium.launch(options);
+  try {
+    const page = await browser.newPage({ viewport: { width: 390, height: 850 }, reducedMotion: 'reduce' });
+    await page.addInitScript(() => { Math.random = () => .9; });
+    await page.goto(`${base}/play`);
+    await page.locator('#board .square').first().waitFor();
+    assert.equal(await page.locator('#player-color').textContent(), 'Чёрные');
+    assert.equal(await page.locator('#board .square').first().getAttribute('data-square'), 'h1');
+    assert.equal(await page.locator('.description').count(), 0);
+    await page.locator('#status').filter({ hasText: 'Ваш ход' }).waitFor();
+    await page.locator('[data-square=e7]').click();
+    assert.equal(await page.locator('[data-square=e5]').evaluate(el => el.classList.contains('possible')), true);
+    await page.locator('[data-square=e5]').click();
+    await page.reload();
+    await page.locator('#board .square').first().waitFor();
+    assert.equal(await page.locator('#player-color').textContent(), 'Чёрные');
+    assert.equal(await page.locator('[data-square=e5] .piece').count(), 1);
   } finally { await browser.close(); }
 }
 console.log('✓ Guest landing → game, legal move, bot reply, persistence and registration at 280/390/1440px');

@@ -7,7 +7,7 @@ import { chooseBotMove } from '../pages/bot.js';
 
 const html = await readFile('pages/play.html', 'utf8');
 const source = (await readFile('pages/play.js', 'utf8')).replace(/^import .*;\n/gm, '') + '\nwindow.testGame = game; window.testRender = render;';
-function setup({ saved = null, storageError = false, memberId = null, now = null } = {}) {
+function setup({ saved = null, storageError = false, memberId = null, now = null, random = 0.1 } = {}) {
   const dom = new JSDOM(html, { runScripts: 'outside-only', url: 'https://example.com/play', pretendToBeVisual: true });
   if (memberId) {
     dom.window.document.body.dataset.gameUser = memberId; dom.window.confirm = () => true;
@@ -17,6 +17,7 @@ function setup({ saved = null, storageError = false, memberId = null, now = null
   if (saved !== null) dom.window.localStorage.setItem(memberId ? `shahmat.member-game.v1.${memberId}` : 'shahmat.guest-game.v1', saved);
   if (storageError) Object.defineProperty(dom.window, 'localStorage', { get() { throw new Error('storage blocked'); } });
   if (now !== null) dom.window.Date.now = () => now.value;
+  dom.window.Math.random = () => random;
   dom.window.Chess = Chess;
   dom.window.chooseBotMove = chooseBotMove;
   dom.window.eval(source);
@@ -217,4 +218,38 @@ test('unfinished game ignores stale countdown and member games never start one',
   member.document.querySelector('#new-game').click();
   assert.deepEqual(member.game.history(), []);
   member.window.close();
+});
+
+
+test('black side starts with bot move, persists orientation, allows black moves and reports mate', async () => {
+  const app = setup({ random: 0.9 });
+  assert.equal(app.document.querySelector('#player-color').textContent, 'Чёрные');
+  assert.equal(app.document.querySelector('#bot-color').textContent, 'Белые');
+  assert.equal(app.document.querySelector('#board').firstElementChild.dataset.square, 'h1');
+  assert.equal(app.document.querySelector('#status').textContent, 'Бот думает…');
+  assert.equal(JSON.parse(app.window.localStorage.getItem('shahmat.guest-game.v1')).playerColor, 'b');
+  await delay(800);
+  assert.equal(app.game.history().length, 1);
+  assert.equal(app.game.turn(), 'b');
+  app.click('e7'); assert.ok(app.document.querySelector('[data-square=e5]').classList.contains('possible'));
+  app.click('e5'); assert.equal(app.game.history().length, 2);
+  const saved = app.window.localStorage.getItem('shahmat.guest-game.v1'); app.window.close();
+  const restored = setup({ saved, random: 0.1 });
+  assert.equal(restored.document.querySelector('#player-color').textContent, 'Чёрные');
+  assert.equal(restored.document.querySelector('#board').firstElementChild.dataset.square, 'h1');
+  restored.window.close();
+  const mate = setup({ saved: JSON.stringify({ version: 1, playerColor: 'b', moves: ['f3', 'e5', 'g4', 'Qh4#'] }) });
+  assert.equal(mate.document.querySelector('#status').textContent, 'Мат. Вы победили!');
+  mate.window.close();
+});
+
+
+test('expired game with black side schedules only one opening bot move', async () => {
+  const now = { value: 1_000_000 };
+  const app = setup({ saved: savedGame(finishedMoves, now.value - 1), now, random: 0.9 });
+  assert.equal(app.document.querySelector('#player-color').textContent, 'Чёрные');
+  await delay(900);
+  assert.equal(app.game.history().length, 1);
+  assert.equal(app.game.turn(), 'b');
+  app.window.close();
 });
