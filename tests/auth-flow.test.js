@@ -468,3 +468,11 @@ test('signup errors give actionable messages without exposing server details', a
     assert.equal(app.$('verify-screen').hidden, true);
   }
 });
+
+
+test('registration deep link opens the signup tab for guests', async () => {
+  const app = await setup({ url: 'https://example.com/login?mode=signup' });
+  assert.equal(app.$('auth-screen').hidden, false);
+  assert.equal(app.$('tab-signup').getAttribute('aria-pressed'), 'true');
+  assert.match(app.$('auth-submit').textContent, /Создать аккаунт/);
+});

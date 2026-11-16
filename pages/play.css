@@ -11,13 +11,13 @@
 :root[data-theme='dark'] {
   color-scheme: dark; --bg: #111; --ink: #f1f1ef; --muted: #a2a29e; --line: #353535;
   --surface: #202020; --surface-alt: #282828; --control: #f1f1ef; --control-ink: #171717;
-  --board-light: #bdbdb8; --board-dark: #686965; --board-frame: #313131;
+  --board-light: #deded9; --board-dark: #989994; --board-frame: #313131;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
     color-scheme: dark; --bg: #111; --ink: #f1f1ef; --muted: #a2a29e; --line: #353535;
     --surface: #202020; --surface-alt: #282828; --control: #f1f1ef; --control-ink: #171717;
-    --board-light: #bdbdb8; --board-dark: #686965; --board-frame: #313131;
+    --board-light: #deded9; --board-dark: #989994; --board-frame: #313131;
   }
 }
 body { margin: 0; background: var(--bg); }
@@ -51,7 +51,7 @@ h1 span { color: var(--muted); }
 .square.selected { box-shadow: inset 0 0 0 100px #f6f4c588; }
 .square.possible::after { content: ''; position: absolute; width: 24%; aspect-ratio: 1; border-radius: 50%; background: #20202055; pointer-events: none; }
 .square.possible:has(.piece)::after { width: 83%; background: transparent; border: 4px solid #20202055; }
-.piece { position: relative; z-index: 1; display: block; width: 92%; height: 92%; user-select: none; pointer-events: none; }
+.piece { filter: drop-shadow(0 1px 1px #0008); position: relative; z-index: 1; display: block; width: 92%; height: 92%; user-select: none; pointer-events: none; }
 .coord { position: absolute; font-size: clamp(8px, 1vw, 11px); font-weight: bold; line-height: 1; pointer-events: none; }
 .coord.file { right: 4px; bottom: 3px; } .coord.rank { top: 3px; left: 4px; }
 .game-panel { padding-top: 76px; }
@@ -69,7 +69,7 @@ h1 span { color: var(--muted); }
 #move-list .move-enter { animation: move-enter .32s cubic-bezier(.22, 1, .36, 1) both; }
 @keyframes move-enter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 #empty-moves { font-size: 12px; padding: 14px 0; }
-.new-game { display: flex; justify-content: space-between; align-items: center; width: 100%; border: 0; border-radius: 7px; background: var(--control); color: var(--control-ink); padding: 17px 19px; margin-top: 24px; text-align: left; font-size: 13px; }
+.new-game { text-decoration: none; display: flex; justify-content: space-between; align-items: center; width: 100%; border: 0; border-radius: 7px; background: var(--control); color: var(--control-ink); padding: 17px 19px; margin-top: 24px; text-align: left; font-size: 13px; }
 .new-game:hover { opacity: .8; }
 .footnote { color: var(--muted); line-height: 1.5; font-size: 11px; }
 .promotion { padding: 14px; margin-top: 12px; background: var(--surface-alt); border: 1px solid var(--line); border-radius: 8px; font-size: 13px; }

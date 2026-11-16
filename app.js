@@ -606,6 +606,8 @@ document.querySelectorAll('.signout').forEach(button => button.addEventListener(
 
 // Keep the page covered until both the session and, when needed, the profile are known.
 async function initialize() {
+  // Registration is a real deep link; recovery callbacks still take precedence.
+  if (window.location.pathname === '/login' && new URLSearchParams(window.location.search).get('mode') === 'signup') setMode('signup');
   // Preserve old bookmarked hash routes, but never touch Supabase callback fragments.
   const legacyPage = window.location.hash.slice(1);
   if (pages.has(legacyPage)) window.history.replaceState(null, '', `/${legacyPage}`);

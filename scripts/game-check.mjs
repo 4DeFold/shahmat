@@ -24,18 +24,28 @@ for (const width of [280, 390, 1440]) {
     await page.locator('[data-square=e2]').click();
     assert.equal(await page.locator('[data-square=e4]').evaluate(el => el.classList.contains('possible')), true);
     await page.locator('[data-square=e4]').click();
+    // Refresh immediately, potentially before the bot has replied.
+    await page.reload();
+    await page.locator('#board').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('[data-square=e4] .piece').count(), 1);
     await page.waitForFunction(() => document.querySelector('#move-list li strong:last-child')?.textContent !== '—');
     assert.match(await page.locator('#move-list').innerText(), /e4/);
     assert.match(await page.locator('#status').innerText(), /Ваш ход/);
-    await page.locator('#new-game').click();
-    assert.equal(await page.locator('#move-list li').count(), 0);
-    assert.equal(await page.locator('[data-square=e2] .piece').count(), 1);
+    const history = await page.locator('#move-list').innerText();
     await page.reload();
     await page.locator('#board').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('#move-list').innerText(), history);
     if (width === 390) await page.screenshot({ path: 'responsive-evidence/game-phone.png', fullPage: true });
     if (width === 1440) await page.screenshot({ path: 'responsive-evidence/game-desktop.png', fullPage: true });
     assert.equal(requests.some(url => url.includes('supabase.co')), false, 'guest game must not contact Supabase');
+    await page.locator('#new-game').click();
+    await page.locator('#auth-screen').waitFor({ state: 'visible' });
+    assert.equal(new URL(page.url()).searchParams.get('mode'), 'signup');
+    assert.equal(await page.locator('#tab-signup').getAttribute('aria-pressed'), 'true');
+    await page.goBack();
+    await page.locator('#board').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('#move-list').innerText(), history, 'registration must not erase the game');
     assert.deepEqual(errors, []);
   } finally { await browser.close(); }
 }
-console.log('✓ Guest landing → game, legal move, bot reply, restart and refresh at 280/390/1440px');
+console.log('✓ Guest landing → game, legal move, bot reply, persistence and registration at 280/390/1440px');

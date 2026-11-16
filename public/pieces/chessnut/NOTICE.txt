@@ -1,4 +1,0 @@
-Chessnut chess pieces by Alexis Luengas, obtained from
-https://github.com/lichess-org/lila/tree/master/public/piece/chessnut
-Original project: https://github.com/LexLuengas/chessnut-pieces
-Licensed under Apache License 2.0; see LICENSE.txt. SVG files are unmodified.

@@ -7,10 +7,46 @@ const board = document.getElementById('board');
 const status = document.getElementById('status');
 const promotion = document.getElementById('promotion');
 const options = document.getElementById('promotion-options');
-const pieceSrc = (color, type) => `/pieces/chessnut/${color}${type.toUpperCase()}.svg`;
+const pieceSrc = (color, type) => `/pieces/neo/${color}${type.toUpperCase()}.png`;
 const names = { k:'король', q:'ферзь', r:'ладья', b:'слон', n:'конь', p:'пешка' };
 const files = 'abcdefgh';
 let selected = null, pending = null, botTimer = null, botThinking = false, lastMove = null;
+const storageKey = 'shahmat.guest-game.v1';
+const storageMessage = document.getElementById('storage-message');
+function storageFailure(message = 'Не удалось сохранить партию на устройстве.') {
+  storageMessage.textContent = message;
+}
+function saveGame() {
+  try {
+    const moves = game.history();
+    if (moves.length > 2000) throw new Error('Game too long');
+    localStorage.setItem(storageKey, JSON.stringify({ version: 1, moves }));
+  } catch { storageFailure(); }
+}
+function restoreGame() {
+  try {
+    const raw = localStorage.getItem(storageKey);
+    if (!raw) return;
+    const saved = JSON.parse(raw);
+    if (saved.version !== 1 || !Array.isArray(saved.moves) || saved.moves.length > 2000) throw new Error('Invalid save');
+    for (const move of saved.moves) {
+      if (typeof move !== 'string' || move.length > 20 || game.isGameOver()) throw new Error('Invalid move');
+      lastMove = game.move(move);
+    }
+  } catch {
+    game.reset(); lastMove = null;
+    storageFailure('Не удалось восстановить сохранённую партию.');
+  }
+}
+function scheduleBot() {
+  if (game.isGameOver() || game.turn() !== 'b') return;
+  botThinking = true;
+  botTimer = setTimeout(() => {
+    const botMove = chooseBotMove(game);
+    if (botMove) { lastMove = game.move(botMove); saveGame(); }
+    botThinking = false; botTimer = null; render(lastMove);
+  }, 380);
+}
 
 function resultText() {
   if (game.isCheckmate()) return game.turn() === 'w' ? 'Мат. Бот победил.' : 'Мат. Вы победили!';
@@ -92,14 +128,8 @@ function render(move = null) {
 }
 function playMove(move) {
   lastMove = game.move(move); selected = null; pending = null; promotion.hidden = true;
-  if (!game.isGameOver() && game.turn() === 'b') {
-    botThinking = true;
-    botTimer = setTimeout(() => {
-      const botMove = chooseBotMove(game);
-      if (botMove) lastMove = game.move(botMove);
-      botThinking = false; botTimer = null; render(lastMove);
-    }, 380);
-  }
+  saveGame();
+  scheduleBot();
   render(lastMove);
 }
 board.addEventListener('click', event => {
@@ -125,8 +155,6 @@ board.addEventListener('click', event => {
   render();
   board.querySelector(`[data-square="${square}"]`)?.focus();
 });
-document.getElementById('new-game').addEventListener('click', () => {
-  if (botTimer !== null) clearTimeout(botTimer);
-  game.reset(); selected = null; pending = null; lastMove = null; botTimer = null; botThinking = false; promotion.hidden = true; render();
-});
+restoreGame();
+scheduleBot();
 render();
