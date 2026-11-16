@@ -45,6 +45,29 @@ for (const width of [280, 390, 1440]) {
     await page.goBack();
     await page.locator('#board').waitFor({ state: 'visible' });
     assert.equal(await page.locator('#move-list').innerText(), history, 'registration must not erase the game');
+    if (width === 390) {
+      await page.evaluate(() => localStorage.setItem('shahmat.guest-game.v1', JSON.stringify({ version: 1, moves: ['f3', 'e5', 'g4', 'Qh4#'] })));
+      await page.reload();
+      await page.locator('#board').waitFor({ state: 'visible' });
+      assert.match(await page.locator('#status').innerText(), /Мат/);
+      assert.equal(await page.locator('#new-game-countdown').isHidden(), true);
+      await page.locator('#new-game').click();
+      await page.locator('#auth-screen').waitFor({ state: 'visible' });
+      await page.goBack();
+      await page.locator('#board').waitFor({ state: 'visible' });
+      assert.match(await page.locator('#new-game-countdown').innerText(), /^(60:00|59:\d{2}) до новой партии$/);
+      assert.match(await page.locator('#status').innerText(), /Мат/);
+      await page.evaluate(() => {
+        const save = JSON.parse(localStorage.getItem('shahmat.guest-game.v1'));
+        save.newGameAt = Date.now() - 1;
+        localStorage.setItem('shahmat.guest-game.v1', JSON.stringify(save));
+      });
+      await page.reload();
+      await page.locator('#board').waitFor({ state: 'visible' });
+      assert.equal(await page.locator('#status').innerText(), 'Ваш ход.');
+      assert.equal(await page.locator('#new-game-countdown').isHidden(), true);
+      assert.equal(await page.locator('#move-list li').count(), 0);
+    }
     assert.deepEqual(errors, []);
   } finally { await browser.close(); }
 }

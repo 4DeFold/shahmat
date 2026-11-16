@@ -29,8 +29,11 @@ and rated games are not yet available. The lightweight bot searches
 two plies; chess.js enforces legal moves, castling, en passant, promotion and
 game-end rules. The current game (including full move history) is saved in the
 browser’s localStorage and resumes after refresh; clearing browser data removes it.
-In the guest demo, “Новая партия” opens registration instead of resetting the board. No game data
-is sent to Supabase. The account game follows the selected palette and theme;
+In the guest demo, “Новая партия” opens registration. If the game has ended,
+the first click also starts a one-hour countdown; the completed game is preserved
+until the deadline and the board resets when it expires. The deadline is stored
+locally and survives navigation and refresh; clearing browser data removes it.
+No game data is sent to Supabase. The account game follows the selected palette and theme;
 the guest demo uses a monochrome board and the device or saved theme preference. Chess pieces are Colin M. L. Burnett’s Cburnett SVGs, copied unmodified from
 Lichess under GPL-2.0-or-later. The source, attribution and full GPL-2.0 text
 are in `public/pieces/cburnett/`. This license applies to these assets; review
