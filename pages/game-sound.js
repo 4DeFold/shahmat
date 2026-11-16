@@ -1,11 +1,7 @@
 // Original, synthesized wooden taps. No third-party sound recordings are used.
 export function createGameSound(win) {
   let context = null, noise = null;
-  const key = 'shahmat.game.sound-muted';
-  let muted = false;
-  try { muted = win.localStorage.getItem(key) === 'true'; } catch { /* Optional preference. */ }
   function prime() {
-    if (muted) return;
     try {
       const AudioContext = win.AudioContext || win.webkitAudioContext;
       if (!AudioContext) return;
@@ -14,7 +10,6 @@ export function createGameSound(win) {
     } catch { /* Audio is optional. */ }
   }
   function play(kind = 'move') {
-    if (muted) return;
     try {
       prime(); if (!context || context.state !== 'running') return;
       const t = context.currentTime;
@@ -41,6 +36,5 @@ export function createGameSound(win) {
       if (kind === 'check') tap(.045, 460, .045);
     } catch { /* Audio support differs across browsers. */ }
   }
-  function setMuted(value) { muted = value; try { win.localStorage.setItem(key, String(value)); } catch { /* Optional preference. */ } if (!muted) prime(); }
-  return { prime, play, setMuted, isMuted: () => muted, destroy: () => { if (context) void context.close(); } };
+  return { prime, play, destroy: () => { if (context) void context.close(); } };
 }

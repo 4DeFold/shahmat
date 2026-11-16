@@ -257,7 +257,6 @@ test('active games show the mode and leave link; clocks always put player below 
     assert.equal(app.$('leave-game-control').hidden, false);
     assert.equal(app.$('leave-game-control').querySelector('a').getAttribute('href'), '/home');
     assert.equal(app.$('leave-game-control').querySelector('a').target, '_top');
-    assert.equal(app.$('leave-game-control').querySelector('.leave-note').hidden, false);
     assert.equal(app.$('opponent-clock-card').nextElementSibling, app.$('player-clock-card'));
     assert.equal(app.$('player-clock-card').dataset.color, user === A ? 'w' : 'b');
     assert.equal(app.$('opponent-clock-card').dataset.color, user === A ? 'b' : 'w');
@@ -270,7 +269,6 @@ test('finished games retain the mode and provide both new game and exit', async 
   t.after(() => app.close()); await app.ui.open(A); await flush();
   assert.equal(app.$('mode-summary').textContent, 'Блиц · 3 мин');
   assert.equal(app.$('leave-game-control').hidden, false);
-  assert.equal(app.$('leave-game-control').querySelector('.leave-note').hidden, true);
   assert.equal(app.$('new-game').hidden, false);
   app.$('new-game').click();
   assert.equal(app.$('mode-picker').classList.contains('is-collapsed'), false); assert.equal(app.$('mode-summary').hidden, true);

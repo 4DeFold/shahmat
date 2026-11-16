@@ -27,14 +27,6 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   const cancelTimer = () => { if (polling !== null) clearTimeout(polling); polling = null; };
   const reducedMotion = () => win.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const boardView = createMemberBoard({ document, board, reducedMotion });
-  const soundButton = $('sound-toggle');
-  function updateSoundButton() {
-    soundButton.setAttribute('aria-pressed', String(!sound.isMuted()));
-    const label = sound.isMuted() ? 'Включить звук' : 'Выключить звук';
-    soundButton.setAttribute('aria-label', label); soundButton.title = label;
-  }
-  soundButton.addEventListener('click', () => { sound.setMuted(!sound.isMuted()); updateSoundButton(); });
-  updateSoundButton();
   const playSound = move => sound.play(chess.isCheck() ? 'check' : move?.captured ? 'capture' : 'move');
   function modeControls() {
     const locked = phase !== 'idle';
@@ -45,7 +37,6 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     $('mode-summary').hidden = !locked || !mode;
     $('mode-summary').textContent = modeLabels[mode] || '';
     $('leave-game-control').hidden = phase !== 'active' && phase !== 'finished';
-    $('leave-game-control').querySelector('.leave-note').hidden = phase !== 'active';
     start.hidden = phase !== 'idle'; start.disabled = !userId || !ready || !mode;
     cancel.hidden = phase !== 'searching'; reset.hidden = phase !== 'finished';
     $('moves').hidden = phase !== 'active' && phase !== 'finished';
@@ -59,15 +50,10 @@ export function createMemberGame({ document, api, opponentName = async () => nul
       const card = $(`${id}-clock-card`), remaining = time(color);
       const background = snapshot ? color : 'neutral';
       if (card.dataset.color !== background) card.dataset.color = background;
-      const progress = `${remaining == null ? 0 : (Math.ceil(remaining / 1000) % 60) / 60 * 100}%`;
-      if (card.style.getPropertyValue('--second-progress') !== progress) card.style.setProperty('--second-progress', progress);
       card.classList.toggle('running', snapshot?.status === 'active' && snapshot.turn === color);
       card.classList.toggle('low', remaining != null && remaining <= 30000 && snapshot?.status === 'active' && snapshot.turn === color);
       const clock = $(`${id}-clock`), text = formatClock(remaining);
-      if (clock.textContent !== text) {
-        clock.replaceChildren(document.createTextNode(text.slice(0, -2)));
-        const seconds = document.createElement('span'); seconds.className = 'clock-seconds'; seconds.textContent = text.slice(-2); clock.append(seconds);
-      }
+      if (clock.textContent !== text) clock.textContent = text;
     }
     for (const [id, text] of [['player', `Вы · ${own === 'w' ? 'Белые' : 'Чёрные'}`], ['opponent', `Соперник · ${other === 'w' ? 'Белые' : 'Чёрные'}`]]) {
       const label = $(`${id}-clock-label`), value = snapshot ? text : '';

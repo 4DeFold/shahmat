@@ -318,11 +318,11 @@ function syncGameAppearance() {
   const frame = $('member-game-frame');
   if (!frame?.contentWindow) return;
   const style = getComputedStyle(landing);
-  const names = ['--page-background', '--foreground', '--surface', '--surface-raised', '--line', '--button-background', '--button-text', '--board-light', '--board-dark'];
+  const names = ['--page-background', '--foreground', '--surface', '--surface-raised', '--line', '--button-background', '--button-text', '--accent', '--board-light', '--board-dark'];
   const colors = Object.fromEntries(names.map(name => [name, style.getPropertyValue(name).trim()]));
   // Apply synchronously before revealing the frame; postMessage keeps its own
   // appearance listener in sync as the palette changes later.
-  const targets = { '--page-background': '--bg', '--foreground': '--ink', '--surface': '--surface', '--surface-raised': '--surface-alt', '--line': '--line', '--button-background': '--control', '--button-text': '--control-ink', '--board-light': '--board-light', '--board-dark': '--board-dark' };
+  const targets = { '--page-background': '--bg', '--foreground': '--ink', '--surface': '--surface', '--surface-raised': '--surface-alt', '--line': '--line', '--button-background': '--control', '--button-text': '--control-ink', '--accent': '--accent', '--board-light': '--board-light', '--board-dark': '--board-dark' };
   try { for (const [name, target] of Object.entries(targets)) if (colors[name]) frame.contentDocument?.documentElement.style.setProperty(target, colors[name]); } catch { /* Frame may still be navigating. */ }
   frame.contentWindow.postMessage({ type: 'shahmat-appearance', colors }, window.location.origin);
 }

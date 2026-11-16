@@ -31,7 +31,7 @@ if (window.parent !== window) {
     if (event.data?.type === 'shahmat-game-hidden') { ui.hide(); return; }
     if (event.data?.type === 'shahmat-game-shown') { ui.show(); return; }
     if (event.data?.type !== 'shahmat-appearance') return;
-    const names = { '--page-background': '--bg', '--foreground': '--ink', '--surface': '--surface', '--surface-raised': '--surface-alt', '--line': '--line', '--button-background': '--control', '--button-text': '--control-ink', '--board-light': '--board-light', '--board-dark': '--board-dark' };
+    const names = { '--page-background': '--bg', '--foreground': '--ink', '--surface': '--surface', '--surface-raised': '--surface-alt', '--line': '--line', '--button-background': '--control', '--button-text': '--control-ink', '--accent': '--accent', '--board-light': '--board-light', '--board-dark': '--board-dark' };
     for (const [name, target] of Object.entries(names)) {
       const value = event.data.colors?.[name];
       if (typeof value === 'string' && value) document.documentElement.style.setProperty(target, value);
