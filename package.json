@@ -9,7 +9,8 @@
     "test": "node --test",
     "test:responsive": "node scripts/responsive-check.mjs",
     "test:sync": "node scripts/appearance-sync-check.mjs",
-    "test:routes": "node scripts/routes-check.mjs"
+    "test:routes": "node scripts/routes-check.mjs",
+    "test:game": "node scripts/game-check.mjs"
   },
   "repository": {
     "type": "git",
@@ -20,7 +21,8 @@
   },
   "homepage": "https://github.com/4DeFold/shahmat#readme",
   "dependencies": {
-    "@supabase/supabase-js": "^2.119.0"
+    "@supabase/supabase-js": "^2.119.0",
+    "chess.js": "^1.4.0"
   },
   "devDependencies": {
     "jsdom": "^31.0.1",

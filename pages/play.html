@@ -1,1 +1,36 @@
-        <section class="empty-page" id="page-play" data-view="play" hidden aria-labelledby="page-play-title"><h2 id="page-play-title" tabindex="-1">Играть</h2></section>
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <title>Игра с ботом — shahmat.xyz</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/pages/play.css">
+  <script type="module" src="/pages/play.js"></script>
+</head>
+<body>
+  <div class="game-shell">
+    <header class="game-header">
+      <a class="brand" href="/" aria-label="shahmat.xyz — на главную"><span>shah</span>mat.xyz</a>
+      <a class="back" href="/">← На главную</a>
+    </header>
+    <main class="game-layout">
+      <section class="board-section" aria-labelledby="game-title">
+        <div class="game-heading"><div><p class="eyebrow">СВОБОДНАЯ ИГРА</p><h1 id="game-title">Игра с ботом<span>.</span></h1></div><span class="guest-label">Без регистрации</span></div>
+        <div class="player-row"><span class="avatar bot-avatar">♞</span><span><strong>Бот</strong><small>Чёрные</small></span><span class="player-tag">ШАХМАТЫ</span></div>
+        <div class="board-frame"><div class="board" id="board" role="group" aria-label="Шахматная доска"></div></div>
+        <div class="player-row"><span class="avatar">♙</span><span><strong>Вы</strong><small>Белые</small></span><span class="player-tag">ИГРАЕТЕ БЕЛЫМИ</span></div>
+      </section>
+      <aside class="game-panel" aria-label="Информация о партии">
+        <div><p class="eyebrow">ПАРТИЯ С БОТОМ</p><h2>Время играть.</h2><p class="description">Выберите фигуру, затем клетку для хода. Бот играет чёрными.</p></div>
+        <div class="status-card"><span class="status-dot"></span><div><span class="status-label">СТАТУС ПАРТИИ</span><p id="status" role="status" aria-live="polite">Ваш ход</p></div></div>
+        <div class="promotion" id="promotion" hidden><p>Выберите фигуру для превращения пешки:</p><div id="promotion-options"></div></div>
+        <div class="moves"><div class="moves-header"><span>ХОДЫ</span><span id="move-count">00</span></div><ol id="move-list" aria-label="История ходов"></ol><p id="empty-moves">Партия ещё не началась</p></div>
+        <button class="new-game" id="new-game" type="button">Новая партия <span>↗</span></button>
+        <p class="footnote">Партия сохраняется только до обновления страницы.</p>
+      </aside>
+    </main>
+  </div>
+</body>
+</html>

@@ -163,7 +163,7 @@ let navigating = false;
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const accountMenu = $('account-menu');
 const accountToggle = $('account-toggle');
-const pages = new Set(['home', 'play', 'profile', 'settings', 'help']);
+const pages = new Set(['home', 'profile', 'settings', 'help']);
 const sidebar = $('app-sidebar');
 const mobileMenuToggle = $('mobile-menu-toggle');
 let sidebarOpen = false;
@@ -230,7 +230,6 @@ function openAccountMenu() {
 // Each view is an independent, lazy-loaded page. Its chunk is requested only when visited.
 const pageLoaders = {
   home: () => import('./pages/home.html?raw'),
-  play: () => import('./pages/play.html?raw'),
   profile: () => import('./pages/profile.html?raw'),
   settings: () => import('./pages/settings.html?raw'),
   help: () => import('./pages/help.html?raw'),
@@ -362,7 +361,7 @@ function setMode(value) {
   }
 }
 async function loadProfile(user, immediate = false) {
-  if (window.location.pathname === '/') window.history.replaceState(null, '', '/home');
+  if (window.location.pathname === '/' || window.location.pathname === '/login') window.history.replaceState(null, '', '/home');
   const { data, error } = await supabase.from('profiles').select('username,bio,palette').eq('id', user.id).maybeSingle();
   if (error) throw error;
   profile = data;
@@ -384,8 +383,11 @@ function displayProfile() {
   $('dashboard-profile-heading').textContent = profile.username;
   $('dashboard-bio').textContent = profile.bio || 'Здесь можно рассказать немного о себе.';
 }
-$('play').addEventListener('click', async () => {
-  const button = $('play');
+$('login').addEventListener('click', async event => {
+  if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  event.preventDefault();
+  window.history.pushState(null, '', '/login');
+  const button = $('login');
   if (button.disabled) return;
   busy(button, true);
   try {
@@ -398,7 +400,7 @@ $('play').addEventListener('click', async () => {
 });
 $('tab-login').addEventListener('click', () => setMode('login'));
 $('tab-signup').addEventListener('click', () => setMode('signup'));
-document.querySelector('[data-action="home"]').addEventListener('click', () => show('landing-screen'));
+document.querySelector('[data-action="home"]').addEventListener('click', () => { window.history.replaceState(null, '', '/'); show('landing-screen'); });
 const unavailableMessage = 'Подтверждение по почте временно недоступно. Попробуй позже.';
 async function openVerification(email, kind, alreadySent = true) {
   verification = { email, kind };
@@ -615,7 +617,7 @@ async function initialize() {
       setRecoveryPending(true);
       await show('reset-password-screen', true);
     } else if (data.session) {
-      if (window.location.pathname === '/') window.history.replaceState(null, '', '/home');
+      if (window.location.pathname === '/' || window.location.pathname === '/login') window.history.replaceState(null, '', '/home');
       await loadProfile(data.session.user, true);
     } else {
       setRecoveryPending(false);
