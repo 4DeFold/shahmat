@@ -20,8 +20,9 @@ The checks use isolated mock authentication and profile responses, not real Supa
 The landing page is `/`, with PLAY opening the standalone guest demo at `/play`
 and «Войти» opening `/login`. The dashboard «Играть» link opens a separate
 `/game` page inside the persistent dashboard, with the existing sidebar and
-profile controls. Its independently loaded game document verifies the account
-with Supabase Auth before showing the game. Its local bot game is stored under a separate key per account and never
+profile controls. The game opens immediately from the cached account session, with Supabase
+Auth checked in the background; absent authentication returns to the landing
+page. No protected server action relies on the cached session. Its local bot game is stored under a separate key per account and never
 shares the demo position. A signed-in user can start a new bot game there.
 Both pages currently offer a local white-vs-black-bot game; online matchmaking
 and rated games are not yet available. The lightweight bot searches
@@ -29,8 +30,8 @@ two plies; chess.js enforces legal moves, castling, en passant, promotion and
 game-end rules. The current game (including full move history) is saved in the
 browser’s localStorage and resumes after refresh; clearing browser data removes it.
 In the guest demo, “Новая партия” opens registration instead of resetting the board. No game data
-is sent to Supabase. The game uses the active account’s saved light/dark preference,
-or the device preference for guests; the game board is monochrome. Chess.com Neo piece images are in `public/pieces/neo/`; they belong to Chess.com
+is sent to Supabase. The account game follows the selected palette and theme;
+the guest demo uses a monochrome board and the device or saved theme preference. Chess.com Neo piece images are in `public/pieces/neo/`; they belong to Chess.com
 and are not covered by this repository’s software license. The signed-in sections use `/home`, `/profile`,
 `/settings`, and `/help`. Their markup lives in `pages/` and is loaded on demand;
 the authentication shell and application code are also deferred on a fresh

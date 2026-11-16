@@ -23,7 +23,8 @@ try {
     return route.fulfill({ json: {} });
   });
   await page.goto(`${base}/game`);
-  await page.locator('#auth-screen').waitFor({ state: 'visible' });
+  await page.locator('#landing-screen').waitFor({ state: 'visible' });
+  assert.equal(new URL(page.url()).pathname, '/');
   assert.equal(await page.locator('#dashboard-screen').isVisible(), false);
   await page.goto(`${base}/play`);
   await page.locator('[data-square=e2]').click(); await page.locator('[data-square=e4]').click();
@@ -57,15 +58,13 @@ try {
   assert.equal(await page.evaluate(() => localStorage.getItem('shahmat.guest-game.v1')), guestSave);
   offline = true;
   await page.reload();
-  await game.locator('#gate-retry').waitFor({ state: 'visible', timeout: 30000 });
-  assert.equal(await game.locator('#member-game').isVisible(), false, 'network error fails closed');
+  await game.locator('#board').waitFor({ state: 'visible', timeout: 30000 });
+  assert.equal(await game.locator('#member-game').isVisible(), true, 'network error must not log out a cached session');
   offline = false;
-  await game.locator('#gate-retry').click();
-  await game.locator('#board').waitFor({ state: 'visible' });
   // Simulate signout in another tab via the storage event Supabase listens to.
   await page.evaluate(key => { localStorage.removeItem(key); window.dispatchEvent(new StorageEvent('storage', { key, oldValue: '{}', newValue: null, storageArea: localStorage })); }, sessionKey);
   // Direct reload must never expose a stored member game without a session.
-  await page.reload(); await page.locator('#auth-screen').waitFor({ state: 'visible' });
+  await page.reload(); await page.locator('#landing-screen').waitFor({ state: 'visible' });
   assert.equal(await page.locator('#dashboard-screen').isVisible(), false);
   console.log('✓ Guest and member pages are separate; auth, account-scoped storage, reload, reset and offline gate work');
 } finally { await browser.close(); }

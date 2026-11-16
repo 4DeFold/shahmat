@@ -498,3 +498,26 @@ test('game route keeps the sidebar and safely handles frame height messages', as
   assert.equal(frame.style.height, '920px');
   window.close();
 });
+
+test('a guest visiting the game route returns to the landing page', async () => {
+  const { $, window } = await setup({ url: 'https://example.com/game' });
+  assert.equal(window.location.pathname, '/');
+  assert.equal($('landing-screen').hidden, false);
+  assert.equal($('dashboard-screen').hidden, true);
+  window.close();
+});
+
+test('the game frame receives board colours from the active palette', async () => {
+  const { $, window, document } = await setup({ existing: true, url: 'https://example.com/game' });
+  const frame = $('member-game-frame');
+  const sent = [];
+  frame.contentWindow.postMessage = (message, origin) => sent.push({ message, origin });
+  const landing = document.querySelector('.landing');
+  landing.style.setProperty('--board-light', '#eeeed2');
+  landing.style.setProperty('--board-dark', '#769656');
+  frame.dispatchEvent(new window.Event('load'));
+  assert.equal(sent.at(-1).origin, 'https://example.com');
+  assert.equal(sent.at(-1).message.colors['--board-light'], '#eeeed2');
+  assert.equal(sent.at(-1).message.colors['--board-dark'], '#769656');
+  window.close();
+});

@@ -286,7 +286,7 @@ function syncGameAppearance() {
   const frame = $('member-game-frame');
   if (!frame?.contentWindow) return;
   const style = getComputedStyle(landing);
-  const names = ['--page-background', '--foreground', '--surface', '--surface-raised', '--line', '--button-background', '--button-text'];
+  const names = ['--page-background', '--foreground', '--surface', '--surface-raised', '--line', '--button-background', '--button-text', '--board-light', '--board-dark'];
   const colors = Object.fromEntries(names.map(name => [name, style.getPropertyValue(name).trim()]));
   frame.contentWindow.postMessage({ type: 'shahmat-appearance', colors }, window.location.origin);
 }
@@ -643,6 +643,7 @@ async function initialize() {
       await loadProfile(data.session.user, true);
     } else {
       setRecoveryPending(false);
+      if (window.location.pathname === '/game') window.history.replaceState(null, '', '/');
       await show(window.location.pathname === '/' ? 'landing-screen' : 'auth-screen', true);
     }
   } catch (error) {

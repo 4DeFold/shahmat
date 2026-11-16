@@ -13,28 +13,20 @@
 <body>
   <div class="game-shell member-shell">
     <main>
-      <div id="game-gate" class="game-gate" role="status" aria-live="polite">
-        <h1>Играть<span>.</span></h1>
-        <p id="gate-message">Проверяем авторизацию…</p>
-        <a id="gate-login" class="new-game" href="/login" hidden>Войти в аккаунт <span>↗</span></a>
-        <button id="gate-retry" class="new-game" type="button" hidden>Попробовать ещё раз <span>↻</span></button>
-        <a class="demo-link" href="/play">Или попробовать демо без входа →</a>
-      </div>
-      <div id="member-game" hidden>
-        <div class="member-intro"><div><p class="eyebrow">ЛИЧНЫЙ КАБИНЕТ / ИГРАТЬ</p><h1>Играть<span>.</span></h1></div><span class="mode-label">ТРЕНИРОВКА</span></div>
+      <div id="member-game">
         <div class="game-layout">
           <section class="board-section" aria-label="Шахматная доска">
-            <div class="player-row"><span class="avatar bot-avatar"><img src="/pieces/neo/bN.png" alt=""></span><span><strong>Бот</strong><small>Чёрные</small></span></div>
+            <div class="player-row"><span class="avatar bot-avatar"><img src="/pieces/neo/bN.png" alt=""></span><span><strong>Бот</strong><small>Без рейтинга</small></span></div>
             <div class="board-frame"><div class="board" id="board" role="group" aria-label="Шахматная доска"></div></div>
-            <div class="player-row"><span class="avatar"><img src="/pieces/neo/wP.png" alt=""></span><span><strong>Вы</strong><small>Белые</small></span></div>
+            <div class="player-row"><span class="avatar"><img src="/pieces/neo/wP.png" alt=""></span><span><strong>Вы</strong></span></div>
           </section>
           <aside class="game-panel" aria-label="Информация о партии">
-            <div class="member-card"><p class="eyebrow">КЛАССИЧЕСКИЕ ШАХМАТЫ</p><h2>Партия с ботом</h2><p class="description">Тренировка без часов и без рейтинга. Сетевые партии и поиск соперника пока недоступны.</p>
+            <div class="member-card">
               <div class="status-card"><span class="status-dot"></span><div><p id="status" role="status" aria-live="polite">Ваш ход</p></div></div>
               <div class="promotion" id="promotion" hidden><p>Выберите фигуру для превращения пешки:</p><div id="promotion-options"></div></div>
               <div class="moves"><div class="moves-header"><span>ХОДЫ</span><span id="move-count">00</span></div><ol id="move-list" aria-label="История ходов"></ol><p id="empty-moves">Пока нет ходов</p></div>
               <button class="new-game" id="new-game" type="button">Новая партия <span>↗</span></button>
-              <p class="footnote" id="storage-message" role="status">Партия сохраняется на этом устройстве отдельно для вашего аккаунта.</p>
+              <p class="footnote" id="storage-message" role="status"></p>
             </div>
           </aside>
         </div>
