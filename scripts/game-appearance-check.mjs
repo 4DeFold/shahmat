@@ -49,5 +49,5 @@ try {
       move: document.querySelector('#move-list strong').getAnimations().length };
   });
   assert.deepEqual(reduced, { piece: 0, move: 0 });
-  console.log('✓ Saved dark theme, Chess.com assets, move animations and reduced motion');
+  console.log('✓ Saved dark theme, GPL-licensed Cburnett pieces, move animations and reduced motion');
 } finally { await browser.close(); }

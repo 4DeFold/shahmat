@@ -7,7 +7,7 @@ const board = document.getElementById('board');
 const status = document.getElementById('status');
 const promotion = document.getElementById('promotion');
 const options = document.getElementById('promotion-options');
-const pieceSrc = (color, type) => `/pieces/neo/${color}${type.toUpperCase()}.png`;
+const pieceSrc = (color, type) => `/pieces/cburnett/${color}${type.toUpperCase()}.svg`;
 const names = { k:'король', q:'ферзь', r:'ладья', b:'слон', n:'конь', p:'пешка' };
 const files = 'abcdefgh';
 let selected = null, pending = null, botTimer = null, botThinking = false, lastMove = null;

@@ -1,6 +1,0 @@
-Neo chess piece images: Chess.com, all rights reserved.
-Retrieved from https://github.com/sethhyo8/chess/tree/main/public/pieces/neo,
-which identifies the original source as
-https://images.chesscomfiles.com/chess-themes/pieces/neo/300/wp.png
-(and corresponding w/b + p/n/b/r/q/k images).
-These assets are not covered by this repository's software license.

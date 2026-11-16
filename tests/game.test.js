@@ -37,6 +37,8 @@ test('bot chooses a legal move without changing position or history', () => {
 test('guest board allows only legal moves and saves the bot reply', async () => {
   const { document, game, click } = setup();
   assert.equal(document.querySelectorAll('[data-square]').length, 64);
+  assert.equal(document.querySelector('[data-square=e1] .piece').getAttribute('src'), '/pieces/cburnett/wK.svg');
+  assert.equal(document.querySelector('[data-square=e8] .piece').getAttribute('src'), '/pieces/cburnett/bK.svg');
   assert.ok(document.querySelector('[data-square=a1]').classList.contains('dark'));
   assert.ok(document.querySelector('[data-square=a8]').classList.contains('light'));
   click('e2'); assert.ok(document.querySelector('[data-square=e4]').classList.contains('possible'));
@@ -57,6 +59,7 @@ test('promotion provides all four choices and honors the selected piece', () => 
   click('a7'); click('a8');
   assert.equal(document.querySelector('#promotion').hidden, false);
   assert.equal(document.querySelectorAll('#promotion-options button').length, 4);
+  assert.deepEqual([...document.querySelectorAll('#promotion-options img')].map(img => img.getAttribute('src')), ['/pieces/cburnett/wQ.svg', '/pieces/cburnett/wR.svg', '/pieces/cburnett/wB.svg', '/pieces/cburnett/wN.svg']);
   document.querySelector('[aria-label="конь"]').click();
   assert.equal(game.get('a8').type, 'n');
   assert.match(document.querySelector('#status').textContent, /Ничья/);

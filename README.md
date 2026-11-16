@@ -31,8 +31,10 @@ game-end rules. The current game (including full move history) is saved in the
 browser’s localStorage and resumes after refresh; clearing browser data removes it.
 In the guest demo, “Новая партия” opens registration instead of resetting the board. No game data
 is sent to Supabase. The account game follows the selected palette and theme;
-the guest demo uses a monochrome board and the device or saved theme preference. Chess.com Neo piece images are in `public/pieces/neo/`; they belong to Chess.com
-and are not covered by this repository’s software license. The signed-in sections use `/home`, `/profile`,
+the guest demo uses a monochrome board and the device or saved theme preference. Chess pieces are Colin M. L. Burnett’s Cburnett SVGs, copied unmodified from
+Lichess under GPL-2.0-or-later. The source, attribution and full GPL-2.0 text
+are in `public/pieces/cburnett/`. This license applies to these assets; review
+its terms before redistribution or modifying them. The signed-in sections use `/home`, `/profile`,
 `/settings`, and `/help`. Their markup lives in `pages/` and is loaded on demand;
 the authentication shell and application code are also deferred on a fresh
 landing-page visit. Navigation uses real links and the History API, while Vercel
