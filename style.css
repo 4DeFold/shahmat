@@ -730,3 +730,6 @@ textarea { resize: vertical; min-height: 92px; }
 @media (max-width: 700px), (max-height: 500px) and (pointer: coarse) {
   .landing:has(.dashboard:not([hidden]) #page-game:not([hidden])) { padding: 68px 0 0; }
 }
+
+/* A transformed dashboard becomes a containing block for its fixed sidebar. */
+.screen.dashboard, .screen.dashboard.entering, .screen.dashboard.leaving { transform: none; }

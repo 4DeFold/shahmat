@@ -363,11 +363,14 @@ function setMode(value) {
     tab.setAttribute('aria-pressed', String(mode === name));
   }
   $('password').autocomplete = mode === 'login' ? 'current-password' : 'new-password';
-  $('password').minLength = mode === 'login' ? 6 : 8;
+  // Existing accounts may have an older six-character password. New account
+  // passwords are checked only after the sign-in attempt.
+  $('password').minLength = 6;
   $('password').placeholder = mode === 'login' ? 'Не менее 6 символов' : 'Не менее 8 символов';
   $('forgot-password').hidden = mode !== 'login';
   $('auth-submit').innerHTML = mode === 'login' ? 'Войти <span>↗</span>' : 'Создать аккаунт <span>↗</span>';
   message('auth-message');
+  $('auth-register-suggestion').hidden = true;
   if (changed && !reducedMotion.matches) {
     const form = $('auth-form');
     form.classList.remove('mode-changing');
@@ -415,6 +418,7 @@ $('login').addEventListener('click', async event => {
 });
 $('tab-login').addEventListener('click', () => setMode('login'));
 $('tab-signup').addEventListener('click', () => setMode('signup'));
+$('auth-register-suggestion').addEventListener('click', () => setMode('signup'));
 document.querySelector('[data-action="home"]').addEventListener('click', () => { window.history.replaceState(null, '', '/'); show('landing-screen'); });
 const unavailableMessage = 'Подтверждение по почте временно недоступно. Попробуй позже.';
 async function openVerification(email, kind, alreadySent = true) {
@@ -430,33 +434,43 @@ $('auth-form').addEventListener('submit', async event => {
   event.preventDefault();
   const button = $('auth-submit');
   if (button.disabled) return;
-  if (mode === 'signup' && !emailOtpReady) { message('auth-message', unavailableMessage); return; }
-  busy(button, true); message('auth-message');
+  busy(button, true); message('auth-message'); $('auth-register-suggestion').hidden = true;
   try {
     const credentials = { email: $('email').value.trim(), password: $('password').value };
-    if (mode === 'signup' && credentials.password.length < 8) { message('auth-message', 'Пароль должен содержать не менее 8 символов.'); return; }
-    const { data, error } = mode === 'signup' ? await supabase.auth.signUp(credentials) : await supabase.auth.signInWithPassword(credentials);
-    if (error) {
-      if (mode === 'login' && emailOtpReady && (error.code === 'email_not_confirmed' || error.message?.toLowerCase().includes('email not confirmed'))) {
-        $('password').value = '';
-        await openVerification(credentials.email, 'signup', false);
-        return;
-      }
-      throw error;
+    // Trying sign-in first also permits an existing account to use the signup tab.
+    // Supabase deliberately returns the same error for an unknown email and a
+    // wrong password, so never infer account existence from this response.
+    const login = await supabase.auth.signInWithPassword(credentials);
+    if (!login.error && login.data?.session) {
+      $('password').value = '';
+      await loadProfile(login.data.session.user);
+      return;
     }
+    const error = login.error || new Error('Session missing');
+    if (emailOtpReady && (error.code === 'email_not_confirmed' || error.message?.toLowerCase().includes('email not confirmed'))) {
+      $('password').value = '';
+      await openVerification(credentials.email, 'signup', false);
+      return;
+    }
+    const invalid = error.code === 'invalid_credentials' || error.message?.toLowerCase().includes('invalid login credentials');
+    if (!invalid) throw error;
+    if (mode === 'login') {
+      message('auth-message', 'Неверная почта или пароль. Проверь данные или перейди к регистрации.');
+      $('auth-register-suggestion').hidden = false;
+      return;
+    }
+    if (!emailOtpReady) { message('auth-message', unavailableMessage); return; }
+    if (credentials.password.length < 8) { message('auth-message', 'Пароль должен содержать не менее 8 символов.'); return; }
+    const { data, error: signupError } = await supabase.auth.signUp(credentials);
+    if (signupError) throw signupError;
     $('password').value = '';
-    if (mode === 'signup') {
-      if (data.session) {
-        // Fail closed if the server was accidentally left in auto-confirm mode.
-        await supabase.auth.signOut({ scope: 'local' });
-        message('auth-message', unavailableMessage);
-        return;
-      }
-      await openVerification(credentials.email, 'signup');
-    } else {
-      if (!data.session) throw new Error('Session missing');
-      await loadProfile(data.session.user);
+    if (data.session) {
+      // Fail closed if the server was accidentally left in auto-confirm mode.
+      await supabase.auth.signOut({ scope: 'local' });
+      message('auth-message', unavailableMessage);
+      return;
     }
+    await openVerification(credentials.email, 'signup');
   } catch (error) { message('auth-message', describe(error)); }
   finally { busy(button, false); }
 });

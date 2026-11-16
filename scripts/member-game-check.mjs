@@ -44,8 +44,9 @@ try {
   assert.equal(new URL(page.url()).pathname, '/game');
   assert.equal(await game.locator('#board [data-square]').count(), 64);
   assert.equal(await game.locator('#board').evaluate(el => el.classList.contains('waiting')), true);
-  assert.equal(await game.locator('#player-clock-card').getAttribute('data-color'), 'w');
-  assert.equal(await game.locator('#opponent-clock-card').getAttribute('data-color'), 'b');
+  assert.equal(await game.locator('#player-clock-card').getAttribute('data-color'), 'neutral');
+  assert.equal(await game.locator('#opponent-clock-card').getAttribute('data-color'), 'neutral');
+  assert.equal(await game.locator('#player-clock-label').isHidden(), true);
   assert.equal(await game.locator('#start-search').isDisabled(), true);
   await game.locator('label:has(input[value=blitz])').click();
   assert.equal(await game.locator('#player-clock').innerText(), '03:00');

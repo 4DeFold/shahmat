@@ -27,11 +27,11 @@ test('board opens at starting position, modes are explicit and a real request st
   const calls = [];
   const app = setup(async body => { calls.push(body); return body.action === 'search' ? { state:'searching' } : { game:null }; });
   assert.equal(app.$('board').querySelectorAll('[data-square]').length, 64);
-  assert.equal(app.$('player-clock-card').dataset.color, 'w');
-  assert.equal(app.$('opponent-clock-card').dataset.color, 'b');
+  assert.equal(app.$('player-clock-card').dataset.color, 'neutral');
+  assert.equal(app.$('opponent-clock-card').dataset.color, 'neutral');
   assert.equal(app.$('player-clock-card').nextElementSibling, app.$('opponent-clock-card'));
-  assert.equal(app.$('player-clock-label').textContent, 'Вы · Белые');
-  assert.equal(app.$('opponent-clock-label').textContent, 'Соперник · Чёрные');
+  assert.equal(app.$('player-clock-label').hidden, true);
+  assert.equal(app.$('opponent-clock-label').hidden, true);
   assert.equal(app.$('board').querySelector('[data-square=e2] img').getAttribute('src'), '/pieces/cburnett/wP.svg');
   assert.deepEqual([...app.$('mode-list').querySelectorAll('input')].map(input => input.value), ['blitz','rapid','classical','daily']);
   assert.equal(app.$('start-search').disabled, true);

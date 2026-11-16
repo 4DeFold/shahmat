@@ -1,33 +1,38 @@
-// Smooth wheel input on scrollable vertical containers; touch, zoom, horizontal
-// gestures and reduced-motion preferences stay native.
-const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
-let current = null, target = 0, frame = 0, lastTime = 0, velocity = 0;
-function scroller(node, delta) {
-  for (let el = node instanceof Element ? node : node?.parentElement; el && el !== document.body; el = el.parentElement) {
-    const style = getComputedStyle(el), max = el.scrollHeight - el.clientHeight;
-    if (max > 1 && /(auto|scroll)/.test(style.overflowY) && ((delta < 0 && el.scrollTop > 0) || (delta > 0 && el.scrollTop < max - 1))) return el;
-  }
-  const el = document.scrollingElement, max = el.scrollHeight - el.clientHeight;
-  return max > 1 && ((delta < 0 && el.scrollTop > 0) || (delta > 0 && el.scrollTop < max - 1)) ? el : null;
+// Animata's website uses Lenis (MIT): components/smooth-scroll.tsx at
+// codse/animata@25c27e5a874c60a56dcc1609df3b2c4f5f8456f8. Its wheel
+// settings are retained here; touch, keyboard and reduced-motion stay native.
+import Lenis from 'lenis';
+
+const preference = window.matchMedia('(prefers-reduced-motion: reduce)');
+const nested = new Map();
+let root = null;
+const options = {
+  lerp: 0.14, wheelMultiplier: 1.1, allowNestedScroll: true,
+  anchors: true, stopInertiaOnNavigate: true, autoRaf: true,
+  prevent: node => !!node.closest?.('[data-lenis-prevent], [role="dialog"], #palette-scroll'),
+};
+function dispose() {
+  root?.destroy(); root = null;
+  for (const instance of nested.values()) instance.destroy();
+  nested.clear();
 }
-function tick(time) {
-  if (!current) { frame = 0; return; }
-  const dt = Math.min(32, lastTime ? time - lastTime : 16); lastTime = time;
-  const distance = target - current.scrollTop;
-  // Smoothly accelerate toward the remaining distance, then decelerate.
-  const desired = distance * .014;
-  velocity += (desired - velocity) * (1 - Math.exp(-dt / 80));
-  const step = velocity * dt;
-  if (Math.abs(distance) < 3 && Math.abs(velocity) < .06) { current.scrollTop = target; frame = 0; current = null; velocity = 0; lastTime = 0; return; }
-  current.scrollTop += Math.abs(step) > Math.abs(distance) && Math.sign(step) === Math.sign(distance) ? distance : step;
-  frame = requestAnimationFrame(tick);
+function configure() {
+  dispose();
+  if (!preference.matches) root = new Lenis(options);
 }
+configure();
+preference.addEventListener('change', configure);
+// Give nested vertical scroll areas their own Lenis, including areas loaded
+// lazily after the initial page. Native horizontal palette scrolling is kept.
 document.addEventListener('wheel', event => {
-  if (event.defaultPrevented || event.ctrlKey || event.metaKey || reduced.matches || Math.abs(event.deltaX) > Math.abs(event.deltaY) || !event.deltaY || event.target.closest?.('#palette-scroll')) return;
-  const el = scroller(event.target, event.deltaY); if (!el) return;
-  event.preventDefault();
-  if (current !== el) { if (frame) cancelAnimationFrame(frame); current = el; target = el.scrollTop; velocity = 0; lastTime = 0; frame = 0; }
-  const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? el.clientHeight : 1;
-  target = Math.max(0, Math.min(el.scrollHeight - el.clientHeight, target + event.deltaY * unit));
-  if (!frame) frame = requestAnimationFrame(tick);
-}, { passive:false });
+  if (!root || event.ctrlKey || event.metaKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
+  for (let node = event.target instanceof Element ? event.target : event.target?.parentElement; node && node !== document.body; node = node.parentElement) {
+    if (node.closest('[data-lenis-prevent], [role="dialog"], #palette-scroll')) return;
+    if (node.scrollHeight > node.clientHeight + 1 && /(auto|scroll)/.test(getComputedStyle(node).overflowY)) {
+      if (!nested.has(node)) nested.set(node, new Lenis({ ...options, anchors:false, wrapper:node, content:node }));
+    }
+  }
+}, { capture:true, passive:true });
+new MutationObserver(() => {
+  for (const [node, instance] of nested) if (!node.isConnected) { instance.destroy(); nested.delete(node); }
+}).observe(document.documentElement, { childList:true, subtree:true });

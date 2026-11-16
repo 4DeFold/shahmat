@@ -49,7 +49,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     const other = own === 'w' ? 'b' : 'w';
     for (const [id, color] of [['player', own], ['opponent', other]]) {
       const card = $(`${id}-clock-card`), remaining = time(color);
-      card.dataset.color = color;
+      card.dataset.color = snapshot ? color : 'neutral';
       card.style.setProperty('--second-progress', `${remaining == null ? 0 : (Math.ceil(remaining / 1000) % 60) / 60 * 100}%`);
       card.classList.toggle('running', snapshot?.status === 'active' && snapshot.turn === color);
       card.classList.toggle('low', remaining != null && remaining <= 30000 && snapshot?.status === 'active' && snapshot.turn === color);
@@ -59,8 +59,10 @@ export function createMemberGame({ document, api, opponentName = async () => nul
         const seconds = document.createElement('span'); seconds.className = 'clock-seconds'; seconds.textContent = text.slice(-2); clock.append(seconds);
       }
     }
-    $('player-clock-label').textContent = `Вы · ${own === 'w' ? 'Белые' : 'Чёрные'}`;
-    $('opponent-clock-label').textContent = `Соперник · ${other === 'w' ? 'Белые' : 'Чёрные'}`;
+    $('player-clock-label').hidden = !snapshot;
+    $('opponent-clock-label').hidden = !snapshot;
+    $('player-clock-label').textContent = snapshot ? `Вы · ${own === 'w' ? 'Белые' : 'Чёрные'}` : '';
+    $('opponent-clock-label').textContent = snapshot ? `Соперник · ${other === 'w' ? 'Белые' : 'Чёрные'}` : '';
   }
   function resultText() {
     if (!snapshot || snapshot.status !== 'finished') return snapshot?.turn === currentColor() ? (chess.isCheck() ? 'Шах! Защитите короля — ваш ход.' : 'Ваш ход.') : (chess.isCheck() ? 'Шах сопернику. Ожидаем ход.' : 'Ход соперника. Можно подготовить свой ход.');
@@ -115,7 +117,10 @@ export function createMemberGame({ document, api, opponentName = async () => nul
       if (column === 0) { const coord = document.createElement('span'); coord.className = 'coord rank'; coord.textContent = rank; cell.append(coord); }
       fragment.append(cell);
     }));
-    board.replaceChildren(fragment); board.classList.toggle('waiting', !snapshot); board.classList.toggle('black', !!snapshot && color === 'b');
+    board.replaceChildren(fragment);
+    // Establish the initial counter-rotation before transitioning both layers.
+    if (board.classList.contains('waiting') && snapshot) void board.offsetWidth;
+    board.classList.toggle('waiting', !snapshot); board.classList.toggle('black', !!snapshot && color === 'b');
     $('player-color').textContent = snapshot ? (color === 'w' ? 'Белые' : 'Чёрные') : 'Цвет определится после поиска';
     $('opponent-color').textContent = snapshot ? (color === 'w' ? 'Чёрные' : 'Белые') : '';
     if (animatedMove && historyIndex === null && !reducedMotion()) {
