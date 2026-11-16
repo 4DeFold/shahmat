@@ -35,6 +35,13 @@ try {
   assert.ok(gap >= 0 && gap <= 12, 'clocks are adjacent');
   await page.locator('label:has(input[value=blitz])').click(); await page.locator('#start-search').click();
   await page.locator('#board.black').waitFor();
+  const blackClocks = await page.locator('.clock-pair').evaluate(pair => {
+    const player = pair.querySelector('#player-clock-card').getBoundingClientRect();
+    const opponent = pair.querySelector('#opponent-clock-card').getBoundingClientRect();
+    const board = document.querySelector('.board-frame').getBoundingClientRect();
+    return {playerCenter:(player.top + player.bottom) / 2, opponentCenter:(opponent.top + opponent.bottom) / 2, middle:(board.top + board.bottom) / 2};
+  });
+  assert.ok(blackClocks.playerCenter >= blackClocks.middle && blackClocks.opponentCenter <= blackClocks.middle, 'black player clock remains in lower half');
   for (const [index, delay] of [50, 200, 300, 600].entries()) {
     await page.waitForTimeout(delay);
     if (index === 1) await page.locator('[data-square=e7]').evaluate(el => el.click()); // redraw mid-animation

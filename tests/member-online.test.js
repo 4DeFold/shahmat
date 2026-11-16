@@ -29,7 +29,7 @@ test('board opens at starting position, modes are explicit and a real request st
   assert.equal(app.$('board').querySelectorAll('[data-square]').length, 64);
   assert.equal(app.$('player-clock-card').dataset.color, 'neutral');
   assert.equal(app.$('opponent-clock-card').dataset.color, 'neutral');
-  assert.equal(app.$('player-clock-card').nextElementSibling, app.$('opponent-clock-card'));
+  assert.equal(app.$('opponent-clock-card').nextElementSibling, app.$('player-clock-card'));
   assert.equal(app.$('player-clock-label').hidden, true);
   assert.equal(app.$('opponent-clock-label').hidden, true);
   assert.equal(app.$('board').querySelector('[data-square=e2] img').getAttribute('src'), '/pieces/cburnett/wP.svg');
@@ -233,4 +233,45 @@ test('hiding during a move ignores stale replies and reconciles on return', asyn
   assert.equal(board.querySelector('[data-square=e4] img').getAttribute('src'), '/pieces/cburnett/wP.svg');
   assert.equal(board.querySelector('[data-square=e5] img').getAttribute('src'), '/pieces/cburnett/bP.svg');
   assert.match(app.$('status').textContent, /Ваш ход/);
+});
+
+
+test('mode selector is replaced during search and restored on cancellation', async t => {
+  const app = setup(async body => body.action === 'search' ? {state:'searching'} : {game:null}); t.after(() => app.close());
+  await app.ui.open(A);
+  assert.equal(app.$('mode-list').hidden, false); assert.equal(app.$('mode-summary').hidden, true);
+  const input = app.$('mode-list').querySelector('[value=blitz]');
+  input.checked = true; input.dispatchEvent(new app.dom.window.Event('change', {bubbles:true}));
+  app.$('start-search').click(); await flush();
+  assert.equal(app.$('mode-label').hidden, true); assert.equal(app.$('mode-list').hidden, true);
+  assert.equal(app.$('mode-summary').hidden, false); assert.equal(app.$('mode-summary').textContent, 'Блиц · 3 мин');
+  app.$('cancel-search').click(); await flush();
+  assert.equal(app.$('mode-list').hidden, false); assert.equal(app.$('mode-label').hidden, false); assert.equal(app.$('mode-summary').hidden, true);
+});
+
+test('active games show the mode and leave link; clocks always put player below opponent', async t => {
+  for (const user of [A, B]) {
+    const app = setup(async () => ({game:game()})); t.after(() => app.close());
+    await app.ui.open(user); await flush();
+    assert.equal(app.$('mode-list').hidden, true); assert.equal(app.$('mode-summary').textContent, 'Блиц · 3 мин');
+    assert.equal(app.$('leave-game-control').hidden, false);
+    assert.equal(app.$('leave-game-control').querySelector('a').getAttribute('href'), '/home');
+    assert.equal(app.$('leave-game-control').querySelector('a').target, '_top');
+    assert.equal(app.$('leave-game-control').querySelector('.leave-note').hidden, false);
+    assert.equal(app.$('opponent-clock-card').nextElementSibling, app.$('player-clock-card'));
+    assert.equal(app.$('player-clock-card').dataset.color, user === A ? 'w' : 'b');
+    assert.equal(app.$('opponent-clock-card').dataset.color, user === A ? 'b' : 'w');
+  }
+});
+
+
+test('finished games retain the mode and provide both new game and exit', async t => {
+  const app = setup(async () => ({ game:game({ status:'finished', result:'draw', reason:'stalemate' }) }));
+  t.after(() => app.close()); await app.ui.open(A); await flush();
+  assert.equal(app.$('mode-summary').textContent, 'Блиц · 3 мин');
+  assert.equal(app.$('leave-game-control').hidden, false);
+  assert.equal(app.$('leave-game-control').querySelector('.leave-note').hidden, true);
+  assert.equal(app.$('new-game').hidden, false);
+  app.$('new-game').click();
+  assert.equal(app.$('mode-list').hidden, false); assert.equal(app.$('mode-summary').hidden, true);
 });

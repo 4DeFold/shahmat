@@ -3,6 +3,7 @@ import { createMemberBoard } from './member-board.js';
 import { createGameSound } from './game-sound.js';
 
 const times = { blitz: 180000, rapid: 600000, classical: 3600000, daily: 86400000 };
+const modeLabels = { blitz:'Блиц · 3 мин', rapid:'Рапид · 10 мин', classical:'Классика · 1 час', daily:'Дневная · 24 часа' };
 const names = { k:'король', q:'ферзь', r:'ладья', b:'слон', n:'конь', p:'пешка' };
 const files = 'abcdefgh';
 const pieceSrc = (color, type) => `/pieces/cburnett/${color}${type.toUpperCase()}.svg`;
@@ -37,6 +38,12 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   function modeControls() {
     const locked = phase !== 'idle';
     $('mode-list').querySelectorAll('input').forEach(input => { input.disabled = locked; });
+    $('mode-label').hidden = locked;
+    $('mode-list').hidden = locked;
+    $('mode-summary').hidden = !locked || !mode;
+    $('mode-summary').textContent = modeLabels[mode] || '';
+    $('leave-game-control').hidden = phase !== 'active' && phase !== 'finished';
+    $('leave-game-control').querySelector('.leave-note').hidden = phase !== 'active';
     start.hidden = phase !== 'idle'; start.disabled = !userId || !ready || !mode;
     cancel.hidden = phase !== 'searching'; reset.hidden = phase !== 'finished';
     $('moves').hidden = phase !== 'active' && phase !== 'finished';
