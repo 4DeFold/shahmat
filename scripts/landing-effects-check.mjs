@@ -19,8 +19,33 @@ try {
     }
     await page.locator('#login').click(); await page.locator('#auth-screen').waitFor({state:'visible'}); await page.waitForTimeout(800);
     assert.equal(await page.locator('#email').isVisible(), true); assert.equal(await page.locator('#password').isVisible(), true);
-    await page.locator('#email').fill('user@example.com'); await page.locator('#password').fill('password123'); await page.locator('#tab-signup').click();
+    assert.equal(await page.locator('#password').getAttribute('placeholder'), 'Не менее 8 символов');
+    assert.equal(await page.locator('#password').getAttribute('minlength'), '8');
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'auth-screen');
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Tab');
+    assert.equal(await page.locator('#tab-login').evaluate(el => el.matches(':focus-visible')), true);
+    assert.equal(await page.locator('#tab-login').evaluate(el => getComputedStyle(el).textDecorationStyle), 'dotted');
+    await page.locator('#email').fill('user@example.com'); await page.locator('#password').fill('1234567');
+    assert.equal(await page.locator('#password').evaluate(el => el.validity.tooShort), true);
+    await page.locator('#password').fill('password123');
+    const initial = await page.locator('#auth-screen').evaluate(el => el.getBoundingClientRect().height);
+    await page.locator('#tab-signup').click();
+    assert.equal(await page.locator('#tab-signup').evaluate(el => getComputedStyle(el).outlineStyle), 'none');
+    assert.equal(await page.locator('#auth-screen').evaluate(el => el.getAnimations().some(a => a.effect.getKeyframes().some(k => k.height))), true);
+    await page.waitForTimeout(130);
+    const middle = await page.locator('#auth-screen').evaluate(el => el.getBoundingClientRect().height);
+    await page.waitForTimeout(450);
+    const final = await page.locator('#auth-screen').evaluate(el => el.getBoundingClientRect().height);
+    assert.ok(final < middle && middle < initial, `smooth height ${initial} → ${middle} → ${final}`);
+    assert.equal(await page.locator('#password').getAttribute('placeholder'), 'Не менее 8 символов');
     assert.equal(await page.locator('#email').inputValue(), 'user@example.com'); assert.equal(await page.locator('#password').inputValue(), 'password123');
+    // Older accounts remain sign-in eligible on the signup tab.
+    await page.locator('#password').fill('secret');
+    assert.equal(await page.locator('#password').evaluate(el => el.validity.tooShort), false);
+    await page.locator('#tab-login').click(); await page.waitForTimeout(100); await page.locator('#tab-signup').click();
+    await page.waitForTimeout(500);
+    assert.equal(await page.locator('#auth-screen').evaluate(el => el.getAnimations().length), 0);
     assert.deepEqual(errors, []); await page.close();
   }
   const page = await browser.newPage({viewport:{width:390,height:844},reducedMotion:'reduce'});
@@ -29,5 +54,7 @@ try {
   assert.equal(await page.locator('.entrance-piece').first().evaluate(el => getComputedStyle(el).animationName), 'none');
   await page.locator('#login').click(); await page.locator('#auth-screen').waitFor({state:'visible'});
   assert.equal(await page.locator('#email').evaluate(el => getComputedStyle(el).animationName), 'none');
+  await page.locator('#tab-signup').click();
+  assert.equal(await page.locator('#auth-screen').evaluate(el => el.getAnimations().length), 0);
   await page.close(); console.log('✓ Landing/auth effects, narrow layouts, preserved form values and reduced motion');
 } finally { await browser.close(); }

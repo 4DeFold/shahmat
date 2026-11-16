@@ -332,9 +332,9 @@ async function show(id, immediate = false) {
   else closeAccountMenu(true);
   window.scrollTo(0, 0);
   requestAnimationFrame(() => requestAnimationFrame(() => next.classList.remove('entering')));
-  const focusTarget = next.querySelector('[data-view]:not([hidden]) h2') || next.querySelector('h2') || next.querySelector('.tab.active');
+  const focusTarget = id === 'auth-screen' ? next : next.querySelector('[data-view]:not([hidden]) h2') || next.querySelector('h2');
   if (focusTarget) {
-    if (focusTarget.tagName === 'H2') focusTarget.setAttribute('tabindex', '-1');
+    if (focusTarget.tagName === 'H2' || focusTarget === next) focusTarget.setAttribute('tabindex', '-1');
     focusTarget.focus({ preventScroll: true });
   }
   navigating = false;
@@ -354,8 +354,26 @@ function describe(error) {
   if (text.includes('already registered')) return 'Аккаунт с этой почтой уже существует. Попробуй войти.';
   return 'Не получилось выполнить действие. Проверь данные и попробуй ещё раз.';
 }
+let authHeightAnimation;
+let authSubmitAnimation;
+let forgotAnimation;
+reducedMotion.addEventListener?.('change', () => {
+  if (reducedMotion.matches) {
+    authHeightAnimation?.cancel();
+    authSubmitAnimation?.cancel();
+    forgotAnimation?.cancel();
+  }
+});
 function setMode(value) {
   const changed = mode !== value;
+  const panel = $('auth-screen');
+  const submit = $('auth-submit');
+  const animateLayout = changed && !panel.hidden && !reducedMotion.matches && typeof panel.animate === 'function';
+  const oldPanel = animateLayout ? panel.getBoundingClientRect() : null;
+  const oldSubmitOffset = animateLayout ? submit.getBoundingClientRect().top - oldPanel.top : 0;
+  authHeightAnimation?.cancel();
+  authSubmitAnimation?.cancel();
+  forgotAnimation?.cancel();
   mode = value;
   for (const name of ['login', 'signup']) {
     const tab = $('tab-' + name);
@@ -363,19 +381,21 @@ function setMode(value) {
     tab.setAttribute('aria-pressed', String(mode === name));
   }
   $('password').autocomplete = mode === 'login' ? 'current-password' : 'new-password';
-  // Existing accounts may have an older six-character password. New account
-  // passwords are checked only after the sign-in attempt.
-  $('password').minLength = 6;
-  $('password').placeholder = mode === 'login' ? 'Не менее 6 символов' : 'Не менее 8 символов';
+  // Signup tries existing accounts first, including older six-character passwords.
+  $('password').minLength = mode === 'login' ? 8 : 6;
+  $('password').placeholder = 'Не менее 8 символов';
   $('forgot-password').hidden = mode !== 'login';
   $('auth-submit').innerHTML = mode === 'login' ? 'Войти <span>↗</span>' : 'Создать аккаунт <span>↗</span>';
   message('auth-message');
   $('auth-register-suggestion').hidden = true;
-  if (changed && !reducedMotion.matches) {
-    const form = $('auth-form');
-    form.classList.remove('mode-changing');
-    void form.offsetWidth;
-    form.classList.add('mode-changing');
+  if (animateLayout) {
+    const newPanel = panel.getBoundingClientRect();
+    const newSubmitOffset = submit.getBoundingClientRect().top - newPanel.top;
+    const timing = { duration: 450, easing: 'cubic-bezier(.22, 1, .36, 1)' };
+    // Animate the actual height so the centered panel and its spotlight move together.
+    authHeightAnimation = panel.animate([{ height: `${oldPanel.height}px` }, { height: `${newPanel.height}px` }], timing);
+    authSubmitAnimation = submit.animate([{ transform: `translateY(${oldSubmitOffset - newSubmitOffset}px)` }, { transform: 'translateY(0)' }], timing);
+    if (mode === 'login') forgotAnimation = $('forgot-password').animate([{ opacity: 0 }, { opacity: 1 }], timing);
   }
 }
 async function loadProfile(user, immediate = false) {
