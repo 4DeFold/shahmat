@@ -1,3 +1,4 @@
+import './smooth-scroll.js';
 import './theme.js';
 
 let appPromise;

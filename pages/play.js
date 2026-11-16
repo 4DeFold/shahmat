@@ -1,3 +1,4 @@
+import '../smooth-scroll.js';
 import { Chess } from 'chess.js';
 import { chooseBotMove } from './bot.js';
 import './game-theme.js';

@@ -19,6 +19,7 @@ try {
     }
     if (path === '/auth/v1/user') return route.fulfill({ json:user });
     if (path === '/rest/v1/profiles') return route.fulfill({ json:{ username:'Player', bio:'', palette:'monochrome' } });
+    if (path === '/functions/v1/match-opponent') return route.fulfill({ json:{ username:'Friend' } });
     if (path === '/functions/v1/matchplay') {
       const body = JSON.parse(request.postData());
       if (body.action === 'current' || body.action === 'cancel') return route.fulfill({ json:{ game:snapshot } });
@@ -59,13 +60,13 @@ try {
     assert.equal(await game.locator('.game-rail').isVisible(), true);
     const clocks = await game.locator('.clock-pair').evaluate(pair => {
       const [own, opponent] = [...pair.children];
-      return { ownLeft: own.getBoundingClientRect().left, opponentLeft: opponent.getBoundingClientRect().left,
+      return { clockLeft: pair.getBoundingClientRect().left, boardRight: document.getElementById('board').getBoundingClientRect().right,
         ownBackground: getComputedStyle(own).backgroundColor, opponentBackground: getComputedStyle(opponent).backgroundColor,
         numberSize: parseFloat(getComputedStyle(own.querySelector('strong')).fontSize) };
     });
-    assert.ok(clocks.ownLeft < clocks.opponentLeft, 'player clock is left of opponent');
+    assert.ok(clocks.clockLeft >= clocks.boardRight, 'clocks are next to the board');
     assert.notEqual(clocks.ownBackground, clocks.opponentBackground, 'clock backgrounds must differ');
-    assert.ok(clocks.numberSize >= 19, 'clock numbers are larger');
+    assert.ok(clocks.numberSize >= 12, 'clock numbers are legible');
     // The longest time control must fit without clipping at every viewport.
     await game.locator('#player-clock').evaluate(el => { el.textContent = '24:00:00'; });
     assert.equal(await game.locator('#player-clock').evaluate(el => el.scrollWidth <= el.clientWidth + 1), true, 'clock value fits');

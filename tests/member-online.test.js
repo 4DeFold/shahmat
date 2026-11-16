@@ -55,7 +55,8 @@ test('matched players can only submit legal moves on their turn; black sees flip
     return { game: game({ moves:['e4'], turn:'b' }) };
   });
   await app.ui.open(B); await flush();
-  assert.equal(app.$('board').firstElementChild.dataset.square, 'h1');
+  assert.equal(app.$('board').firstElementChild.dataset.square, 'a8');
+  assert.equal(app.$('board').classList.contains('black'), true);
   assert.equal(app.$('player-color').textContent, 'Чёрные');
   assert.equal(app.$('player-clock-card').dataset.color, 'b');
   assert.equal(app.$('opponent-clock-card').dataset.color, 'w');
@@ -103,4 +104,66 @@ test('clock times remain assigned to the player and opponent when playing black'
   assert.equal(app.$('player-clock-card').dataset.color, 'b');
   assert.equal(app.$('opponent-clock-card').dataset.color, 'w');
   app.close();
+});
+
+test('optimistic move appears immediately and rolls back when rejected', async t => {
+  let rejectMove;
+  const app = setup(async body => {
+    if (body.action === 'move') return new Promise((resolve, reject) => { rejectMove = reject; });
+    return { game:game() };
+  }); t.after(() => app.close());
+  await app.ui.open(A); await flush();
+  const click = square => app.$('board').querySelector(`[data-square="${square}"]`).click();
+  click('e2'); assert.equal(app.$('board').querySelector('[data-square=e4]').classList.contains('possible'), true);
+  click('e4');
+  assert.ok(app.$('board').querySelector('[data-square=e4] img'), 'piece moves without waiting for network');
+  rejectMove(Error('offline')); await flush();
+  assert.ok(app.$('board').querySelector('[data-square=e2] img'), 'failed move rolls back');
+});
+
+test('premove is sent only after the other move and can be cancelled', async t => {
+  let current = game({ moves:['e4'], turn:'b' }); const moves = [];
+  const app = setup(async body => {
+    if (body.action === 'move') { moves.push(body); current = game({ moves:['e4','e5','Nf3'], turn:'b' }); }
+    return { game:current };
+  }); t.after(() => app.close());
+  await app.ui.open(A); await flush();
+  const click = square => app.$('board').querySelector(`[data-square="${square}"]`).click();
+  click('g1'); click('f3'); assert.equal(app.$('board').querySelector('[data-square=f3]').classList.contains('premove'), true);
+  click('f3'); assert.equal(app.$('board').querySelector('[data-square=f3]').classList.contains('premove'), false);
+  click('g1'); click('f3'); assert.equal(moves.length, 0);
+  current = game({ moves:['e4','e5'], turn:'w' }); app.ui.hide(); app.ui.show(); await flush();
+  assert.equal(moves.length, 1); assert.equal(moves[0].from, 'g1'); assert.equal(moves[0].to, 'f3');
+});
+
+test('history can be inspected without submitting moves and checkmate highlights the king', async t => {
+  const finished = game({ moves:['f3','e5','g4','Qh4#'], turn:'w', status:'finished', result:'black_win', reason:'checkmate' });
+  const app = setup(async () => ({ game:finished })); t.after(() => app.close());
+  await app.ui.open(A); await flush();
+  assert.ok(app.$('board').querySelector('[data-square=e1]').classList.contains('check'));
+  assert.match(app.$('status').textContent, /мат/);
+  app.$('history-first').click(); assert.ok(app.$('board').querySelector('[data-square=e2] img'));
+  assert.match(app.$('status').textContent, /Просмотр/);
+  app.$('history-last').click(); assert.ok(app.$('board').querySelector('[data-square=e1]').classList.contains('check'));
+  app.$('toggle-moves').click(); assert.equal(app.$('history-content').hidden, true);
+});
+
+test('drag submits a legal move and illegal premove is cancelled on the next position', async t => {
+  let current = game(), calls = [];
+  const app = setup(async body => {
+    if (body.action === 'move') { calls.push(body); current = game({ moves:['e4'], turn:'b' }); }
+    return { game:current };
+  }); t.after(() => app.close());
+  await app.ui.open(A); await flush();
+  const board = app.$('board'), win = app.dom.window;
+  const pointer = (node, type, x, y) => { const ev = new win.MouseEvent(type, { bubbles:true, button:0, clientX:x, clientY:y }); Object.defineProperty(ev, 'pointerId', {value:1}); node.dispatchEvent(ev); };
+  app.dom.window.document.elementFromPoint = () => board.querySelector('[data-square=e4]');
+  pointer(board.querySelector('[data-square=e2]'), 'pointerdown', 10, 10); pointer(board, 'pointermove', 30, 30); pointer(board, 'pointerup', 30, 30); await flush();
+  assert.equal(calls.length, 1); assert.equal(calls[0].to, 'e4');
+  const click = square => board.querySelector(`[data-square="${square}"]`).click();
+  click('e4'); click('e5'); // The opponent may occupy the target square.
+  assert.ok(board.querySelector('[data-square=e5]').classList.contains('premove'));
+  current = game({ moves:['e4','e5'], turn:'w' });
+  app.ui.hide(); app.ui.show(); await flush();
+  assert.equal(calls.length, 1); assert.match(app.$('status').textContent, /отменён/);
 });
