@@ -699,3 +699,24 @@ textarea { resize: vertical; min-height: 92px; }
 /* The game is an independent document inside the persistent account shell. */
 .game-view { width: 100%; min-width: 0; }
 #member-game-frame { display: block; width: 100%; height: 1100px; min-height: 500px; border: 0; background: var(--page-background); }
+
+
+/* Settings: equal columns of diagonal colour ribbons in a native scroll strip. */
+.settings-page { min-width: 0; }
+.settings-palettes { margin-top: clamp(46px, 7vw, 82px); min-width: 0; }
+.settings-palettes h3 { margin: 0; font: 400 clamp(36px, 4.5vw, 58px)/1.1 'Playfair Display', Georgia, serif; letter-spacing: -.04em; }
+.settings-palettes h3 span { opacity: .4; }
+.settings-palettes .palette-help { margin: 12px 0 24px; }
+.palette-scroll { width: 100%; min-width: 0; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; scroll-behavior: smooth; scrollbar-width: thin; scrollbar-color: var(--line) transparent; padding: 4px 3px 16px; }
+.settings-palette-list { display: flex; gap: 14px; width: max-content; min-width: 100%; }
+.settings-palette-list .palette-option { position: relative; flex: 0 0 168px; width: 168px; height: 360px; padding: 0; display: flex; flex-direction: column; align-items: stretch; gap: 0; overflow: hidden; background: var(--surface); border: 1px solid var(--line); }
+.settings-palette-list .palette-option input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.settings-palette-list .palette-swatch { display: block; flex: 1 1 auto; width: 100%; min-height: 0; height: auto; border: 0; }
+.settings-palette-list .palette-name { flex: 0 0 70px; padding: 14px 15px; font: 400 16px/1.2 'Charis SIL', Georgia, serif; overflow-wrap: normal; }
+.settings-palette-list .palette-name small { display: none; }
+.settings-palette-list .palette-check { position: absolute; top: 10px; right: 10px; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--foreground); color: var(--page-background); font: 16px/1 Arial, sans-serif; }
+.settings-palette-list .palette-option:has(input:checked) { border-color: var(--foreground); box-shadow: inset 0 0 0 1px var(--foreground); }
+.settings-palette-list .palette-option:has(input:focus-visible) { outline: 2px solid var(--foreground); outline-offset: -3px; }
+@media (hover: hover) { .landing.palette-active .dashboard .settings-palette-list .palette-option:hover { transform: translateY(-3px); } }
+@media (max-width: 700px) { .settings-palettes { margin-top: 42px; } .settings-palette-list .palette-option { flex-basis: 148px; width: 148px; height: 320px; } }
+@media (prefers-reduced-motion: reduce) { .palette-scroll { scroll-behavior: auto; } .landing.palette-active .dashboard .settings-palette-list .palette-option { transition: none; } }

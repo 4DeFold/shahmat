@@ -291,7 +291,8 @@ test('sidebar navigates between pages, moves the dashboard to profile and return
   assert.equal($('dashboard-home').hidden, false);
   assert.equal($('dashboard-home').textContent.trim(), 'Главная');
   assert.equal($('page-profile').hidden, true);
-  assert.ok($('page-profile').contains($('dashboard-palettes')));
+  assert.ok($('page-settings').contains($('dashboard-palettes')));
+  assert.equal($('page-profile').contains($('dashboard-palettes')), false);
   assert.equal($('nav-play').getAttribute('href'), '/game');
   assert.equal($('nav-play').dataset.page, 'game');
   $('nav-play').click(); await tick();
@@ -520,4 +521,43 @@ test('the game frame receives board colours from the active palette', async () =
   assert.equal(sent.at(-1).message.colors['--board-light'], '#eeeed2');
   assert.equal(sent.at(-1).message.colors['--board-dark'], '#769656');
   window.close();
+});
+
+
+test('settings contains palette options and keeps selection when navigating', async () => {
+  const { $, choose, document, window } = await setup({ existing: true, palette: 'forest' });
+  assert.equal($('page-profile').querySelector('#dashboard-palettes'), null);
+  assert.equal($('settings-palette-heading').textContent, 'Палитры.');
+  assert.equal($('dashboard-palettes').querySelectorAll('label.palette-option').length, 5);
+  document.querySelector('#account-menu [data-page=settings]').click(); await tick();
+  assert.equal(window.location.pathname, '/settings');
+  assert.equal($('dashboard-palettes').querySelector('input:checked').value, 'forest');
+  await choose('dashboard-palettes', 'wood');
+  document.querySelector('#account-menu [data-page=profile]').click(); await tick();
+  document.querySelector('#account-menu [data-page=settings]').click(); await tick();
+  assert.equal($('dashboard-palettes').querySelector('input:checked').value, 'wood');
+  assert.equal(document.querySelector('.landing').dataset.palette, 'wood');
+});
+
+
+test('palette mouse wheel scrolls the strip and leaves page scrolling available at edges', async () => {
+  const { $, window } = await setup({ existing: true });
+  const strip = $('palette-scroll');
+  Object.defineProperties(strip, { scrollWidth: { value: 900 }, clientWidth: { value: 300 } });
+  let scroll = null;
+  strip.scrollBy = options => { scroll = options; };
+  const wheel = values => {
+    const event = new window.WheelEvent('wheel', { bubbles: true, cancelable: true, ...values });
+    strip.dispatchEvent(event); return event;
+  };
+  assert.equal(wheel({ deltaY: -30 }).defaultPrevented, false);
+  assert.equal(wheel({ deltaY: 60 }).defaultPrevented, true);
+  assert.equal(scroll.left, 60);
+  assert.equal(scroll.behavior, 'instant'); // test setup prefers reduced motion
+  scroll = null;
+  assert.equal(wheel({ deltaX: 60, deltaY: 10 }).defaultPrevented, false);
+  assert.equal(wheel({ deltaY: 50, ctrlKey: true }).defaultPrevented, false);
+  assert.equal(scroll, null);
+  strip.scrollLeft = 600;
+  assert.equal(wheel({ deltaY: 20 }).defaultPrevented, false);
 });

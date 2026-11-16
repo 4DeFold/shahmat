@@ -41,10 +41,16 @@ try {
   assert.equal(new URL(page.url()).pathname, '/home');
   assert.equal(await page.locator('#page-profile').count(), 0, 'profile is not loaded on home');
   assert.ok(!requests.some(path => /\/assets\/profile-/.test(path)), 'profile chunk is requested only on visit');
+  assert.equal(await page.locator('#page-settings').count(), 0, 'settings is not loaded on home');
+  assert.ok(!requests.some(path => /\/assets\/settings-/.test(path)), 'settings chunk is requested only on visit');
   for (const name of ['settings', 'help', 'profile']) {
     await page.goto(`${base}/${name}`);
     await page.locator(`#page-${name}`).waitFor({ state: 'visible' });
     assert.equal(new URL(page.url()).pathname, `/${name}`);
+    if (name === 'settings') {
+      assert.equal(await page.locator('#dashboard-palettes input:checked').inputValue(), 'monochrome');
+      assert.equal(await page.locator('#dashboard-palettes label').count(), 5);
+    }
     await page.reload();
     await page.locator(`#page-${name}`).waitFor({ state: 'visible' });
   }

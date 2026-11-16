@@ -1,1 +1,18 @@
-        <section class="empty-page" id="page-settings" data-view="settings" hidden aria-labelledby="page-settings-title"><h2 id="page-settings-title" tabindex="-1">Настройки</h2></section>
+<section class="empty-page settings-page" id="page-settings" data-view="settings" hidden aria-labelledby="page-settings-title">
+  <h2 id="page-settings-title" tabindex="-1">Настройки</h2>
+  <section class="settings-palettes" aria-labelledby="settings-palette-heading">
+    <h3 id="settings-palette-heading">Палитры<span>.</span></h3>
+    <p class="palette-help" id="settings-palette-help">Выбери палитру. Нажми ещё раз, чтобы сменить тему.</p>
+    <div class="palette-scroll" id="palette-scroll">
+      <fieldset class="palette-list settings-palette-list" id="dashboard-palettes" aria-describedby="settings-palette-help">
+        <legend class="visually-hidden">Выбери палитру</legend>
+        <label class="palette-option" data-choice="monochrome"><input type="radio" name="dashboard-palette" value="monochrome" checked><span class="palette-swatch monochrome" aria-hidden="true"></span><span class="palette-name">Монохром<small>Классическая палитра</small></span><span class="palette-check" aria-hidden="true">✓</span></label>
+        <label class="palette-option" data-choice="gray"><input type="radio" name="dashboard-palette" value="gray"><span class="palette-swatch gray" aria-hidden="true"></span><span class="palette-name">Графит<small>Мягкие оттенки серого</small></span><span class="palette-check" aria-hidden="true">✓</span></label>
+        <label class="palette-option" data-choice="forest"><input type="radio" name="dashboard-palette" value="forest"><span class="palette-swatch forest" aria-hidden="true"></span><span class="palette-name">Лес<small>Спокойные зелёные оттенки</small></span><span class="palette-check" aria-hidden="true">✓</span></label>
+        <label class="palette-option" data-choice="atelier"><input type="radio" name="dashboard-palette" value="atelier"><span class="palette-swatch atelier" aria-hidden="true"></span><span class="palette-name">Шахматный кабинет<small>Холодные оттенки и терракота</small></span><span class="palette-check" aria-hidden="true">✓</span></label>
+        <label class="palette-option" data-choice="wood"><input type="radio" name="dashboard-palette" value="wood"><span class="palette-swatch wood" aria-hidden="true"></span><span class="palette-name">Тёплое дерево<small>Природные коричневые оттенки</small></span><span class="palette-check" aria-hidden="true">✓</span></label>
+      </fieldset>
+    </div>
+    <p class="message palette-feedback" id="dashboard-message" role="status" aria-live="polite"></p>
+  </section>
+</section>

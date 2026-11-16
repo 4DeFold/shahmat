@@ -249,7 +249,8 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
     if (!$(viewId(name))) {
       const { default: html } = await pageLoaders[name]();
       if (!$(viewId(name))) $('page-content').insertAdjacentHTML('beforeend', html);
-      if (name === 'profile') { if (profile) displayProfile(); applyPalette(selectedPalette); }
+      if (name === 'profile' && profile) displayProfile();
+      if (name === 'settings') applyPalette(selectedPalette);
     }
     if (request !== pageRequest) return;
     $('page-load-error')?.remove();
@@ -594,13 +595,24 @@ $('palette-form').addEventListener('submit', async event => {
   displayProfile();
   await show('dashboard-screen');
 });
-// Profile controls are bound on the shared container because the page is lazy-loaded.
+// Profile and settings controls are bound on the shared container because pages are lazy-loaded.
 $('page-content').addEventListener('click', event => {
   if (event.target.closest('#edit-profile')) { editing = true; prepareProfile(); void show('profile-screen'); }
   if (event.target.matches('#dashboard-palettes input[name="dashboard-palette"]') && event.target.value === selectedPalette) {
     toggleSelectedTheme(); recordAppearance();
   }
 });
+// A mouse wheel over the palette strip scrolls it horizontally; touch and
+// horizontal trackpad gestures remain native. At either edge, let the page scroll.
+$('page-content').addEventListener('wheel', event => {
+  const strip = event.target.closest('#palette-scroll');
+  if (!strip || event.ctrlKey || event.shiftKey || Math.abs(event.deltaX) >= Math.abs(event.deltaY)) return;
+  const max = strip.scrollWidth - strip.clientWidth;
+  if (max <= 0 || (event.deltaY < 0 && strip.scrollLeft <= 0) || (event.deltaY > 0 && strip.scrollLeft >= max - 1)) return;
+  event.preventDefault();
+  const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? strip.clientWidth : 1;
+  strip.scrollBy({ left: event.deltaY * unit, behavior: reducedMotion.matches ? 'instant' : 'smooth' });
+}, { passive: false });
 $('page-content').addEventListener('change', event => {
   if (event.target.matches('#dashboard-palettes input[name="dashboard-palette"]') && event.target.value !== selectedPalette) {
     applyPalette(event.target.value); recordAppearance();
