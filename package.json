@@ -27,6 +27,7 @@
     "chess.js": "^1.4.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.16",
     "jsdom": "^31.0.1",
     "playwright": "^1.65.1",
     "vite": "^8.3.8"

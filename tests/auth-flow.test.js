@@ -484,7 +484,7 @@ test('registration deep link opens the signup tab for guests', async () => {
   assert.match(app.$('auth-submit').textContent, /Создать аккаунт/);
 });
 
-test('game route keeps the sidebar and safely handles frame height messages', async () => {
+test('game route keeps the sidebar and ignores frame height messages', async () => {
   const { $, window } = await setup({ existing: true, url: 'https://example.com/game' });
   assert.equal($('dashboard-screen').hidden, false);
   assert.equal($('page-game').hidden, false);
@@ -494,9 +494,9 @@ test('game route keeps the sidebar and safely handles frame height messages', as
   window.dispatchEvent(new window.MessageEvent('message', { origin: 'https://evil.example', source: frame.contentWindow, data: { type: 'shahmat-game-height', height: 920 } }));
   assert.equal(frame.style.height, '');
   window.dispatchEvent(new window.MessageEvent('message', { origin: 'https://example.com', source: frame.contentWindow, data: { type: 'shahmat-game-height', height: 920 } }));
-  assert.equal(frame.style.height, '920px');
+  assert.equal(frame.style.height, '');
   window.dispatchEvent(new window.MessageEvent('message', { origin: 'https://example.com', source: frame.contentWindow, data: { type: 'shahmat-game-height', height: 1000000 } }));
-  assert.equal(frame.style.height, '920px');
+  assert.equal(frame.style.height, '');
   window.close();
 });
 

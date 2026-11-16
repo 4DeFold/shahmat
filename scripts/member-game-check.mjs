@@ -1,70 +1,61 @@
-// Run against the built preview; all Supabase requests are mocked.
+// Browser check against built preview with mocked auth and matchplay; no DB writes.
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
+import { Chess } from 'chess.js';
 const base = process.env.RESPONSIVE_BASE_URL || 'http://127.0.0.1:4174';
 const browser = await chromium.launch({ headless: true,
   ...(process.env.CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.CHROMIUM_EXECUTABLE_PATH } : {}),
   ...(process.env.CHROMIUM_EXTRA_ARGS ? { args: process.env.CHROMIUM_EXTRA_ARGS.split(' ') } : {}),
 });
-const user = { id: '12345678-1234-1234-1234-123456789012', email: 'test@example.com', aud: 'authenticated', role: 'authenticated', user_metadata: {} };
-const sessionKey = 'sb-eswyxbyddkajysogtglp-auth-token';
-let offline = false;
+const user = { id:'12345678-1234-1234-1234-123456789012', email:'test@example.com', aud:'authenticated', role:'authenticated', user_metadata:{} };
+let snapshot = null;
 try {
-  const page = await browser.newPage({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
+  const page = await browser.newPage({ viewport:{ width:390, height:844 }, reducedMotion:'reduce' });
   await page.route('https://eswyxbyddkajysogtglp.supabase.co/**', async route => {
-    const path = new URL(route.request().url()).pathname;
-    if (path === '/auth/v1/user' && offline) return route.fulfill({ status: 503, json: { message: 'Unavailable' } });
+    const request = route.request(), path = new URL(request.url()).pathname;
     if (path === '/auth/v1/token') {
-      const token = ['e30', Buffer.from(JSON.stringify({ sub: user.id, exp: Math.floor(Date.now()/1000)+3600, role: 'authenticated' })).toString('base64url'), 'x'].join('.');
-      return route.fulfill({ json: { access_token: token, token_type: 'bearer', expires_in: 3600, refresh_token: 'mock-refresh', user } });
+      const token = ['e30', Buffer.from(JSON.stringify({ sub:user.id, exp:Math.floor(Date.now()/1000)+3600, role:'authenticated' })).toString('base64url'), 'x'].join('.');
+      return route.fulfill({ json:{ access_token:token, token_type:'bearer', expires_in:3600, refresh_token:'mock-refresh', user } });
     }
-    if (path === '/auth/v1/user') return route.fulfill({ json: user });
-    if (path === '/rest/v1/profiles') return route.fulfill({ json: { username: 'Player', bio: '', palette: 'monochrome' } });
-    return route.fulfill({ json: {} });
+    if (path === '/auth/v1/user') return route.fulfill({ json:user });
+    if (path === '/rest/v1/profiles') return route.fulfill({ json:{ username:'Player', bio:'', palette:'monochrome' } });
+    if (path === '/functions/v1/matchplay') {
+      const body = JSON.parse(request.postData());
+      if (body.action === 'current' || body.action === 'cancel') return route.fulfill({ json:{ game:snapshot } });
+      if (body.action === 'search') {
+        snapshot = { id:'fixture', white_id:user.id, black_id:'opponent', mode:body.mode, moves:[], turn:'w', version:0, status:'active', white_ms:180000, black_ms:180000 };
+        return route.fulfill({ json:{ state:'matched', game:snapshot } });
+      }
+      if (body.action === 'move') {
+        const chess = new Chess(); snapshot.moves.forEach(move => chess.move(move)); chess.move({ from:body.from, to:body.to });
+        snapshot = { ...snapshot, moves:chess.history(), turn:'b', version:1 };
+      }
+      return route.fulfill({ json:{ game:snapshot } });
+    }
+    return route.fulfill({ json:{} });
   });
-  await page.goto(`${base}/game`);
-  await page.locator('#landing-screen').waitFor({ state: 'visible' });
-  assert.equal(new URL(page.url()).pathname, '/');
-  assert.equal(await page.locator('#dashboard-screen').isVisible(), false);
-  await page.goto(`${base}/play`);
-  await page.locator('[data-square=e2]').click(); await page.locator('[data-square=e4]').click();
-  const guestSave = await page.evaluate(() => localStorage.getItem('shahmat.guest-game.v1'));
-  assert.deepEqual(JSON.parse(guestSave).moves, ['e4']);
   await page.goto(`${base}/login`);
   await page.locator('#email').fill('test@example.com'); await page.locator('#password').fill('password123'); await page.locator('#auth-submit').click();
-  await page.locator('#dashboard-home').waitFor({ state: 'visible' });
-  await page.locator('#mobile-menu-toggle').click();
-  await page.locator('#nav-play').click();
+  await page.locator('#dashboard-home').waitFor({ state:'visible' });
+  await page.locator('#mobile-menu-toggle').click(); await page.locator('#nav-play').click();
   const game = page.frameLocator('#member-game-frame');
-  await game.locator('#board [data-square=e2]').waitFor({ state: 'visible' });
+  await game.locator('#board [data-square=e2]').waitFor({ state:'visible' });
   assert.equal(new URL(page.url()).pathname, '/game');
-  assert.equal(await page.locator('#nav-play').getAttribute('aria-current'), 'page');
-  await page.setViewportSize({ width: 1440, height: 900 });
-  assert.equal(await page.locator('#app-sidebar').isVisible(), true);
-  assert.equal(await game.locator('#board').isVisible(), true);
-  const positions = await page.evaluate(() => ({ sidebar: document.querySelector('#app-sidebar').getBoundingClientRect().right, frame: document.querySelector('#member-game-frame').getBoundingClientRect().left }));
-  assert.ok(positions.frame >= positions.sidebar, 'game is to the right of the sidebar');
-  await page.setViewportSize({ width: 390, height: 844 });
   assert.equal(await game.locator('#board [data-square]').count(), 64);
-  assert.equal(await game.locator('#board [data-square=e2] .piece').count(), 1, 'member starts independently of demo');
-  assert.equal(await page.evaluate(() => localStorage.getItem('shahmat.guest-game.v1')), guestSave);
-  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'no horizontal overflow on mobile');
-  await game.locator('[data-square=d2]').click(); await game.locator('[data-square=d4]').click();
-  await page.waitForFunction(key => JSON.parse(localStorage.getItem(key) || '{}').moves?.length === 2, `shahmat.member-game.v1.${user.id}`);
-  await page.reload(); await game.locator('#board [data-square=d4] .piece').waitFor({ state: 'visible' });
-  page.once('dialog', dialog => dialog.accept());
-  await game.locator('#new-game').click();
-  assert.equal(await game.locator('#board [data-square=d2] .piece').count(), 1);
-  assert.equal(await page.evaluate(() => localStorage.getItem('shahmat.guest-game.v1')), guestSave);
-  offline = true;
-  await page.reload();
-  await game.locator('#board').waitFor({ state: 'visible', timeout: 30000 });
-  assert.equal(await game.locator('#member-game').isVisible(), true, 'network error must not log out a cached session');
-  offline = false;
-  // Simulate signout in another tab via the storage event Supabase listens to.
-  await page.evaluate(key => { localStorage.removeItem(key); window.dispatchEvent(new StorageEvent('storage', { key, oldValue: '{}', newValue: null, storageArea: localStorage })); }, sessionKey);
-  // Direct reload must never expose a stored member game without a session.
-  await page.reload(); await page.locator('#landing-screen').waitFor({ state: 'visible' });
-  assert.equal(await page.locator('#dashboard-screen').isVisible(), false);
-  console.log('✓ Guest and member pages are separate; auth, account-scoped storage, reload, reset and offline gate work');
+  assert.equal(await game.locator('#start-search').isDisabled(), true);
+  await game.locator('label:has(input[value=blitz])').click();
+  assert.equal(await game.locator('#player-clock').innerText(), '03:00');
+  await game.locator('#start-search').click();
+  await game.locator('#status').filter({ hasText:'Ваш ход' }).waitFor();
+  await game.locator('[data-square=e2]').click(); await game.locator('[data-square=e4]').click();
+  await game.locator('#status').filter({ hasText:'Ход соперника' }).waitFor();
+  assert.equal(await game.locator('[data-square=e4] img').count(), 1);
+  for (const size of [{ width:390,height:844 },{ width:1440,height:900 }]) {
+    await page.setViewportSize(size);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1 && document.documentElement.scrollHeight <= innerHeight + 1), true, 'game page must fit viewport');
+    assert.equal(await game.locator('#board').isVisible(), true);
+    assert.equal(await game.locator('.game-rail').isVisible(), true);
+  }
+  assert.equal(await page.locator('#app-sidebar').isVisible(), true);
+  console.log('✓ Viewport game, four controls, mocked search and legal move');
 } finally { await browser.close(); }

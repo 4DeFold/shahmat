@@ -1,5 +1,5 @@
-// The account page is optimistic UI for local, unrated bot play only. Server
-// authorization and RLS are still required for all protected operations.
+// Cached identity is only for optimistic display. All online operations require
+// verified authentication and server-side authorization.
 export function cachedUserId(storage) {
   try {
     const session = JSON.parse(storage.getItem('sb-eswyxbyddkajysogtglp-auth-token') || 'null');

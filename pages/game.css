@@ -1,7 +1,40 @@
-/* The dashboard supplies the navigation and selected palette. */
-.member-shell { max-width: none; padding: 0 0 30px; }
-.member-shell .game-layout { padding-top: 0; }
-.member-shell .game-panel { padding-top: 12px; }
-.member-card { background: var(--surface-alt); border: 1px solid var(--line); border-radius: 12px; padding: 24px; }
-.member-shell #storage-message:empty { display: none; }
-@media (max-width: 760px) { .member-shell .game-panel { padding-top: 0; } .member-card { padding: 20px; } }
+@font-face { font-family: Playfair; src: url('/fonts/playfair-display-cyrillic-400-normal.woff2') format('woff2'); font-display: swap; unicode-range: U+0400-052F; }
+html, body { width: 100%; height: 100%; overflow: hidden; }
+.member-shell { width: 100%; height: 100dvh; display: grid; grid-template-columns: minmax(0,1fr) clamp(250px, 23vw, 310px); }
+.board-area { min-width: 0; min-height: 0; display: grid; place-items: center; padding: 12px 24px; }
+.board-wrap { width: min(100%, 680px, calc(100dvh - 124px)); min-width: 0; }
+.board-wrap .player-row { padding: 8px 0; }
+.game-rail { min-width: 0; min-height: 0; overflow-y: auto; background: var(--surface-alt); border-left: 1px solid var(--line); padding: 28px 22px; }
+.game-rail h1 { font: 400 32px/1.1 Playfair, Georgia, serif; margin: 0 0 24px; }
+.game-rail h1 span { color: var(--muted); }
+.clock-pair { display: grid; gap: 8px; }
+.clock { display: flex; justify-content: space-between; align-items: center; gap: 8px; border: 1px solid var(--line); background: var(--bg); padding: 11px 12px; }
+.clock span { font-size: 12px; color: var(--muted); }
+.clock strong { font: 600 18px/1 Arial, sans-serif; font-variant-numeric: tabular-nums; }
+.rail-label { margin: 30px 0 12px; color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .12em; }
+.mode-list { display: grid; gap: 7px; border: 0; padding: 0; margin: 0; min-width: 0; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+.mode-option { display: block; cursor: pointer; border: 1px solid var(--line); background: var(--bg); }
+.mode-option:has(input:checked) { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.mode-option:has(input:focus-visible) { outline: 2px solid var(--ink); outline-offset: 2px; }
+.mode-option:has(input:disabled) { opacity: .6; cursor: default; }
+.mode-option input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.mode-option span { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 9px 12px; }
+.mode-option strong { font-size: 13px; }.mode-option small { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.game-rail .new-game { margin-top: 14px; min-height: 48px; }.game-rail .new-game:disabled { opacity: .42; cursor: default; }
+.cancel-search { width: 100%; border: 1px solid var(--line); color: var(--ink); background: transparent; min-height: 44px; margin-top: 12px; }
+.game-status { margin: 15px 0; color: var(--muted); font-size: 12px; line-height: 1.45; }
+.game-rail .moves { margin-top: 20px; }.game-rail #move-list { max-height: 180px; }
+@media (max-width: 700px) {
+  .member-shell { height: 100%; grid-template-columns: minmax(0,1fr); grid-template-rows: minmax(0,1fr) auto; }
+  .board-area { padding: 4px 14px; }
+  .board-wrap { width: min(100%, max(140px, calc(100dvh - 370px)), 500px); }
+  .board-wrap .player-row { padding: 4px 0; }.board-wrap .avatar { width: 30px; height: 30px; }
+  .game-rail { border-left: 0; border-top: 1px solid var(--line); padding: 10px 16px; max-height: 52dvh; }
+  .game-rail h1 { display: none; }.clock-pair { grid-template-columns: 1fr 1fr; gap: 6px; }
+  .clock { padding: 7px 9px; }.clock strong { font-size: 15px; }
+  .rail-label { margin: 12px 0 8px; }.mode-list { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .mode-option span { min-height: 36px; padding: 6px 9px; }.game-rail .new-game { min-height: 40px; padding: 10px 14px; margin-top: 8px; }
+  .game-status { margin: 8px 0; }
+}
+@media (max-height: 600px) and (min-width: 701px) { .game-rail { padding: 12px 18px; }.game-rail h1 { margin-bottom: 12px; }.rail-label { margin-top: 14px; } }

@@ -254,6 +254,7 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
     }
     if (request !== pageRequest) return;
     $('page-load-error')?.remove();
+    $('member-game-frame')?.contentWindow?.postMessage({ type: name === 'game' ? 'shahmat-game-shown' : 'shahmat-game-hidden' }, window.location.origin);
     document.querySelectorAll('#dashboard-screen [data-view]').forEach(view => {
       const active = view.dataset.view === name;
       const changed = active && view.hidden;
@@ -282,7 +283,7 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
   }
 }
 // The game document remains a separate lazy-loaded page. Only messages from
-// our own game frame and origin can resize it or exchange appearance settings.
+// our own game frame receives appearance settings.
 function syncGameAppearance() {
   const frame = $('member-game-frame');
   if (!frame?.contentWindow) return;
@@ -291,12 +292,6 @@ function syncGameAppearance() {
   const colors = Object.fromEntries(names.map(name => [name, style.getPropertyValue(name).trim()]));
   frame.contentWindow.postMessage({ type: 'shahmat-appearance', colors }, window.location.origin);
 }
-window.addEventListener('message', event => {
-  const frame = $('member-game-frame');
-  if (event.origin !== window.location.origin || event.source !== frame?.contentWindow || event.data?.type !== 'shahmat-game-height') return;
-  const height = Number(event.data.height);
-  if (Number.isFinite(height) && height >= 100 && height <= 10000) frame.style.height = `${Math.ceil(height)}px`;
-});
 new MutationObserver(syncGameAppearance).observe(landing, { attributes: true, attributeFilter: ['data-palette', 'data-palette-theme', 'class'] });
 $('page-content').addEventListener('load', event => { if (event.target.id === 'member-game-frame') syncGameAppearance(); }, true);
 $('dashboard-screen').querySelectorAll('[data-page]').forEach(link => link.addEventListener('click', event => {

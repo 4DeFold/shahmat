@@ -20,15 +20,16 @@ The checks use isolated mock authentication and profile responses, not real Supa
 The landing page is `/`, with PLAY opening the standalone guest demo at `/play`
 and «Войти» opening `/login`. The dashboard «Играть» link opens a separate
 `/game` page inside the persistent dashboard, with the existing sidebar and
-profile controls. The game opens immediately from the cached account session, with Supabase
-Auth checked in the background; absent authentication returns to the landing
-page. No protected server action relies on the cached session. Its local bot game is stored under a separate key per account and never
-shares the demo position. A signed-in user can start a new bot game there.
-Both pages currently offer a local white-vs-black-bot game; online matchmaking
-and rated games are not yet available. The lightweight bot searches
-two plies; chess.js enforces legal moves, castling, en passant, promotion and
-game-end rules. The current game (including full move history) is saved in the
-browser’s localStorage and resumes after refresh; clearing browser data removes it.
+profile controls. The board appears immediately; Supabase Auth is checked in the
+background. The member screen offers match search for blitz (3 minutes), rapid
+(10 minutes), classical (1 hour) and daily (24 hours), per player, without an
+increment. Search pairs distinct authenticated users with the same control.
+The Supabase `matchplay` Edge Function validates legal moves with chess.js;
+transactional SQL serializes matching and updates clocks using server time.
+An active match resumes on return. Games are currently unrated, and the
+previously requested automatic bot fallback is not implemented: search waits for
+another player. The guest demo remains an independent local bot game; its move
+history is saved in browser localStorage and clearing browser data removes it.
 In the guest demo, “Новая партия” opens registration. If the game has ended,
 the first click also starts a one-hour countdown; the completed game is preserved
 until the deadline and the board resets when it expires. The deadline is stored
