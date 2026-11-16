@@ -520,10 +520,12 @@ test('the game frame receives board colours from the active palette', async () =
   const landing = document.querySelector('.landing');
   landing.style.setProperty('--board-light', '#eeeed2');
   landing.style.setProperty('--board-dark', '#769656');
+  landing.style.setProperty('--accent', '#3d5a40');
   frame.dispatchEvent(new window.Event('load'));
   assert.equal(sent.at(-1).origin, 'https://example.com');
   assert.equal(sent.at(-1).message.colors['--board-light'], '#eeeed2');
   assert.equal(sent.at(-1).message.colors['--board-dark'], '#769656');
+  assert.equal(sent.at(-1).message.colors['--accent'], '#3d5a40');
   window.close();
 });
 

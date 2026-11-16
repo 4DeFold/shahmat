@@ -52,6 +52,10 @@ try {
   assert.equal(await game.locator('#player-clock').innerText(), '03:00');
   await game.locator('#start-search').click();
   await game.locator('#status').filter({ hasText:'Ваш ход' }).waitFor();
+  assert.equal(await game.locator('#mode-picker').getAttribute('aria-hidden'), 'true');
+  assert.equal(await game.locator('#mode-picker').evaluate(el => el.getBoundingClientRect().height), 0);
+  assert.equal(await game.locator('#mode-summary').innerText(), 'Блиц · 3 мин');
+  assert.equal(await game.locator('#leave-game-control').isVisible(), true);
   await game.locator('[data-square=e2]').click(); await game.locator('[data-square=e4]').click();
   await game.locator('#status').filter({ hasText:'Ход соперника' }).waitFor();
   assert.equal(await game.locator('[data-square=e4] img').count(), 1);
@@ -66,7 +70,8 @@ try {
   await game.locator('#history-first').click();
   assert.equal(await game.locator('[data-square=e2] img').count(), 1);
   await game.locator('#history-last').click();
-  await game.locator('#toggle-moves').click(); assert.equal(await game.locator('#history-content').isHidden(), true);
+  await game.locator('#toggle-moves').click(); assert.equal(await game.locator('#history-content').getAttribute('aria-hidden'), 'true');
+  assert.equal(await game.locator('#history-content').evaluate(el => el.getBoundingClientRect().height), 0);
 
   for (const size of [{ width:390,height:844 },{ width:1440,height:900 }]) {
     await page.setViewportSize(size);
@@ -74,12 +79,14 @@ try {
     assert.equal(await game.locator('#board').isVisible(), true);
     assert.equal(await game.locator('.game-rail').isVisible(), true);
     const clocks = await game.locator('.clock-pair').evaluate(pair => {
-      const [own, opponent] = [...pair.children];
+      const own = pair.querySelector('#player-clock-card'), opponent = pair.querySelector('#opponent-clock-card');
       return { clockLeft: pair.getBoundingClientRect().left, boardRight: document.getElementById('board').getBoundingClientRect().right,
         ownBackground: getComputedStyle(own).backgroundColor, opponentBackground: getComputedStyle(opponent).backgroundColor,
-        numberSize: parseFloat(getComputedStyle(own.querySelector('strong')).fontSize) };
+        numberSize: parseFloat(getComputedStyle(own.querySelector('strong')).fontSize), ownTop:own.getBoundingClientRect().top, opponentBottom:opponent.getBoundingClientRect().bottom, ownCenter:(own.getBoundingClientRect().top + own.getBoundingClientRect().bottom) / 2, opponentCenter:(opponent.getBoundingClientRect().top + opponent.getBoundingClientRect().bottom) / 2, boardMiddle: (document.getElementById('board').getBoundingClientRect().top + document.getElementById('board').getBoundingClientRect().bottom) / 2 };
     });
     assert.ok(clocks.clockLeft >= clocks.boardRight, 'clocks are next to the board');
+    assert.ok(clocks.ownTop >= clocks.opponentBottom, 'player clock is below opponent');
+    assert.ok(clocks.ownCenter >= clocks.boardMiddle && clocks.opponentCenter <= clocks.boardMiddle, 'clocks are in the correct halves');
     assert.notEqual(clocks.ownBackground, clocks.opponentBackground, 'clock backgrounds must differ');
     assert.ok(clocks.numberSize >= 12, 'clock numbers are legible');
     // The longest time control must fit without clipping at every viewport.
@@ -87,5 +94,10 @@ try {
     assert.equal(await game.locator('#player-clock').evaluate(el => el.scrollWidth <= el.clientWidth + 1), true, 'clock value fits');
   }
   assert.equal(await page.locator('#app-sidebar').isVisible(), true);
+  await game.locator('.leave-game').click();
+  await page.waitForURL('**/home');
+  await page.locator('#nav-play').click();
+  await page.frameLocator('#member-game-frame').locator('#status').filter({hasText:'Ход соперника'}).waitFor();
+  assert.deepEqual(snapshot.moves, ['e4','e5','Nf3'], 'leaving must not end the game');
   console.log('✓ Viewport game, four controls, mocked search and legal move');
 } finally { await browser.close(); }

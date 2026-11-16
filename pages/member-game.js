@@ -1,6 +1,9 @@
 import { Chess } from 'chess.js';
+import { createMemberBoard } from './member-board.js';
+import { createGameSound } from './game-sound.js';
 
 const times = { blitz: 180000, rapid: 600000, classical: 3600000, daily: 86400000 };
+const modeLabels = { blitz:'Блиц · 3 мин', rapid:'Рапид · 10 мин', classical:'Классика · 1 час', daily:'Дневная · 24 часа' };
 const names = { k:'король', q:'ферзь', r:'ладья', b:'слон', n:'конь', p:'пешка' };
 const files = 'abcdefgh';
 const pieceSrc = (color, type) => `/pieces/cburnett/${color}${type.toUpperCase()}.svg`;
@@ -15,29 +18,25 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   const $ = id => document.getElementById(id), win = document.defaultView;
   const board = $('board'), start = $('start-search'), cancel = $('cancel-search'), reset = $('new-game');
   const promotion = $('promotion'), options = $('promotion-options');
-  let userId = null, ready = false, chess = new Chess(), mode = null, phase = 'idle', selected = null, pending = null;
-  let snapshot = null, receivedAt = 0, polling = null, generation = 0, moving = false, pendingSearch = null, viewVisible = true, browserVisible = true;
-  let premove = null, historyIndex = null, nameForGame = null, nameTimer = null, drag = null, suppressClick = false, audio = null;
+  let userId = null, ready = false, chess = new Chess(), latestMove = null, mode = null, phase = 'idle', selected = null, pending = null;
+  let snapshot = null, receivedAt = 0, polling = null, generation = 0, moving = false, pendingSearch = null, viewVisible = true, browserVisible = true, pollFailures = 0;
+  let premove = null, historyIndex = null, nameForGame = null, nameTimer = null, drag = null, suppressClick = false;
+  const sound = createGameSound(win);
   const isVisible = () => viewVisible && browserVisible;
-  const setStatus = (text, urgent = false) => { $('status').textContent = text; $('status').parentElement.classList.toggle('urgent', urgent); };
+  const setStatus = (text, urgent = false) => { const el = $('status'); if (el.textContent !== text) el.textContent = text; el.parentElement.classList.toggle('urgent', urgent); };
   const cancelTimer = () => { if (polling !== null) clearTimeout(polling); polling = null; };
   const reducedMotion = () => win.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-  function sound(capture = false) {
-    try {
-      const Context = win.AudioContext || win.webkitAudioContext;
-      if (!Context) return;
-      audio ||= new Context();
-      if (audio.state === 'suspended') void audio.resume();
-      const oscillator = audio.createOscillator(), gain = audio.createGain(), t = audio.currentTime;
-      oscillator.type = 'sine'; oscillator.frequency.setValueAtTime(capture ? 260 : 520, t);
-      oscillator.frequency.exponentialRampToValueAtTime(capture ? 120 : 330, t + .08);
-      gain.gain.setValueAtTime(.0001, t); gain.gain.exponentialRampToValueAtTime(.12, t + .008); gain.gain.exponentialRampToValueAtTime(.0001, t + .12);
-      oscillator.connect(gain); gain.connect(audio.destination); oscillator.start(t); oscillator.stop(t + .13);
-    } catch { /* Audio is optional and subject to browser autoplay rules. */ }
-  }
+  const boardView = createMemberBoard({ document, board, reducedMotion });
+  const playSound = move => sound.play(chess.isCheck() ? 'check' : move?.captured ? 'capture' : 'move');
   function modeControls() {
     const locked = phase !== 'idle';
     $('mode-list').querySelectorAll('input').forEach(input => { input.disabled = locked; });
+    const picker = $('mode-picker');
+    picker.classList.toggle('is-collapsed', locked);
+    picker.inert = locked; picker.setAttribute('aria-hidden', String(locked));
+    $('mode-summary').hidden = !locked || !mode;
+    $('mode-summary').textContent = modeLabels[mode] || '';
+    $('leave-game-control').hidden = phase !== 'active' && phase !== 'finished';
     start.hidden = phase !== 'idle'; start.disabled = !userId || !ready || !mode;
     cancel.hidden = phase !== 'searching'; reset.hidden = phase !== 'finished';
     $('moves').hidden = phase !== 'active' && phase !== 'finished';
@@ -49,20 +48,18 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     const other = own === 'w' ? 'b' : 'w';
     for (const [id, color] of [['player', own], ['opponent', other]]) {
       const card = $(`${id}-clock-card`), remaining = time(color);
-      card.dataset.color = snapshot ? color : 'neutral';
-      card.style.setProperty('--second-progress', `${remaining == null ? 0 : (Math.ceil(remaining / 1000) % 60) / 60 * 100}%`);
+      const background = snapshot ? color : 'neutral';
+      if (card.dataset.color !== background) card.dataset.color = background;
       card.classList.toggle('running', snapshot?.status === 'active' && snapshot.turn === color);
       card.classList.toggle('low', remaining != null && remaining <= 30000 && snapshot?.status === 'active' && snapshot.turn === color);
       const clock = $(`${id}-clock`), text = formatClock(remaining);
-      if (clock.textContent !== text) {
-        clock.replaceChildren(document.createTextNode(text.slice(0, -2)));
-        const seconds = document.createElement('span'); seconds.className = 'clock-seconds'; seconds.textContent = text.slice(-2); clock.append(seconds);
-      }
+      if (clock.textContent !== text) clock.textContent = text;
     }
-    $('player-clock-label').hidden = !snapshot;
-    $('opponent-clock-label').hidden = !snapshot;
-    $('player-clock-label').textContent = snapshot ? `Вы · ${own === 'w' ? 'Белые' : 'Чёрные'}` : '';
-    $('opponent-clock-label').textContent = snapshot ? `Соперник · ${other === 'w' ? 'Белые' : 'Чёрные'}` : '';
+    for (const [id, text] of [['player', `Вы · ${own === 'w' ? 'Белые' : 'Чёрные'}`], ['opponent', `Соперник · ${other === 'w' ? 'Белые' : 'Чёрные'}`]]) {
+      const label = $(`${id}-clock-label`), value = snapshot ? text : '';
+      if (label.hidden !== !snapshot) label.hidden = !snapshot;
+      if (label.textContent !== value) label.textContent = value;
+    }
   }
   function resultText() {
     if (!snapshot || snapshot.status !== 'finished') return snapshot?.turn === currentColor() ? (chess.isCheck() ? 'Шах! Защитите короля — ваш ход.' : 'Ваш ход.') : (chess.isCheck() ? 'Шах сопернику. Ожидаем ход.' : 'Ход соперника. Можно подготовить свой ход.');
@@ -75,19 +72,36 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     if (historyIndex === null) return chess;
     const position = new Chess(); chess.history().slice(0, historyIndex).forEach(move => position.move(move)); return position;
   }
+  const historyButtons = [], historyMoves = [];
+  let activeHistoryButton = null;
   function renderHistory() {
-    const moves = chess.history(), list = $('move-list'); list.replaceChildren();
-    for (let i = 0; i < moves.length; i += 2) {
-      const li = document.createElement('li'), num = document.createElement('span'); num.textContent = `${i / 2 + 1}.`; li.append(num);
-      for (let j = i; j < Math.min(i + 2, moves.length); j++) {
-        const button = document.createElement('button'); button.type = 'button'; button.textContent = moves[j];
-        button.classList.toggle('current', (historyIndex ?? moves.length) === j + 1);
-        button.addEventListener('click', () => showHistory(j + 1)); li.append(button);
-      }
-      list.append(li);
+    const moves = chess.history(), list = $('move-list');
+    let common = 0;
+    while (common < historyMoves.length && common < moves.length && historyMoves[common] === moves[common]) common++;
+    while (historyButtons.length > common) {
+      const button = historyButtons.pop(), row = button.parentElement;
+      button.remove(); if (!row.querySelector('button')) row.remove();
+      historyMoves.pop();
     }
+    for (let i = common; i < moves.length; i++) {
+      let row = list.lastElementChild;
+      if (i % 2 === 0) {
+        row = document.createElement('li'); const number = document.createElement('span');
+        number.textContent = `${i / 2 + 1}.`; row.append(number); list.append(row);
+      }
+      const button = document.createElement('button'); button.type = 'button'; button.textContent = moves[i];
+      button.dataset.historyIndex = String(i + 1); row.append(button); historyButtons.push(button); historyMoves.push(moves[i]);
+    }
+    activeHistoryButton?.classList.remove('current');
+    const index = historyIndex ?? moves.length;
+    activeHistoryButton = historyButtons[index - 1] || null;
+    activeHistoryButton?.classList.add('current');
     $('move-count').textContent = String(Math.ceil(moves.length / 2)).padStart(2, '0');
   }
+  $('move-list').addEventListener('click', event => {
+    const button = event.target.closest('[data-history-index]');
+    if (button) showHistory(Number(button.dataset.historyIndex));
+  });
   function showHistory(index) {
     const count = chess.history().length; historyIndex = index >= count ? null : Math.max(0, index);
     selected = null; renderBoard(); renderHistory();
@@ -101,37 +115,15 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   function renderBoard(animatedMove = null) {
     const color = currentColor(), shown = displayChess();
     const legal = selected && historyIndex === null ? legalFor(selected).map(move => move.to) : [];
-    const last = shown.history({ verbose:true }).at(-1);
-    const fragment = document.createDocumentFragment();
-    [8,7,6,5,4,3,2,1].forEach((rank, row) => [...files].forEach((file, column) => {
-      const square = `${file}${rank}`, piece = shown.get(square), cell = document.createElement('button');
-      cell.type = 'button'; cell.className = `square ${(rank + files.indexOf(file)) % 2 ? 'dark' : 'light'}`; cell.dataset.square = square;
-      cell.classList.toggle('selected', selected === square); cell.classList.toggle('possible', legal.includes(square));
-      cell.classList.toggle('last-move', !!last && (last.from === square || last.to === square));
-      cell.classList.toggle('premove', !!premove && (premove.from === square || premove.to === square));
-      cell.classList.toggle('check', !!piece && piece.type === 'k' && piece.color === shown.turn() && shown.isCheck());
-      cell.setAttribute('aria-label', `${square}, ${piece ? (piece.color === 'w' ? 'белые, ' : 'чёрные, ') + names[piece.type] : 'пусто'}`);
-      cell.setAttribute('aria-pressed', String(selected === square));
-      if (piece) { const img = document.createElement('img'); img.className = 'piece'; img.src = pieceSrc(piece.color, piece.type); img.alt = ''; img.draggable = false; cell.append(img); }
-      if (row === 7) { const coord = document.createElement('span'); coord.className = 'coord file'; coord.textContent = file; cell.append(coord); }
-      if (column === 0) { const coord = document.createElement('span'); coord.className = 'coord rank'; coord.textContent = rank; cell.append(coord); }
-      fragment.append(cell);
-    }));
-    board.replaceChildren(fragment);
-    // Establish the initial counter-rotation before transitioning both layers.
+    const last = historyIndex === null ? latestMove : shown.history({ verbose:true }).at(-1);
+    boardView.render({ shown, selected, legal, last, premove, animatedMove: historyIndex === null ? animatedMove : null });
+    // Establish initial rotation before the board changes sides.
     if (board.classList.contains('waiting') && snapshot) void board.offsetWidth;
     board.classList.toggle('waiting', !snapshot); board.classList.toggle('black', !!snapshot && color === 'b');
-    $('player-color').textContent = snapshot ? (color === 'w' ? 'Белые' : 'Чёрные') : 'Цвет определится после поиска';
-    $('opponent-color').textContent = snapshot ? (color === 'w' ? 'Чёрные' : 'Белые') : '';
-    if (animatedMove && historyIndex === null && !reducedMotion()) {
-      const from = board.querySelector(`[data-square="${animatedMove.from}"]`), to = board.querySelector(`[data-square="${animatedMove.to}"]`), img = to?.querySelector('img');
-      if (from && to && img?.animate) {
-        const a = from.getBoundingClientRect(), b = to.getBoundingClientRect();
-        // Transforms on the rotated board use its local coordinates.
-        const sign = color === 'b' ? -1 : 1;
-        img.animate([{ translate:`${(a.left-b.left)*sign}px ${(a.top-b.top)*sign}px` }, { translate:'0 0' }], { duration:180, easing:'ease-out' });
-      }
-    }
+    const playerColor = snapshot ? (color === 'w' ? 'Белые' : 'Чёрные') : 'Цвет определится после поиска';
+    const opponentColor = snapshot ? (color === 'w' ? 'Чёрные' : 'Белые') : '';
+    if ($('player-color').textContent !== playerColor) $('player-color').textContent = playerColor;
+    if ($('opponent-color').textContent !== opponentColor) $('opponent-color').textContent = opponentColor;
   }
   function revealName(text) {
     clearInterval(nameTimer); const el = $('opponent-name'); el.setAttribute('aria-label', text);
@@ -144,26 +136,47 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     nameForGame = game.id;
     Promise.resolve(opponentName(game.id)).then(name => { if (nameForGame === game.id && name) revealName(name); }).catch(() => {});
   }
+  function playQueuedPremove() {
+    if (!premove || phase !== 'active' || moving || chess.turn() !== currentColor()) return false;
+    const move = premove; premove = null;
+    const valid = chess.moves({ square:move.from, verbose:true }).some(m => m.to === move.to && (!m.promotion || m.promotion === move.promotion));
+    if (valid) { void submitMove(move.from, move.to, move.promotion); return true; }
+    renderBoard(); setStatus('Предварительный ход отменён: он больше невозможен.'); return false;
+  }
   function applyGame(game) {
-    if (!game || (snapshot && snapshot.id === game.id && game.version < snapshot.version)) return;
+    if (!game || !Array.isArray(game.moves) || (snapshot && snapshot.id === game.id && game.version < snapshot.version)) return;
     if (snapshot && snapshot.id === game.id && game.version === snapshot.version && game.status === snapshot.status && !moving) {
-      snapshot = game; receivedAt = now(); drawClocks(); return;
+      snapshot = game; receivedAt = now(); drawClocks(); playQueuedPremove(); return;
     }
-    const previous = snapshot, next = new Chess();
-    try { for (const move of game.moves) next.move(move); } catch { setStatus('Не удалось восстановить партию.', true); return; }
-    const newMove = previous?.id === game.id && game.moves.length > previous.moves.length ? next.history({ verbose:true }).at(-1) : null;
-    snapshot = game; receivedAt = now(); chess = next; selected = null; pending = null; promotion.hidden = true;
+    const previous = snapshot, localMoves = chess.history();
+    const sameGame = previous?.id === game.id;
+    const alreadyDisplayed = sameGame && localMoves.length === game.moves.length && localMoves.every((move, i) => move === game.moves[i]);
+    let next = chess, nextLast = latestMove;
+    if (!alreadyDisplayed) {
+      const appendOnly = sameGame && localMoves.length <= game.moves.length && localMoves.every((move, i) => move === game.moves[i]);
+      next = appendOnly ? chess : new Chess();
+      let applied = 0;
+      try {
+        for (const move of game.moves.slice(appendOnly ? localMoves.length : 0)) { nextLast = next.move(move); applied++; }
+        if (!game.moves.length) nextLast = null;
+      } catch {
+        if (appendOnly) while (applied-- > 0) next.undo();
+        setStatus('Не удалось восстановить партию.', true); return;
+      }
+    }
+    const newMove = sameGame && game.moves.length === previous.moves.length + 1 && !alreadyDisplayed ? nextLast : null;
+    snapshot = game; receivedAt = now(); chess = next; latestMove = nextLast;
+    if (!alreadyDisplayed) { cancelDrag(); selected = null; pending = null; promotion.hidden = true; }
     phase = game.status === 'active' ? 'active' : 'finished'; mode = game.mode;
-    const input = $('mode-list').querySelector(`input[value="${mode}"]`); if (input) input.checked = true;
-    loadName(game); modeControls(); renderBoard(newMove); renderHistory(); drawClocks(); statusGame();
-    if (newMove && !moving) sound(!!newMove.captured);
-    if (premove && phase === 'active' && chess.turn() === currentColor() && !moving) {
-      const move = premove; premove = null;
-      const valid = chess.moves({ square:move.from, verbose:true }).some(m => m.to === move.to && (!m.promotion || m.promotion === move.promotion));
-      if (valid) void submitMove(move.from, move.to, move.promotion);
-      else { renderBoard(); setStatus('Предварительный ход отменён: он больше невозможен.'); }
-    }
     if (phase === 'finished') premove = null;
+    const input = $('mode-list').querySelector(`input[value="${mode}"]`); if (input) input.checked = true;
+    loadName(game); modeControls();
+    // Confirming our optimistic move must not restart its animation or replace pieces.
+    if (!alreadyDisplayed) renderBoard(newMove);
+    renderHistory(); drawClocks();
+    if (historyIndex !== null) setStatus(`Просмотр позиции: ход ${historyIndex} из ${game.moves.length}.`); else statusGame();
+    if (newMove && !moving) playSound(newMove);
+    if (!moving) playQueuedPremove();
   }
   async function poll(expected) {
     if (expected !== generation || !userId || !isVisible() || !['searching','active'].includes(phase)) return;
@@ -174,10 +187,13 @@ export function createMemberGame({ document, api, opponentName = async () => nul
       let response;
       try { response = await request; } finally { if (pendingSearch === request) pendingSearch = null; }
       if (expected !== generation) return;
+      pollFailures = 0;
       if (response.game && !moving) applyGame(response.game);
       else if (phase === 'searching' && response.state === 'searching') setStatus('Ищем соперника с таким же режимом…');
-    } catch { if (expected === generation) setStatus('Нет связи. Повторяем попытку…', true); }
-    if (expected === generation && isVisible() && ['searching','active'].includes(phase)) polling = setTimeout(() => poll(expected), phase === 'active' && mode === 'daily' ? 15000 : 900);
+    } catch { if (expected === generation) { pollFailures = Math.min(pollFailures + 1, 5); setStatus('Нет связи. Повторяем попытку…', true); } }
+    // Faster updates while waiting for the opponent, but back off on outages.
+    const delay = pollFailures ? Math.min(10000, 800 * 2 ** (pollFailures - 1)) : phase === 'active' && mode === 'daily' ? 15000 : phase === 'active' && snapshot?.turn !== currentColor() ? 450 : 900;
+    if (expected === generation && isVisible() && ['searching','active'].includes(phase)) polling = setTimeout(() => poll(expected), delay);
   }
   async function search() {
     if (!userId || !mode || phase !== 'idle') return;
@@ -195,26 +211,44 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     } catch { setStatus('Не удалось отменить поиск. Проверь соединение.', true); if (phase === 'searching') polling = setTimeout(() => poll(generation), 2500); }
     finally { cancel.disabled = false; }
   }
-  async function submitMove(from, to, piece = null) {
+  async function submitMove(from, to, piece = null, animate = true) {
     if (moving || phase !== 'active' || !snapshot || chess.turn() !== currentColor()) return;
-    const saved = snapshot, priorMoves = chess.history(); let move;
+    const saved = snapshot, priorMoves = chess.history(), savedLast = latestMove; let move;
     try { move = chess.move({ from, to, ...(piece ? { promotion:piece } : {}) }); } catch { return; }
-    moving = true; selected = null; pending = null; promotion.hidden = true; historyIndex = null;
-    renderBoard(move); renderHistory(); sound(!!move.captured); setStatus('Отправляем ход…');
+    // Invalidate any old snapshot request before it can overwrite the optimistic move.
+    cancelTimer(); const moveGeneration = ++generation;
+    moving = true; selected = null; pending = null; promotion.hidden = true; historyIndex = null; latestMove = move;
+    renderBoard(animate ? move : null); renderHistory(); playSound(move); setStatus('Отправляем ход…');
     try {
       const result = await api({ action:'move', gameId:saved.id, version:saved.version, from, to, ...(piece ? { promotion:piece } : {}) });
       if (!result.game) throw Error('missing snapshot');
+      if (moveGeneration !== generation) return;
       applyGame(result.game);
       if (result.game.version === saved.version) setStatus('Ход не принят сервером. Позиция обновлена.', true);
     } catch {
-      chess = new Chess(); priorMoves.forEach(m => chess.move(m)); renderBoard(); renderHistory();
+      if (moveGeneration !== generation) return;
       setStatus('Ход не подтверждён. Проверяем партию…', true);
-      // The request may have committed even if the response was lost.
-      try { const result = await api({ action:'snapshot', gameId:saved.id }); if (result.game) applyGame(result.game); } catch { setStatus('Нет связи. Позиция восстановится после подключения.', true); }
-    } finally { moving = false; }
+      // A lost response may still have committed: reconcile before rolling back.
+      try {
+        const result = await api({ action:'snapshot', gameId:saved.id });
+        if (moveGeneration !== generation) return;
+        if (!result.game) throw Error('missing snapshot');
+        applyGame(result.game);
+      } catch {
+        if (moveGeneration !== generation) return;
+        chess = new Chess(); priorMoves.forEach(m => chess.move(m)); latestMove = savedLast;
+        premove = null; selected = null; renderBoard(); renderHistory();
+        setStatus('Нет связи. Позиция восстановится после подключения.', true);
+      }
+    } finally {
+      moving = false;
+      if (moveGeneration === generation && isVisible() && phase === 'active') {
+        if (!playQueuedPremove()) { cancelTimer(); void poll(++generation); }
+      }
+    }
   }
-  function attempt(from, to) {
-    if (historyIndex !== null || phase !== 'active' || moving || pending || !from || !to) return false;
+  function attempt(from, to, animate = true) {
+    if (historyIndex !== null || phase !== 'active' || (moving && chess.turn() === currentColor()) || pending || !from || !to) return false;
     const choices = legalFor(from).filter(move => move.to === to);
     if (!choices.length) return false;
     if (chess.turn() !== currentColor()) {
@@ -229,47 +263,78 @@ export function createMemberGame({ document, api, opponentName = async () => nul
       }
       options.firstChild.focus(); return true;
     }
-    void submitMove(from, to); return true;
+    void submitMove(from, to, null, animate); return true;
   }
   function choose(square) {
-    if (!square || phase !== 'active' || moving || pending || historyIndex !== null) return;
+    if (!square || phase !== 'active' || (moving && chess.turn() === currentColor()) || pending || historyIndex !== null) return;
     if (premove && (premove.from === square || premove.to === square)) { premove = null; selected = null; renderBoard(); statusGame(); return; }
     if (selected && attempt(selected, square)) return;
     const piece = chess.get(square); selected = piece?.color === currentColor() && selected !== square ? square : null; renderBoard();
     board.querySelector(`[data-square="${square}"]`)?.focus();
   }
-  board.addEventListener('click', event => { if (suppressClick) { suppressClick = false; return; } choose(event.target.closest('[data-square]')?.dataset.square); });
+  board.addEventListener('click', event => { sound.prime(); if (suppressClick) { suppressClick = false; return; } choose(event.target.closest('[data-square]')?.dataset.square); });
+  board.addEventListener('keydown', () => sound.prime());
+  start.addEventListener('pointerdown', () => sound.prime());
+  start.addEventListener('keydown', () => sound.prime());
+  function moveGhost(d) {
+    if (!d.ghost) return;
+    d.ghost.style.transform = `translate3d(${d.xNow}px, ${d.yNow}px, 0) translate(-50%, -50%)`;
+    d.raf = null;
+  }
+  function cancelDrag() {
+    if (!drag) return;
+    if (drag.raf != null) win.cancelAnimationFrame?.(drag.raf);
+    drag.cell.classList.remove('dragging'); drag.ghost?.remove(); drag = null;
+  }
   board.addEventListener('pointerdown', event => {
-    if (event.button !== 0 || phase !== 'active' || moving || pending || historyIndex !== null) return;
+    sound.prime();
+    if (event.button !== 0 || phase !== 'active' || (moving && chess.turn() === currentColor()) || pending || historyIndex !== null) return;
     const cell = event.target.closest('[data-square]'), square = cell?.dataset.square, piece = square && chess.get(square);
     if (!piece || piece.color !== currentColor()) return;
-    drag = { from:square, x:event.clientX, y:event.clientY, pointer:event.pointerId, cell, ghost:null };
+    drag = { from:square, x:event.clientX, y:event.clientY, xNow:event.clientX, yNow:event.clientY, pointer:event.pointerId, cell, ghost:null, raf:null };
   });
   board.addEventListener('pointermove', event => {
     if (!drag || drag.pointer !== event.pointerId) return;
+    drag.xNow = event.clientX; drag.yNow = event.clientY;
     if (!drag.ghost && Math.hypot(event.clientX-drag.x, event.clientY-drag.y) > 5) {
       board.setPointerCapture?.(event.pointerId);
-      const size = drag.cell.getBoundingClientRect().width; selected = drag.from; renderBoard(); drag.ghost = document.createElement('img'); drag.ghost.className = 'drag-ghost'; drag.ghost.src = pieceSrc(currentColor(), chess.get(drag.from).type); drag.ghost.style.setProperty('--drag-size', `${size}px`); document.body.append(drag.ghost);
+      const size = drag.cell.getBoundingClientRect().width; selected = drag.from; renderBoard();
+      drag.ghost = document.createElement('img'); drag.ghost.className = 'drag-ghost'; drag.ghost.alt = '';
+      drag.ghost.src = pieceSrc(currentColor(), chess.get(drag.from).type); drag.ghost.style.setProperty('--drag-size', `${size}px`);
+      drag.cell.classList.add('dragging'); document.body.append(drag.ghost); moveGhost(drag);
     }
-    if (drag.ghost) { drag.ghost.style.left = `${event.clientX}px`; drag.ghost.style.top = `${event.clientY}px`; }
+    if (drag.ghost && drag.raf == null) {
+      if (win.requestAnimationFrame) drag.raf = win.requestAnimationFrame(() => { if (drag) moveGhost(drag); });
+      else moveGhost(drag);
+    }
   });
   function endDrag(event) {
     if (!drag || drag.pointer !== event.pointerId) return;
-    const d = drag; drag = null; if (!d.ghost) return;
-    d.ghost.remove(); suppressClick = true; setTimeout(() => { suppressClick = false; }, 0);
+    const d = drag;
+    if (!d.ghost) { drag = null; return; }
     const target = document.elementFromPoint?.(event.clientX, event.clientY)?.closest('[data-square]')?.dataset.square;
-    if (!target || !attempt(d.from, target)) { selected = null; renderBoard(); }
+    cancelDrag(); suppressClick = true; setTimeout(() => { suppressClick = false; }, 0);
+    // The dragged piece is already under the pointer; do not animate it from its old square.
+    if (!target || !attempt(d.from, target, false)) { selected = null; renderBoard(); }
   }
-  board.addEventListener('pointerup', endDrag); board.addEventListener('pointercancel', event => { if (drag?.ghost) drag.ghost.remove(); drag = null; selected = null; renderBoard(); });
-  $('toggle-moves').addEventListener('click', () => { const content = $('history-content'); content.hidden = !content.hidden; $('toggle-moves').setAttribute('aria-expanded', String(!content.hidden)); });
+  board.addEventListener('pointerup', endDrag);
+  board.addEventListener('pointercancel', event => { if (drag?.pointer !== event.pointerId) return; cancelDrag(); selected = null; renderBoard(); });
+  $('toggle-moves').addEventListener('click', () => {
+    const toggle = $('toggle-moves'), content = $('history-content');
+    const expanded = toggle.getAttribute('aria-expanded') !== 'true';
+    if (!expanded && content.contains(document.activeElement)) toggle.focus();
+    toggle.setAttribute('aria-expanded', String(expanded));
+    content.classList.toggle('is-collapsed', !expanded);
+    content.inert = !expanded; content.setAttribute('aria-hidden', String(!expanded));
+  });
   $('history-first').addEventListener('click', () => showHistory(0)); $('history-prev').addEventListener('click', () => showHistory((historyIndex ?? chess.history().length) - 1));
   $('history-next').addEventListener('click', () => showHistory((historyIndex ?? chess.history().length) + 1)); $('history-last').addEventListener('click', () => showHistory(chess.history().length));
   $('mode-list').addEventListener('change', event => { if (phase === 'idle' && times[event.target.value]) { mode = event.target.value; modeControls(); drawClocks(); setStatus('Всё готово к поиску.'); } });
   start.addEventListener('click', () => void search()); cancel.addEventListener('click', () => void cancelSearch());
-  reset.addEventListener('click', () => { cancelTimer(); generation++; snapshot = null; chess = new Chess(); phase = 'idle'; premove = null; historyIndex = null; nameForGame = null; clearInterval(nameTimer); $('opponent-name').textContent = 'Соперник'; modeControls(); renderBoard(); renderHistory(); drawClocks(); setStatus('Выбери режим.'); });
-  function pause() { if (phase === 'searching') void cancelSearch(); else { generation++; cancelTimer(); } }
+  reset.addEventListener('click', () => { cancelTimer(); generation++; snapshot = null; chess = new Chess(); latestMove = null; phase = 'idle'; premove = null; historyIndex = null; nameForGame = null; clearInterval(nameTimer); $('opponent-name').textContent = 'Соперник'; modeControls(); renderBoard(); renderHistory(); drawClocks(); setStatus('Выбери режим.'); });
+  function pause() { cancelDrag(); if (phase === 'searching') void cancelSearch(); else { generation++; cancelTimer(); } }
   function resume() { if (phase === 'active' || phase === 'searching') void poll(++generation); }
-  const clockInterval = setInterval(drawClocks, 100);
+  const clockInterval = setInterval(() => { if (isVisible()) drawClocks(); }, 250);
   modeControls(); renderBoard(); drawClocks(); setTimeout(() => board.classList.add('ready'), 500);
   return {
     async open(id) {
@@ -282,6 +347,6 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     hide() { const wasVisible = isVisible(); viewVisible = false; if (wasVisible) pause(); },
     show() { const wasVisible = isVisible(); viewVisible = true; if (!wasVisible && isVisible()) { board.classList.add('ready'); resume(); } },
     browserVisibility(value) { const wasVisible = isVisible(); browserVisible = value; if (wasVisible && !isVisible()) pause(); else if (!wasVisible && isVisible()) resume(); },
-    destroy() { generation++; cancelTimer(); clearInterval(clockInterval); clearInterval(nameTimer); void audio?.close(); },
+    destroy() { generation++; cancelDrag(); cancelTimer(); clearInterval(clockInterval); clearInterval(nameTimer); sound.destroy(); },
   };
 }

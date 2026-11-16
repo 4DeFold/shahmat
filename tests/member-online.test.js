@@ -29,7 +29,7 @@ test('board opens at starting position, modes are explicit and a real request st
   assert.equal(app.$('board').querySelectorAll('[data-square]').length, 64);
   assert.equal(app.$('player-clock-card').dataset.color, 'neutral');
   assert.equal(app.$('opponent-clock-card').dataset.color, 'neutral');
-  assert.equal(app.$('player-clock-card').nextElementSibling, app.$('opponent-clock-card'));
+  assert.equal(app.$('opponent-clock-card').nextElementSibling, app.$('player-clock-card'));
   assert.equal(app.$('player-clock-label').hidden, true);
   assert.equal(app.$('opponent-clock-label').hidden, true);
   assert.equal(app.$('board').querySelector('[data-square=e2] img').getAttribute('src'), '/pieces/cburnett/wP.svg');
@@ -145,7 +145,7 @@ test('history can be inspected without submitting moves and checkmate highlights
   app.$('history-first').click(); assert.ok(app.$('board').querySelector('[data-square=e2] img'));
   assert.match(app.$('status').textContent, /Просмотр/);
   app.$('history-last').click(); assert.ok(app.$('board').querySelector('[data-square=e1]').classList.contains('check'));
-  app.$('toggle-moves').click(); assert.equal(app.$('history-content').hidden, true);
+  app.$('toggle-moves').click(); assert.equal(app.$('history-content').getAttribute('aria-hidden'), 'true'); assert.equal(app.$('history-content').inert, true);
 });
 
 test('drag submits a legal move and illegal premove is cancelled on the next position', async t => {
@@ -166,4 +166,123 @@ test('drag submits a legal move and illegal premove is cancelled on the next pos
   current = game({ moves:['e4','e5'], turn:'w' });
   app.ui.hide(); app.ui.show(); await flush();
   assert.equal(calls.length, 1); assert.match(app.$('status').textContent, /отменён/);
+});
+
+test('optimistic move and its confirmation keep squares and pieces stable', async t => {
+  let finishMove;
+  const app = setup(async body => {
+    if (body.action === 'move') return new Promise(resolve => { finishMove = resolve; });
+    return { game:game() };
+  }); t.after(() => app.close());
+  await app.ui.open(A); await flush();
+  const board = app.$('board'), from = board.querySelector('[data-square=e2]'), to = board.querySelector('[data-square=e4]');
+  const pawn = from.querySelector('img'), neighbor = board.querySelector('[data-square=d2] img');
+  from.click(); to.click();
+  assert.equal(to.querySelector('img'), pawn);
+  finishMove({ game:game({ moves:['e4'], turn:'b' }) }); await flush();
+  assert.equal(board.querySelector('[data-square=e2]'), from);
+  assert.equal(board.querySelector('[data-square=e4]'), to);
+  assert.equal(to.querySelector('img'), pawn);
+  assert.equal(board.querySelector('[data-square=d2] img'), neighbor);
+});
+
+test('premove may be entered during a slow move acknowledgement and executes on reply', async t => {
+  let finishFirst, position = game(), sent = [];
+  const app = setup(async body => {
+    if (body.action === 'move') {
+      sent.push(body);
+      if (sent.length === 1) return new Promise(resolve => { finishFirst = resolve; });
+      position = game({ moves:['e4','e5','Nf3'], turn:'b' }); return { game:position };
+    }
+    return { game:position };
+  }); t.after(() => app.close());
+  await app.ui.open(A); await flush();
+  const click = square => app.$('board').querySelector(`[data-square="${square}"]`).click();
+  click('e2'); click('e4'); click('g1'); click('f3');
+  assert.equal(app.$('board').querySelector('[data-square=f3]').classList.contains('premove'), true);
+  position = game({ moves:['e4','e5'], turn:'w' });
+  finishFirst({ game:game({ moves:['e4'], turn:'b' }) });
+  await flush(); await flush();
+  assert.equal(sent.length, 2); assert.equal(sent[1].from, 'g1'); assert.equal(sent[1].to, 'f3');
+});
+
+test('lost move response reconciles before rollback and keeps a committed piece in place', async t => {
+  let committed = false;
+  const app = setup(async body => {
+    if (body.action === 'move') { committed = true; throw Error('response lost'); }
+    if (body.action === 'snapshot' && committed) return { game:game({ moves:['e4'], turn:'b' }) };
+    return { game:game() };
+  }); t.after(() => app.close());
+  await app.ui.open(A); await flush();
+  const board = app.$('board'), pawn = board.querySelector('[data-square=e2] img');
+  board.querySelector('[data-square=e2]').click(); board.querySelector('[data-square=e4]').click(); await flush();
+  assert.equal(board.querySelector('[data-square=e4] img'), pawn);
+  assert.equal(board.querySelector('[data-square=e2] img'), null);
+});
+
+test('hiding during a move ignores stale replies and reconciles on return', async t => {
+  let finish, position = game();
+  const app = setup(async body => {
+    if (body.action === 'move') return new Promise(resolve => { finish = resolve; });
+    return { game:position };
+  }); t.after(() => app.close());
+  await app.ui.open(A); await flush();
+  const board = app.$('board'); board.querySelector('[data-square=e2]').click(); board.querySelector('[data-square=e4]').click();
+  app.ui.hide(); position = game({ moves:['e4','e5'], turn:'w' });
+  finish({ game:game({ moves:['e4'], turn:'b' }) }); await flush(); app.ui.show(); await flush();
+  assert.equal(board.querySelector('[data-square=e4] img').getAttribute('src'), '/pieces/cburnett/wP.svg');
+  assert.equal(board.querySelector('[data-square=e5] img').getAttribute('src'), '/pieces/cburnett/bP.svg');
+  assert.match(app.$('status').textContent, /Ваш ход/);
+});
+
+
+test('mode selector is replaced during search and restored on cancellation', async t => {
+  const app = setup(async body => body.action === 'search' ? {state:'searching'} : {game:null}); t.after(() => app.close());
+  await app.ui.open(A);
+  assert.equal(app.$('mode-picker').classList.contains('is-collapsed'), false); assert.equal(app.$('mode-summary').hidden, true);
+  const input = app.$('mode-list').querySelector('[value=blitz]');
+  input.checked = true; input.dispatchEvent(new app.dom.window.Event('change', {bubbles:true}));
+  app.$('start-search').click(); await flush();
+  assert.equal(app.$('mode-picker').getAttribute('aria-hidden'), 'true'); assert.equal(app.$('mode-picker').inert, true);
+  assert.equal(app.$('mode-summary').hidden, false); assert.equal(app.$('mode-summary').textContent, 'Блиц · 3 мин');
+  app.$('cancel-search').click(); await flush();
+  assert.equal(app.$('mode-picker').classList.contains('is-collapsed'), false); assert.equal(app.$('mode-picker').getAttribute('aria-hidden'), 'false'); assert.equal(app.$('mode-summary').hidden, true);
+});
+
+test('active games show the mode and leave link; clocks always put player below opponent', async t => {
+  for (const user of [A, B]) {
+    const app = setup(async () => ({game:game()})); t.after(() => app.close());
+    await app.ui.open(user); await flush();
+    assert.equal(app.$('mode-picker').classList.contains('is-collapsed'), true); assert.equal(app.$('mode-summary').textContent, 'Блиц · 3 мин');
+    assert.equal(app.$('leave-game-control').hidden, false);
+    assert.equal(app.$('leave-game-control').querySelector('a').getAttribute('href'), '/home');
+    assert.equal(app.$('leave-game-control').querySelector('a').target, '_top');
+    assert.equal(app.$('opponent-clock-card').nextElementSibling, app.$('player-clock-card'));
+    assert.equal(app.$('player-clock-card').dataset.color, user === A ? 'w' : 'b');
+    assert.equal(app.$('opponent-clock-card').dataset.color, user === A ? 'b' : 'w');
+  }
+});
+
+
+test('finished games retain the mode and provide both new game and exit', async t => {
+  const app = setup(async () => ({ game:game({ status:'finished', result:'draw', reason:'stalemate' }) }));
+  t.after(() => app.close()); await app.ui.open(A); await flush();
+  assert.equal(app.$('mode-summary').textContent, 'Блиц · 3 мин');
+  assert.equal(app.$('leave-game-control').hidden, false);
+  assert.equal(app.$('new-game').hidden, false);
+  app.$('new-game').click();
+  assert.equal(app.$('mode-picker').classList.contains('is-collapsed'), false); assert.equal(app.$('mode-summary').hidden, true);
+});
+
+
+test('history panel can be rapidly toggled with accessible state and focus', async t => {
+  const app = setup(async () => ({game:game()})); t.after(() => app.close());
+  await app.ui.open(A); await flush();
+  const button = app.$('toggle-moves'), content = app.$('history-content');
+  app.$('history-first').focus(); button.click();
+  assert.equal(app.dom.window.document.activeElement, button);
+  assert.equal(button.getAttribute('aria-expanded'), 'false'); assert.equal(content.inert, true);
+  assert.equal(content.getAttribute('aria-hidden'), 'true');
+  button.click(); assert.equal(button.getAttribute('aria-expanded'), 'true');
+  assert.equal(content.inert, false); assert.equal(content.classList.contains('is-collapsed'), false);
 });

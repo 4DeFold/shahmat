@@ -32,9 +32,24 @@ try {
   assert.ok(Math.abs(await angle()) < 1, 'pieces upright while board is sideways');
   assert.equal(await page.locator('#player-clock-label').isHidden(),true);
   const gap = await page.locator('.clock-pair').evaluate(el => {const [a,b] = el.children; return b.getBoundingClientRect().top-a.getBoundingClientRect().bottom;});
-  assert.ok(gap >= 0 && gap <= 12, 'clocks are adjacent');
+  assert.ok(gap > 12, 'clocks are separated towards opposite sides');
+  const pickerHeight = await page.locator('#mode-picker').evaluate(el => el.getBoundingClientRect().height);
   await page.locator('label:has(input[value=blitz])').click(); await page.locator('#start-search').click();
   await page.locator('#board.black').waitFor();
+  await page.waitForTimeout(80);
+  const collapsingPicker = await page.locator('#mode-picker').evaluate(el => el.getBoundingClientRect().height);
+  assert.ok(collapsingPicker > 0 && collapsingPicker < pickerHeight, `mode picker collapses smoothly: ${pickerHeight} -> ${collapsingPicker}`);
+  assert.equal(await page.locator('#mode-picker').getAttribute('aria-hidden'), 'true');
+  await page.waitForTimeout(400);
+  assert.equal(await page.locator('#mode-picker').evaluate(el => el.getBoundingClientRect().height), 0);
+  assert.equal(await page.locator('#mode-summary').innerText(), 'Блиц · 3 мин');
+  const blackClocks = await page.locator('.clock-pair').evaluate(pair => {
+    const player = pair.querySelector('#player-clock-card').getBoundingClientRect();
+    const opponent = pair.querySelector('#opponent-clock-card').getBoundingClientRect();
+    const board = document.querySelector('.board-frame').getBoundingClientRect();
+    return {playerCenter:(player.top + player.bottom) / 2, opponentCenter:(opponent.top + opponent.bottom) / 2, middle:(board.top + board.bottom) / 2};
+  });
+  assert.ok(blackClocks.playerCenter >= blackClocks.middle && blackClocks.opponentCenter <= blackClocks.middle, 'black player clock remains in lower half');
   for (const [index, delay] of [50, 200, 300, 600].entries()) {
     await page.waitForTimeout(delay);
     if (index === 1) await page.locator('[data-square=e7]').evaluate(el => el.click()); // redraw mid-animation
@@ -64,5 +79,5 @@ try {
     const value = await login.evaluate(() => ({ transform:getComputedStyle(document.querySelector('#dashboard-screen')).transform, left:document.querySelector('#app-sidebar').getBoundingClientRect().left }));
     assert.equal(value.transform, 'none'); assert.ok(Math.abs(value.left) < 1, `sidebar stays on left: ${value.left}`);
   }
-  console.log('✓ Upright pieces throughout rotation, adjacent neutral clocks, nested Lenis scrolling and stable sidebar');
+  console.log('✓ Upright pieces throughout rotation, separated clocks, smooth panels, nested Lenis scrolling and stable sidebar');
 } finally { await browser.close(); }
