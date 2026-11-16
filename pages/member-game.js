@@ -30,7 +30,8 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   const soundButton = $('sound-toggle');
   function updateSoundButton() {
     soundButton.setAttribute('aria-pressed', String(!sound.isMuted()));
-    soundButton.textContent = sound.isMuted() ? 'Звук выключен' : 'Звук включён';
+    const label = sound.isMuted() ? 'Включить звук' : 'Выключить звук';
+    soundButton.setAttribute('aria-label', label); soundButton.title = label;
   }
   soundButton.addEventListener('click', () => { sound.setMuted(!sound.isMuted()); updateSoundButton(); });
   updateSoundButton();
@@ -38,8 +39,9 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   function modeControls() {
     const locked = phase !== 'idle';
     $('mode-list').querySelectorAll('input').forEach(input => { input.disabled = locked; });
-    $('mode-label').hidden = locked;
-    $('mode-list').hidden = locked;
+    const picker = $('mode-picker');
+    picker.classList.toggle('is-collapsed', locked);
+    picker.inert = locked; picker.setAttribute('aria-hidden', String(locked));
     $('mode-summary').hidden = !locked || !mode;
     $('mode-summary').textContent = modeLabels[mode] || '';
     $('leave-game-control').hidden = phase !== 'active' && phase !== 'finished';
@@ -331,7 +333,14 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   }
   board.addEventListener('pointerup', endDrag);
   board.addEventListener('pointercancel', event => { if (drag?.pointer !== event.pointerId) return; cancelDrag(); selected = null; renderBoard(); });
-  $('toggle-moves').addEventListener('click', () => { const content = $('history-content'); content.hidden = !content.hidden; $('toggle-moves').setAttribute('aria-expanded', String(!content.hidden)); });
+  $('toggle-moves').addEventListener('click', () => {
+    const toggle = $('toggle-moves'), content = $('history-content');
+    const expanded = toggle.getAttribute('aria-expanded') !== 'true';
+    if (!expanded && content.contains(document.activeElement)) toggle.focus();
+    toggle.setAttribute('aria-expanded', String(expanded));
+    content.classList.toggle('is-collapsed', !expanded);
+    content.inert = !expanded; content.setAttribute('aria-hidden', String(!expanded));
+  });
   $('history-first').addEventListener('click', () => showHistory(0)); $('history-prev').addEventListener('click', () => showHistory((historyIndex ?? chess.history().length) - 1));
   $('history-next').addEventListener('click', () => showHistory((historyIndex ?? chess.history().length) + 1)); $('history-last').addEventListener('click', () => showHistory(chess.history().length));
   $('mode-list').addEventListener('change', event => { if (phase === 'idle' && times[event.target.value]) { mode = event.target.value; modeControls(); drawClocks(); setStatus('Всё готово к поиску.'); } });

@@ -36,6 +36,27 @@ try {
   release(); await page.locator('#status').filter({hasText:'Ход соперника'}).waitFor();
   assert.equal(await page.evaluate(() => document.querySelector('[data-square=e4]') === window.square && document.querySelector('[data-square=e4] img') === window.pawn),true);
   assert.equal(await page.evaluate(() => window.pieceAnimations),1, 'acknowledgement must not animate again');
+  const history = page.locator('#history-content');
+  const initialHeight = await history.evaluate(el => el.getBoundingClientRect().height);
+  assert.ok(initialHeight > 40);
+  await page.locator('#toggle-moves').click();
+  assert.equal(await page.locator('#toggle-moves').getAttribute('aria-expanded'), 'false');
+  await page.waitForTimeout(90);
+  const collapsingHeight = await history.evaluate(el => el.getBoundingClientRect().height);
+  assert.ok(collapsingHeight > 0 && collapsingHeight < initialHeight, `history should collapse gradually: ${initialHeight} -> ${collapsingHeight}`);
+  await page.waitForTimeout(400);
+  assert.equal(await history.evaluate(el => el.getBoundingClientRect().height), 0);
+  await page.locator('#toggle-moves').click(); await page.waitForTimeout(90);
+  const expandingHeight = await history.evaluate(el => el.getBoundingClientRect().height);
+  assert.ok(expandingHeight > 0 && expandingHeight < initialHeight, `history should expand gradually: ${expandingHeight}`);
+  await page.waitForTimeout(400);
+  const fonts = await page.evaluate(async () => {
+    await Promise.all([document.fonts.load("16px 'Charis SIL'", 'Жывы'), document.fonts.load('16px Playfair', 'Играть')]);
+    return { body:getComputedStyle(document.body).fontFamily, clock:getComputedStyle(document.querySelector('#player-clock')).fontFamily,
+      title:getComputedStyle(document.querySelector('.game-rail h1')).fontFamily, loaded:document.fonts.check("16px 'Charis SIL'", 'Жывы') && document.fonts.check('16px Playfair', 'Играть') };
+  });
+  assert.match(fonts.body, /Charis SIL/); assert.match(fonts.clock, /Charis SIL/); assert.match(fonts.title, /Playfair/); assert.equal(fonts.loaded, true);
+  assert.equal(await page.locator('#sound-toggle').innerText(), '', 'sound toggle has no visible text');
   await page.locator('#sound-toggle').click();
   assert.equal(await page.locator('#sound-toggle').getAttribute('aria-pressed'),'false');
   assert.equal(await page.evaluate(() => localStorage.getItem('shahmat.game.sound-muted')),'true');

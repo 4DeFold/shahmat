@@ -145,7 +145,7 @@ test('history can be inspected without submitting moves and checkmate highlights
   app.$('history-first').click(); assert.ok(app.$('board').querySelector('[data-square=e2] img'));
   assert.match(app.$('status').textContent, /Просмотр/);
   app.$('history-last').click(); assert.ok(app.$('board').querySelector('[data-square=e1]').classList.contains('check'));
-  app.$('toggle-moves').click(); assert.equal(app.$('history-content').hidden, true);
+  app.$('toggle-moves').click(); assert.equal(app.$('history-content').getAttribute('aria-hidden'), 'true'); assert.equal(app.$('history-content').inert, true);
 });
 
 test('drag submits a legal move and illegal premove is cancelled on the next position', async t => {
@@ -239,21 +239,21 @@ test('hiding during a move ignores stale replies and reconciles on return', asyn
 test('mode selector is replaced during search and restored on cancellation', async t => {
   const app = setup(async body => body.action === 'search' ? {state:'searching'} : {game:null}); t.after(() => app.close());
   await app.ui.open(A);
-  assert.equal(app.$('mode-list').hidden, false); assert.equal(app.$('mode-summary').hidden, true);
+  assert.equal(app.$('mode-picker').classList.contains('is-collapsed'), false); assert.equal(app.$('mode-summary').hidden, true);
   const input = app.$('mode-list').querySelector('[value=blitz]');
   input.checked = true; input.dispatchEvent(new app.dom.window.Event('change', {bubbles:true}));
   app.$('start-search').click(); await flush();
-  assert.equal(app.$('mode-label').hidden, true); assert.equal(app.$('mode-list').hidden, true);
+  assert.equal(app.$('mode-picker').getAttribute('aria-hidden'), 'true'); assert.equal(app.$('mode-picker').inert, true);
   assert.equal(app.$('mode-summary').hidden, false); assert.equal(app.$('mode-summary').textContent, 'Блиц · 3 мин');
   app.$('cancel-search').click(); await flush();
-  assert.equal(app.$('mode-list').hidden, false); assert.equal(app.$('mode-label').hidden, false); assert.equal(app.$('mode-summary').hidden, true);
+  assert.equal(app.$('mode-picker').classList.contains('is-collapsed'), false); assert.equal(app.$('mode-picker').getAttribute('aria-hidden'), 'false'); assert.equal(app.$('mode-summary').hidden, true);
 });
 
 test('active games show the mode and leave link; clocks always put player below opponent', async t => {
   for (const user of [A, B]) {
     const app = setup(async () => ({game:game()})); t.after(() => app.close());
     await app.ui.open(user); await flush();
-    assert.equal(app.$('mode-list').hidden, true); assert.equal(app.$('mode-summary').textContent, 'Блиц · 3 мин');
+    assert.equal(app.$('mode-picker').classList.contains('is-collapsed'), true); assert.equal(app.$('mode-summary').textContent, 'Блиц · 3 мин');
     assert.equal(app.$('leave-game-control').hidden, false);
     assert.equal(app.$('leave-game-control').querySelector('a').getAttribute('href'), '/home');
     assert.equal(app.$('leave-game-control').querySelector('a').target, '_top');
@@ -273,5 +273,18 @@ test('finished games retain the mode and provide both new game and exit', async 
   assert.equal(app.$('leave-game-control').querySelector('.leave-note').hidden, true);
   assert.equal(app.$('new-game').hidden, false);
   app.$('new-game').click();
-  assert.equal(app.$('mode-list').hidden, false); assert.equal(app.$('mode-summary').hidden, true);
+  assert.equal(app.$('mode-picker').classList.contains('is-collapsed'), false); assert.equal(app.$('mode-summary').hidden, true);
+});
+
+
+test('history panel can be rapidly toggled with accessible state and focus', async t => {
+  const app = setup(async () => ({game:game()})); t.after(() => app.close());
+  await app.ui.open(A); await flush();
+  const button = app.$('toggle-moves'), content = app.$('history-content');
+  app.$('history-first').focus(); button.click();
+  assert.equal(app.dom.window.document.activeElement, button);
+  assert.equal(button.getAttribute('aria-expanded'), 'false'); assert.equal(content.inert, true);
+  assert.equal(content.getAttribute('aria-hidden'), 'true');
+  button.click(); assert.equal(button.getAttribute('aria-expanded'), 'true');
+  assert.equal(content.inert, false); assert.equal(content.classList.contains('is-collapsed'), false);
 });

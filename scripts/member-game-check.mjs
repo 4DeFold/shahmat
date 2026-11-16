@@ -52,7 +52,8 @@ try {
   assert.equal(await game.locator('#player-clock').innerText(), '03:00');
   await game.locator('#start-search').click();
   await game.locator('#status').filter({ hasText:'Ваш ход' }).waitFor();
-  assert.equal(await game.locator('#mode-list').isHidden(), true);
+  assert.equal(await game.locator('#mode-picker').getAttribute('aria-hidden'), 'true');
+  assert.equal(await game.locator('#mode-picker').evaluate(el => el.getBoundingClientRect().height), 0);
   assert.equal(await game.locator('#mode-summary').innerText(), 'Блиц · 3 мин');
   assert.equal(await game.locator('#leave-game-control').isVisible(), true);
   await game.locator('[data-square=e2]').click(); await game.locator('[data-square=e4]').click();
@@ -69,7 +70,8 @@ try {
   await game.locator('#history-first').click();
   assert.equal(await game.locator('[data-square=e2] img').count(), 1);
   await game.locator('#history-last').click();
-  await game.locator('#toggle-moves').click(); assert.equal(await game.locator('#history-content').isHidden(), true);
+  await game.locator('#toggle-moves').click(); assert.equal(await game.locator('#history-content').getAttribute('aria-hidden'), 'true');
+  assert.equal(await game.locator('#history-content').evaluate(el => el.getBoundingClientRect().height), 0);
 
   for (const size of [{ width:390,height:844 },{ width:1440,height:900 }]) {
     await page.setViewportSize(size);
