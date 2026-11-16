@@ -18,7 +18,7 @@ function tick(time) {
   const desired = distance * .014;
   velocity += (desired - velocity) * (1 - Math.exp(-dt / 80));
   const step = velocity * dt;
-  if (Math.abs(distance) < .5 && Math.abs(velocity) < .02) { current.scrollTop = target; frame = 0; current = null; velocity = 0; lastTime = 0; return; }
+  if (Math.abs(distance) < 3 && Math.abs(velocity) < .06) { current.scrollTop = target; frame = 0; current = null; velocity = 0; lastTime = 0; return; }
   current.scrollTop += Math.abs(step) > Math.abs(distance) && Math.sign(step) === Math.sign(distance) ? distance : step;
   frame = requestAnimationFrame(tick);
 }

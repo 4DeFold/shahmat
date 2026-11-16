@@ -239,11 +239,11 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     const cell = event.target.closest('[data-square]'), square = cell?.dataset.square, piece = square && chess.get(square);
     if (!piece || piece.color !== currentColor()) return;
     drag = { from:square, x:event.clientX, y:event.clientY, pointer:event.pointerId, cell, ghost:null };
-    board.setPointerCapture?.(event.pointerId);
   });
   board.addEventListener('pointermove', event => {
     if (!drag || drag.pointer !== event.pointerId) return;
     if (!drag.ghost && Math.hypot(event.clientX-drag.x, event.clientY-drag.y) > 5) {
+      board.setPointerCapture?.(event.pointerId);
       const size = drag.cell.getBoundingClientRect().width; selected = drag.from; renderBoard(); drag.ghost = document.createElement('img'); drag.ghost.className = 'drag-ghost'; drag.ghost.src = pieceSrc(currentColor(), chess.get(drag.from).type); drag.ghost.style.setProperty('--drag-size', `${size}px`); document.body.append(drag.ghost);
     }
     if (drag.ghost) { drag.ghost.style.left = `${event.clientX}px`; drag.ghost.style.top = `${event.clientY}px`; }

@@ -29,7 +29,7 @@ try {
       }
       if (body.action === 'move') {
         const chess = new Chess(); snapshot.moves.forEach(move => chess.move(move)); chess.move({ from:body.from, to:body.to });
-        snapshot = { ...snapshot, moves:chess.history(), turn:'b', version:1 };
+        snapshot = { ...snapshot, moves:chess.history(), turn:chess.turn(), version:chess.history().length };
       }
       return route.fulfill({ json:{ game:snapshot } });
     }
@@ -43,6 +43,7 @@ try {
   await game.locator('#board [data-square=e2]').waitFor({ state:'visible' });
   assert.equal(new URL(page.url()).pathname, '/game');
   assert.equal(await game.locator('#board [data-square]').count(), 64);
+  assert.equal(await game.locator('#board').evaluate(el => el.classList.contains('waiting')), true);
   assert.equal(await game.locator('#player-clock-card').getAttribute('data-color'), 'w');
   assert.equal(await game.locator('#opponent-clock-card').getAttribute('data-color'), 'b');
   assert.equal(await game.locator('#start-search').isDisabled(), true);
@@ -53,6 +54,19 @@ try {
   await game.locator('[data-square=e2]').click(); await game.locator('[data-square=e4]').click();
   await game.locator('#status').filter({ hasText:'Ход соперника' }).waitFor();
   assert.equal(await game.locator('[data-square=e4] img').count(), 1);
+  // Drag a premove while the opponent is thinking, then deliver their reply.
+  const from = await game.locator('[data-square=g1]').boundingBox(), to = await game.locator('[data-square=f3]').boundingBox();
+  await page.mouse.move(from.x + from.width/2, from.y + from.height/2); await page.mouse.down();
+  await page.mouse.move(to.x + to.width/2, to.y + to.height/2, { steps:8 }); await page.mouse.up();
+  assert.equal(await game.locator('[data-square=f3]').evaluate(el => el.classList.contains('premove')), true);
+  snapshot = { ...snapshot, moves:['e4','e5'], turn:'w', version:2 };
+  await game.locator('[data-square=f3] img').waitFor();
+  assert.equal(snapshot.moves.at(-1), 'Nf3');
+  await game.locator('#history-first').click();
+  assert.equal(await game.locator('[data-square=e2] img').count(), 1);
+  await game.locator('#history-last').click();
+  await game.locator('#toggle-moves').click(); assert.equal(await game.locator('#history-content').isHidden(), true);
+
   for (const size of [{ width:390,height:844 },{ width:1440,height:900 }]) {
     await page.setViewportSize(size);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1 && document.documentElement.scrollHeight <= innerHeight + 1), true, 'game page must fit viewport');
