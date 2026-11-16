@@ -690,5 +690,5 @@ textarea { resize: vertical; min-height: 92px; }
 /* Real links support opening pages in a new tab and retain navigation styling. */
 .sidebar-brand, .mobile-brand, .sidebar-item, .account-menu a { text-decoration: none; cursor: pointer; font-family: inherit; }
 
-.landing-login { color: var(--foreground); font: 18px 'Charis SIL', Georgia, serif; text-underline-offset: 5px; padding: 10px 18px; }
+.landing-login { color: var(--foreground); font: 18px 'Charis SIL', Georgia, serif; text-decoration: none; padding: 10px 18px; }
 .landing-login:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }

@@ -22,7 +22,10 @@ and «Войти» opening `/login`. Guests and signed-in visitors can play a lo
 white-vs-black-bot game without authentication. The lightweight bot searches
 two plies; chess.js enforces legal moves, castling, en passant, promotion and
 game-end rules. Games are not persisted and are lost on refresh. No game data
-is sent to Supabase. The signed-in sections use `/home`, `/profile`,
+is sent to Supabase. The game uses the active account’s saved light/dark preference,
+or the device preference for guests; the game board is monochrome. Chessnut
+SVG pieces by Alexis Luengas are distributed under Apache 2.0; attribution and
+license are in `public/pieces/chessnut/`. The signed-in sections use `/home`, `/profile`,
 `/settings`, and `/help`. Their markup lives in `pages/` and is loaded on demand;
 the authentication shell and application code are also deferred on a fresh
 landing-page visit. Navigation uses real links and the History API, while Vercel
@@ -34,6 +37,8 @@ email callback fragments. The original logo is in `public/images/shahmat-logo.pn
 To test production routing and lazy loading using mock Supabase responses:
 `VITE_EMAIL_OTP_READY=true npm run build`, then `npm run preview`, and in another
 terminal `npm run test:routes` (set `RESPONSIVE_BASE_URL` if needed).
+`npm run test:game` and `npm run test:game-appearance` check guest play, themes,
+SVG pieces, movement animations and reduced-motion behavior in the browser.
 
 ## Database foundations
 
