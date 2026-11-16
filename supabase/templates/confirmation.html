@@ -1,4 +1,18 @@
-<h2>Подтверждение почты — shahmat.xyz</h2>
-<p>Введи этот код на сайте, чтобы подтвердить адрес электронной почты:</p>
-<p><strong>{{ .Token }}</strong></p>
-<p>Если ты не регистрировался, просто проигнорируй это письмо. Никому не сообщай код.</p>
+<!doctype html>
+<html lang="ru">
+<body style="margin:0;padding:0;background:#f5f5f3;color:#000000;font-family:Georgia,'Times New Roman',serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f5f5f3;border-collapse:collapse;">
+    <tr><td align="center" style="padding:36px 16px;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:520px;background:#ffffff;border:1px solid #ddddda;border-collapse:collapse;">
+        <tr><td style="padding:36px 30px 12px;font-family:Georgia,'Times New Roman',serif;font-size:30px;line-height:1.2;letter-spacing:-1px;color:#000000;white-space:nowrap;"><span style="display:inline-block;background:#000000;color:#ffffff;">shah</span><span style="color:#000000;text-decoration:none;">mat&#8203;.xyz</span></td></tr>
+        <tr><td style="padding:36px 30px 0;font-family:Georgia,'Times New Roman',serif;font-size:28px;line-height:1.2;color:#000000;">Подтверди почту<span style="color:#777777;">.</span></td></tr>
+        <tr><td style="padding:16px 30px 0;font-family:Arial,sans-serif;font-size:14px;line-height:1.6;color:#555555;">Введи этот код на сайте, чтобы завершить регистрацию.</td></tr>
+        <tr><td style="padding:28px 30px;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;"><tr><td align="center" style="padding:20px 10px;border:1px solid #000000;background:#ffffff;font-family:Arial,sans-serif;font-size:34px;font-weight:700;line-height:1.2;letter-spacing:6px;color:#000000;">{{ .Token }}</td></tr></table>
+        </td></tr>
+        <tr><td style="padding:0 30px 36px;font-family:Arial,sans-serif;font-size:12px;line-height:1.6;color:#777777;">Не сообщай код никому. Если ты не регистрировался, просто проигнорируй это письмо.</td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>

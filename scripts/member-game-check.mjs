@@ -19,6 +19,7 @@ try {
     }
     if (path === '/auth/v1/user') return route.fulfill({ json:user });
     if (path === '/rest/v1/profiles') return route.fulfill({ json:{ username:'Player', bio:'', palette:'monochrome' } });
+    if (path === '/functions/v1/match-opponent') return route.fulfill({ json:{ username:'Friend' } });
     if (path === '/functions/v1/matchplay') {
       const body = JSON.parse(request.postData());
       if (body.action === 'current' || body.action === 'cancel') return route.fulfill({ json:{ game:snapshot } });
@@ -28,7 +29,7 @@ try {
       }
       if (body.action === 'move') {
         const chess = new Chess(); snapshot.moves.forEach(move => chess.move(move)); chess.move({ from:body.from, to:body.to });
-        snapshot = { ...snapshot, moves:chess.history(), turn:'b', version:1 };
+        snapshot = { ...snapshot, moves:chess.history(), turn:chess.turn(), version:chess.history().length };
       }
       return route.fulfill({ json:{ game:snapshot } });
     }
@@ -42,8 +43,10 @@ try {
   await game.locator('#board [data-square=e2]').waitFor({ state:'visible' });
   assert.equal(new URL(page.url()).pathname, '/game');
   assert.equal(await game.locator('#board [data-square]').count(), 64);
-  assert.equal(await game.locator('#player-clock-card').getAttribute('data-color'), 'w');
-  assert.equal(await game.locator('#opponent-clock-card').getAttribute('data-color'), 'b');
+  assert.equal(await game.locator('#board').evaluate(el => el.classList.contains('waiting')), true);
+  assert.equal(await game.locator('#player-clock-card').getAttribute('data-color'), 'neutral');
+  assert.equal(await game.locator('#opponent-clock-card').getAttribute('data-color'), 'neutral');
+  assert.equal(await game.locator('#player-clock-label').isHidden(), true);
   assert.equal(await game.locator('#start-search').isDisabled(), true);
   await game.locator('label:has(input[value=blitz])').click();
   assert.equal(await game.locator('#player-clock').innerText(), '03:00');
@@ -52,6 +55,19 @@ try {
   await game.locator('[data-square=e2]').click(); await game.locator('[data-square=e4]').click();
   await game.locator('#status').filter({ hasText:'Ход соперника' }).waitFor();
   assert.equal(await game.locator('[data-square=e4] img').count(), 1);
+  // Drag a premove while the opponent is thinking, then deliver their reply.
+  const from = await game.locator('[data-square=g1]').boundingBox(), to = await game.locator('[data-square=f3]').boundingBox();
+  await page.mouse.move(from.x + from.width/2, from.y + from.height/2); await page.mouse.down();
+  await page.mouse.move(to.x + to.width/2, to.y + to.height/2, { steps:8 }); await page.mouse.up();
+  assert.equal(await game.locator('[data-square=f3]').evaluate(el => el.classList.contains('premove')), true);
+  snapshot = { ...snapshot, moves:['e4','e5'], turn:'w', version:2 };
+  await game.locator('[data-square=f3] img').waitFor();
+  assert.equal(snapshot.moves.at(-1), 'Nf3');
+  await game.locator('#history-first').click();
+  assert.equal(await game.locator('[data-square=e2] img').count(), 1);
+  await game.locator('#history-last').click();
+  await game.locator('#toggle-moves').click(); assert.equal(await game.locator('#history-content').isHidden(), true);
+
   for (const size of [{ width:390,height:844 },{ width:1440,height:900 }]) {
     await page.setViewportSize(size);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1 && document.documentElement.scrollHeight <= innerHeight + 1), true, 'game page must fit viewport');
@@ -59,13 +75,13 @@ try {
     assert.equal(await game.locator('.game-rail').isVisible(), true);
     const clocks = await game.locator('.clock-pair').evaluate(pair => {
       const [own, opponent] = [...pair.children];
-      return { ownLeft: own.getBoundingClientRect().left, opponentLeft: opponent.getBoundingClientRect().left,
+      return { clockLeft: pair.getBoundingClientRect().left, boardRight: document.getElementById('board').getBoundingClientRect().right,
         ownBackground: getComputedStyle(own).backgroundColor, opponentBackground: getComputedStyle(opponent).backgroundColor,
         numberSize: parseFloat(getComputedStyle(own.querySelector('strong')).fontSize) };
     });
-    assert.ok(clocks.ownLeft < clocks.opponentLeft, 'player clock is left of opponent');
+    assert.ok(clocks.clockLeft >= clocks.boardRight, 'clocks are next to the board');
     assert.notEqual(clocks.ownBackground, clocks.opponentBackground, 'clock backgrounds must differ');
-    assert.ok(clocks.numberSize >= 19, 'clock numbers are larger');
+    assert.ok(clocks.numberSize >= 12, 'clock numbers are legible');
     // The longest time control must fit without clipping at every viewport.
     await game.locator('#player-clock').evaluate(el => { el.textContent = '24:00:00'; });
     assert.equal(await game.locator('#player-clock').evaluate(el => el.scrollWidth <= el.clientWidth + 1), true, 'clock value fits');

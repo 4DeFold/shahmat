@@ -79,3 +79,21 @@ h1 span { color: var(--muted); }
 @media (max-width: 760px) { .game-shell { padding: 22px 18px 45px; } .game-header { padding-bottom: 18px; } .game-layout { grid-template-columns: minmax(0, 600px); gap: 15px; padding-top: 30px; } .game-panel { padding-top: 0; } .moves { margin-top: 20px; } }
 @media (max-width: 370px) { h1 { font-size: 31px; } }
 @media (prefers-reduced-motion: reduce) { #move-list .move-enter { animation: none; } }
+
+/* Gentle React Bits-inspired entrance: no blur on pieces or controls during play. */
+body.demo-page .game-header { animation: demo-enter .65s cubic-bezier(.22,1,.36,1) both; }
+body.demo-page .game-heading { animation: demo-enter .75s cubic-bezier(.22,1,.36,1) .06s both; }
+body.demo-page .board-section .player-row, body.demo-page .board-frame { animation: demo-enter .8s cubic-bezier(.22,1,.36,1) .12s both; }
+body.demo-page .game-panel > :not([hidden]) { animation: demo-enter .7s cubic-bezier(.22,1,.36,1) .18s both; }
+body.demo-page .square { transition: filter .2s ease; }
+@media (hover: hover) { body.demo-page .square:hover { filter: brightness(1.1); } }
+body.demo-page .new-game { transition: opacity .2s ease, transform .3s cubic-bezier(.22,1,.36,1); }
+@media (hover: hover) { body.demo-page .new-game:hover { transform: translateY(-3px); } }
+@keyframes demo-enter { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) {
+  body.demo-page :is(.game-header, .game-heading, .board-section .player-row, .board-frame, .game-panel > *) { animation: none; }
+  body.demo-page :is(.square, .new-game) { transition: none; }
+}
+body.demo-page .status-card { position: relative; isolation: isolate; overflow: hidden; }
+body.demo-page .status-card::before { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(160px circle at var(--spot-x, 50%) var(--spot-y, 50%), color-mix(in srgb, var(--ink) 10%, transparent), transparent 75%); }
+.demo-spark { position: fixed; z-index: 1000; width: 6px; height: 1.5px; background: var(--ink); pointer-events: none; }

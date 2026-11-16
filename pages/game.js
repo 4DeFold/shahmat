@@ -1,14 +1,20 @@
+import '../smooth-scroll.js';
 import { createClient } from '@supabase/supabase-js';
 import { cachedUserId, startSessionMonitor } from './member-session.js';
 import { createMemberGame } from './member-game.js';
 import './game-theme.js';
 
 const supabase = createClient('https://eswyxbyddkajysogtglp.supabase.co', 'sb_publishable_w9pinHWr8XK5F9CflsSJmQ_4KFMKzHS');
-const ui = createMemberGame({ document, api: async body => {
+const ui = createMemberGame({ document, opponentName: async gameId => {
+  const { data, error } = await supabase.functions.invoke('match-opponent', { body: { gameId } });
+  return error ? null : data?.username;
+}, api: async body => {
   const { data, error } = await supabase.functions.invoke('matchplay', { body });
   if (error || data?.error) throw new Error(data?.error || 'Сервис недоступен');
   return data;
 } });
+// A preloaded embedded game stays paused until its parent shows the view.
+if (window.parent !== window) ui.hide();
 let cachedId = null;
 try { cachedId = cachedUserId(window.localStorage); } catch { /* Storage may be blocked. */ }
 startSessionMonitor({

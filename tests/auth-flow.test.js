@@ -10,7 +10,7 @@ const pageHtml = (await Promise.all(['home', 'game-view', 'profile', 'settings',
 const html = rootHtml.replace('    </main>', shellHtml.replace('<div id="page-content"></div>', `<div id="page-content">${pageHtml}</div>`) + '    </main>');
 const source = (await readFile('app.js', 'utf8')).replace(/import .*?;\n/g, '').replace('export const appReady = initialize();', 'initialize();');
 const tick = () => new Promise(resolve => setTimeout(resolve, 10));
-async function setup({ existing = false, palette = 'monochrome', failSave = false, systemDark = false, initialStorage = {}, saveHandler = null, getUserHandler = null, userId = 'user-1', otpReady = true, autoConfirm = false, signupError = null, url = 'https://example.com', accessToken = null } = {}) {
+async function setup({ existing = false, palette = 'monochrome', failSave = false, systemDark = false, initialStorage = {}, saveHandler = null, getUserHandler = null, userId = 'user-1', otpReady = true, autoConfirm = false, signupError = null, signInHandler = null, url = 'https://example.com', accessToken = null } = {}) {
   const dom = new JSDOM(html, { runScripts: 'outside-only', url });
   const { window } = dom;
   let loggedIn = existing;
@@ -28,7 +28,11 @@ async function setup({ existing = false, palette = 'monochrome', failSave = fals
       resetPasswordForEmail: async () => { resetRequests++; return { error: null }; },
       resend: async () => { resends++; return { error: null }; },
       verifyOtp: async values => { lastVerification = values; if (values.token !== '123456') return { data: { session: null }, error: new Error('invalid') }; loggedIn = true; return { data: { session: { user: user() } }, error: null }; },
-      signInWithPassword: async () => { loggedIn = true; return { data: { session: { user: user() } } }; },
+      signInWithPassword: async credentials => {
+        if (signInHandler) { const result = await signInHandler(credentials); if (result.data?.session) loggedIn = true; return result; }
+        if (!storedProfile) return { data: { session:null }, error: { code:'invalid_credentials', message:'Invalid login credentials' } };
+        loggedIn = true; return { data: { session: { user: user() } } };
+      },
       updateUser: async ({ data, password }) => { if (password) { newPassword = password; return { error: null }; } if (saveHandler) await saveHandler(data); if (failSave) return { error: new Error('save failed') }; metadata = { ...metadata, ...data }; return { data: { user: user() } }; },
       signOut: async () => { loggedIn = false; return {}; }
     },
@@ -560,4 +564,32 @@ test('palette mouse wheel scrolls the strip and leaves page scrolling available 
   assert.equal(scroll, null);
   strip.scrollLeft = 600;
   assert.equal(wheel({ deltaY: 20 }).defaultPrevented, false);
+});
+
+
+test('signup signs in an existing account when credentials are correct', async () => {
+  const app = await setup({ signInHandler: async () => ({ data: { session:{ user:{ id:'user-1', user_metadata:{} } } }, error:null }) });
+  await app.click('login'); await app.click('tab-signup');
+  app.$('email').value = 'known@example.com'; app.$('password').value = 'secret';
+  await app.submit('auth-form');
+  assert.equal(app.getSignUps(), 0); assert.equal(app.$('profile-screen').hidden, false);
+});
+
+test('invalid login does not redirect and explicitly preserves credentials for signup', async () => {
+  const app = await setup(); await app.click('login');
+  app.$('email').value = 'unknown@example.com'; app.$('password').value = 'secret123'; await app.submit('auth-form');
+  assert.equal(app.$('tab-login').getAttribute('aria-pressed'), 'true');
+  assert.equal(app.$('auth-register-suggestion').hidden, false);
+  assert.match(app.$('auth-message').textContent, /Неверная почта или пароль/);
+  await app.click('auth-register-suggestion');
+  assert.equal(app.$('tab-signup').getAttribute('aria-pressed'), 'true');
+  assert.equal(app.$('email').value, 'unknown@example.com'); assert.equal(app.$('password').value, 'secret123');
+  assert.equal(app.getSignUps(), 0);
+});
+
+test('signup does not create an account when sign-in failed due to network', async () => {
+  const app = await setup({ signInHandler: async () => ({ data:null, error:{ name:'AuthRetryableFetchError', message:'failed to fetch' } }) });
+  await app.click('login'); await app.click('tab-signup');
+  app.$('email').value = 'new@example.com'; app.$('password').value = 'secret123'; await app.submit('auth-form');
+  assert.equal(app.getSignUps(), 0); assert.match(app.$('auth-message').textContent, /сервер/);
 });
