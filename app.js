@@ -227,42 +227,64 @@ function openAccountMenu() {
     if (accountToggle.getAttribute('aria-expanded') === 'true') accountMenu.classList.add('is-open');
   });
 }
+// Each view is an independent, lazy-loaded page. Its chunk is requested only when visited.
+const pageLoaders = {
+  home: () => import('./pages/home.html?raw'),
+  play: () => import('./pages/play.html?raw'),
+  profile: () => import('./pages/profile.html?raw'),
+  settings: () => import('./pages/settings.html?raw'),
+  help: () => import('./pages/help.html?raw'),
+};
+let pageRequest = 0;
+const viewId = name => name === 'home' ? 'dashboard-home' : `page-${name}`;
 function currentPage() {
-  const name = window.location.hash.slice(1);
+  const name = window.location.pathname.replace(/^\/+|\/+$/g, '');
   return pages.has(name) ? name : 'home';
 }
-function showPage(name, { updateHistory = false, focus = false } = {}) {
+async function showPage(name, { updateHistory = false, focus = false } = {}) {
   if (!pages.has(name)) name = 'home';
-  if (updateHistory && currentPage() !== name) {
-    const url = new URL(window.location.href);
-    url.hash = name === 'home' ? '' : name;
-    window.history.pushState(null, '', url);
-  }
-  document.querySelectorAll('#dashboard-screen [data-view]').forEach(view => {
-    const active = view.dataset.view === name;
-    const changed = active && view.hidden;
-    view.hidden = !active;
-    if (changed && focus && !reducedMotion.matches) {
-      view.classList.remove('page-enter');
-      void view.offsetWidth;
-      view.classList.add('page-enter');
+  const request = ++pageRequest;
+  if (updateHistory && currentPage() !== name) window.history.pushState(null, '', `/${name}`);
+  try {
+    if (!$(viewId(name))) {
+      const { default: html } = await pageLoaders[name]();
+      if (!$(viewId(name))) $('page-content').insertAdjacentHTML('beforeend', html);
+      if (name === 'profile') { if (profile) displayProfile(); applyPalette(selectedPalette); }
     }
-  });
-  document.querySelectorAll('#dashboard-screen [data-page]').forEach(button => {
-    if (button.dataset.page === name) button.setAttribute('aria-current', 'page');
-    else button.removeAttribute('aria-current');
-  });
-  closeAccountMenu();
-  if (focus) {
-    window.scrollTo(0, 0);
-    const heading = name === 'profile' ? $('dashboard-title') : $('page-' + name + '-title');
-    heading.setAttribute('tabindex', '-1');
-    heading.focus({ preventScroll: true });
+    if (request !== pageRequest) return;
+    $('page-load-error')?.remove();
+    document.querySelectorAll('#dashboard-screen [data-view]').forEach(view => {
+      const active = view.dataset.view === name;
+      const changed = active && view.hidden;
+      view.hidden = !active;
+      view.inert = sidebarOpen;
+      if (changed && focus && !reducedMotion.matches) {
+        view.classList.remove('page-enter'); void view.offsetWidth; view.classList.add('page-enter');
+      }
+    });
+    document.querySelectorAll('#dashboard-screen [data-page]').forEach(link => {
+      if (link.dataset.page === name) link.setAttribute('aria-current', 'page');
+      else link.removeAttribute('aria-current');
+    });
+    closeAccountMenu();
+    if (focus) {
+      window.scrollTo(0, 0);
+      const heading = name === 'profile' ? $('dashboard-title') : $('page-' + name + '-title');
+      if (heading) { heading.setAttribute('tabindex', '-1'); heading.focus({ preventScroll: true }); }
+    }
+    document.title = ({ home: 'Главная', play: 'Играть', profile: 'Профиль', settings: 'Настройки', help: 'Помощь' })[name] + ' — shahmat.xyz';
+  } catch {
+    if (request !== pageRequest) return;
+    document.querySelectorAll('#dashboard-screen [data-view]').forEach(view => { view.hidden = true; });
+    $('page-load-error')?.remove();
+    $('page-content').insertAdjacentHTML('beforeend', '<section class="empty-page" id="page-load-error" role="alert"><h2>Страница не загрузилась.</h2><p>Проверь соединение и обнови страницу.</p></section>');
   }
 }
-$('dashboard-screen').querySelectorAll('[data-page]').forEach(button => button.addEventListener('click', () => {
+$('dashboard-screen').querySelectorAll('[data-page]').forEach(link => link.addEventListener('click', event => {
+  if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  event.preventDefault();
   setSidebarOpen(false);
-  showPage(button.dataset.page, { updateHistory: true, focus: true });
+  void showPage(link.dataset.page, { updateHistory: true, focus: true });
 }));
 accountToggle.addEventListener('click', () => {
   if (accountToggle.getAttribute('aria-expanded') === 'true') closeAccountMenu();
@@ -292,7 +314,7 @@ async function show(id, immediate = false) {
   if (!immediate) next.classList.add('entering');
   next.hidden = false;
   screen = next;
-  if (id === 'dashboard-screen') { setSidebarOpen(false); showPage(currentPage()); }
+  if (id === 'dashboard-screen') { setSidebarOpen(false); await showPage(currentPage()); }
   else closeAccountMenu(true);
   window.scrollTo(0, 0);
   requestAnimationFrame(() => requestAnimationFrame(() => next.classList.remove('entering')));
@@ -306,10 +328,16 @@ async function show(id, immediate = false) {
 function message(id, text = '') { $(id).textContent = text; }
 function busy(button, value) { button.disabled = value; button.setAttribute('aria-busy', String(value)); }
 function describe(error) {
+  const text = error?.message?.toLowerCase() || '';
   if (error?.code === '23505') return 'Это имя уже занято. Попробуй другое.';
-  if (error?.message?.toLowerCase().includes('invalid login credentials')) return 'Неверная почта или пароль.';
-  if (error?.message?.toLowerCase().includes('already registered')) return 'Аккаунт с этой почтой уже существует. Попробуй войти.';
-  if (error?.message?.toLowerCase().includes('rate limit')) return 'Слишком много попыток. Попробуй позже.';
+  if (error?.code === 'email_address_invalid' || text.includes('email address') && text.includes('invalid')) return 'Проверь адрес электронной почты.';
+  if (error?.code === 'email_address_not_authorized') return 'Отправка писем на этот адрес не разрешена. Обратись к администратору сайта.';
+  if (error?.code === 'email_provider_disabled' || error?.code === 'signup_disabled') return 'Регистрация по почте сейчас отключена. Обратись к администратору сайта.';
+  if (error?.code === 'email_send_failed' || text.includes('error sending confirmation email') || text.includes('error sending recovery email')) return 'Не удалось отправить письмо. Попробуй позже или сообщи администратору сайта.';
+  if (error?.code === 'over_email_send_rate_limit' || error?.code === 'over_request_rate_limit' || error?.status === 429 || text.includes('rate limit') || text.includes('security purposes')) return 'Слишком много попыток. Подожди немного и попробуй ещё раз.';
+  if (error?.name === 'AuthRetryableFetchError' || text.includes('failed to fetch') || text.includes('network request failed')) return 'Не удалось связаться с сервером. Проверь интернет и попробуй ещё раз.';
+  if (text.includes('invalid login credentials')) return 'Неверная почта или пароль.';
+  if (text.includes('already registered')) return 'Аккаунт с этой почтой уже существует. Попробуй войти.';
   return 'Не получилось выполнить действие. Проверь данные и попробуй ещё раз.';
 }
 function setMode(value) {
@@ -334,6 +362,7 @@ function setMode(value) {
   }
 }
 async function loadProfile(user, immediate = false) {
+  if (window.location.pathname === '/') window.history.replaceState(null, '', '/home');
   const { data, error } = await supabase.from('profiles').select('username,bio,palette').eq('id', user.id).maybeSingle();
   if (error) throw error;
   profile = data;
@@ -350,6 +379,7 @@ function prepareProfile() {
   message('profile-message');
 }
 function displayProfile() {
+  if (!$('dashboard-title')) return;
   $('dashboard-title').textContent = 'Привет, ' + profile.username + '.';
   $('dashboard-profile-heading').textContent = profile.username;
   $('dashboard-bio').textContent = profile.bio || 'Здесь можно рассказать немного о себе.';
@@ -543,17 +573,18 @@ $('palette-form').addEventListener('submit', async event => {
   displayProfile();
   await show('dashboard-screen');
 });
-$('dashboard-palettes').addEventListener('click', event => {
-  if (event.target.matches('input[name="dashboard-palette"]') && event.target.value === selectedPalette) {
+// Profile controls are bound on the shared container because the page is lazy-loaded.
+$('page-content').addEventListener('click', event => {
+  if (event.target.closest('#edit-profile')) { editing = true; prepareProfile(); void show('profile-screen'); }
+  if (event.target.matches('#dashboard-palettes input[name="dashboard-palette"]') && event.target.value === selectedPalette) {
     toggleSelectedTheme(); recordAppearance();
   }
 });
-$('dashboard-palettes').addEventListener('change', event => {
-  if (event.target.matches('input[name="dashboard-palette"]') && event.target.value !== selectedPalette) {
+$('page-content').addEventListener('change', event => {
+  if (event.target.matches('#dashboard-palettes input[name="dashboard-palette"]') && event.target.value !== selectedPalette) {
     applyPalette(event.target.value); recordAppearance();
   }
 });
-$('edit-profile').addEventListener('click', () => { editing = true; prepareProfile(); show('profile-screen'); });
 $('profile-cancel').addEventListener('click', () => { editing = false; show('dashboard-screen'); });
 document.querySelectorAll('.signout').forEach(button => button.addEventListener('click', async () => {
   busy(button, true);
@@ -565,7 +596,7 @@ document.querySelectorAll('.signout').forEach(button => button.addEventListener(
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
     profile = null; applyPalette('monochrome'); applyTheme(null); $('auth-form').reset(); setMode('login');
-    const url = new URL(window.location.href); url.hash = ''; window.history.replaceState(null, '', url);
+    window.history.replaceState(null, '', '/');
     await show('auth-screen');
   } catch (error) { appearanceUserId = signedOutUser; startAppearancePolling(); void syncAppearance(); message('sidebar-message', 'Не удалось выйти. Попробуй ещё раз.'); }
   finally { busy(button, false); }
@@ -573,6 +604,9 @@ document.querySelectorAll('.signout').forEach(button => button.addEventListener(
 
 // Keep the page covered until both the session and, when needed, the profile are known.
 async function initialize() {
+  // Preserve old bookmarked hash routes, but never touch Supabase callback fragments.
+  const legacyPage = window.location.hash.slice(1);
+  if (pages.has(legacyPage)) window.history.replaceState(null, '', `/${legacyPage}`);
   try {
     const { data, error } = await supabase.auth.getSession();
     if (error) throw error;
@@ -580,12 +614,17 @@ async function initialize() {
     if (data.session && (recoveryPending() || verifiedRecoveryLink)) {
       setRecoveryPending(true);
       await show('reset-password-screen', true);
-    } else if (data.session) await loadProfile(data.session.user, true);
-    else { setRecoveryPending(false); await show('landing-screen', true); }
+    } else if (data.session) {
+      if (window.location.pathname === '/') window.history.replaceState(null, '', '/home');
+      await loadProfile(data.session.user, true);
+    } else {
+      setRecoveryPending(false);
+      await show(window.location.pathname === '/' ? 'landing-screen' : 'auth-screen', true);
+    }
   } catch (error) {
     await show('auth-screen', true);
     message('auth-message', 'Не удалось проверить сессию. Проверь соединение и попробуй войти.');
   }
   document.body.classList.add('startup-ready');
 }
-initialize();
+export const appReady = initialize();

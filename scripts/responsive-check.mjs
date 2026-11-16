@@ -88,9 +88,15 @@ for (const device of devices) {
     const title = document.querySelector('h1'), play = document.querySelector('#play');
     const titleRect = title.getBoundingClientRect(), playRect = play.getBoundingClientRect();
     const touch = getComputedStyle(play, '::before');
-    return { title: titleRect.width, button: playRect.width, titleFont: parseFloat(getComputedStyle(title).fontSize), buttonFont: parseFloat(getComputedStyle(play).fontSize), height: playRect.height, hitHeight: parseFloat(touch.height), ratio: playRect.width / titleRect.width };
+    return { title: titleRect.width, titleLeft: titleRect.left, titleRight: titleRect.right, viewport: innerWidth, button: playRect.width, titleFont: parseFloat(getComputedStyle(title).fontSize), buttonFont: parseFloat(getComputedStyle(play).fontSize), height: playRect.height, hitHeight: parseFloat(touch.height), ratio: playRect.width / titleRect.width };
   });
-  assert.ok(Math.abs(hero.ratio - 240 / 718) < .008, `${device.id}: button/title proportions ${hero.ratio}`);
+  if (device.width <= 480) {
+    assert.ok(Math.abs(hero.title / hero.viewport - .9) < .025, `${device.id}: title should occupy about 90% of the screen: ${JSON.stringify(hero)}`);
+    assert.ok(hero.titleLeft >= 0 && hero.titleRight <= hero.viewport, `${device.id}: title must not be clipped`);
+    assert.ok(hero.button >= 120 && hero.button <= 160 && hero.height >= 44, `${device.id}: PLAY should have a comfortable visible size`);
+  } else {
+    assert.ok(Math.abs(hero.ratio - 240 / 718) < .008, `${device.id}: button/title proportions ${hero.ratio}`);
+  }
   assert.ok(hero.hitHeight >= 44, `${device.id}: PLAY hit area is too small`);
   await screenshot('landing');
   // On narrow screens activate the extended touch target, outside the painted button.
@@ -214,10 +220,11 @@ for (const device of devices) {
   assert.ok(alignment < 1.5, `${device.id}: logo must be centered in the rail (offset ${alignment}px)`);
   }
   await page.locator('#nav-play').click();
+  await page.locator('#page-play').waitFor({ state: 'visible' });
   if (mobileDrawer) assert.equal(await page.locator('#app-sidebar').isVisible(), false);
   assert.equal(await page.locator('#page-play').isVisible(), true);
   assert.equal(await page.locator('#dashboard-home').isVisible(), false);
-  assert.equal(new URL(page.url()).hash, '#play');
+  assert.equal(new URL(page.url()).pathname, '/play');
   await checkLayout('play');
   await page.reload();
   await page.locator('#page-play').waitFor({ state: 'visible' });
@@ -228,7 +235,7 @@ for (const device of devices) {
   const toggleColors = await page.locator('#account-toggle').evaluate(el => ({ background: getComputedStyle(el).backgroundColor, color: getComputedStyle(el).color }));
   assert.deepEqual(toggleColors, activeColors, 'expanded profile control must remain legible on hover');
   const menuSpacing = await page.locator('#account-menu').evaluate(el => {
-    const rect = el.getBoundingClientRect(), buttons = el.querySelectorAll('button');
+    const rect = el.getBoundingClientRect(), buttons = el.querySelectorAll('button, a');
     return { top: buttons[0].getBoundingClientRect().top - rect.top, bottom: rect.bottom - buttons[buttons.length - 1].getBoundingClientRect().bottom };
   });
   assert.ok(menuSpacing.top >= 8 && menuSpacing.bottom >= 8, `${device.id}: profile menu needs vertical padding ${JSON.stringify(menuSpacing)}`);
@@ -271,20 +278,23 @@ for (const device of devices) {
     await openDrawer();
     await page.locator('#account-toggle').click();
     await page.locator(`#account-menu [data-page=${name}]`).click();
+    await page.locator(`#page-${name}`).waitFor({ state: 'visible' });
     assert.equal(await page.locator(`#page-${name}`).isVisible(), true);
     assert.equal(await page.locator('#account-menu').isVisible(), false);
-    assert.equal(new URL(page.url()).hash, `#${name}`);
+    assert.equal(new URL(page.url()).pathname, `/${name}`);
     await checkLayout(name);
   }
   await page.goBack();
   await page.locator('#page-settings').waitFor({ state: 'visible' });
   if (mobileDrawer) await page.locator('#mobile-brand').click();
   else await page.locator('.sidebar-brand').click();
+  await page.locator('#dashboard-home').waitFor({ state: 'visible' });
   assert.equal(await page.locator('#dashboard-home').isVisible(), true);
-  assert.equal(new URL(page.url()).hash, '');
+  assert.equal(new URL(page.url()).pathname, '/home');
   await openDrawer();
   await page.locator('#account-toggle').click();
   await page.locator('#account-menu [data-page=profile]').click();
+  await page.locator('#page-profile').waitFor({ state: 'visible' });
   assert.equal(await page.locator('#page-profile').isVisible(), true);
   assert.equal(await page.locator('#dashboard-home').isVisible(), false);
   assert.equal(await page.evaluate(() => document.activeElement.id), 'dashboard-title');
@@ -297,7 +307,7 @@ for (const device of devices) {
   assert.equal(await page.evaluate(() => window.getSelection().toString()), '');
   await page.reload();
   await page.locator('#page-profile').waitFor({ state: 'visible' });
-  assert.equal(new URL(page.url()).hash, '#profile', 'profile route survives reload');
+  assert.equal(new URL(page.url()).pathname, '/profile', 'profile route survives reload');
   assert.match(await page.locator('#dashboard-title').innerText(), /LongPlayerName_123456789/);
   await screenshot('dashboard-profile');
   // Exercise navigation from the bottom of a long screen, not only from the top.

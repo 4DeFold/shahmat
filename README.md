@@ -15,6 +15,50 @@ The checks use isolated mock authentication and profile responses, not real Supa
 
 `npm run test:sync` runs a two-session browser check with a shared mock Supabase account. It also checks menu/page animations and reduced motion. No real account data is changed.
 
+## Pages and assets
+
+The landing page is `/`. The signed-in sections use `/home`, `/play`, `/profile`,
+`/settings`, and `/help`. Their markup lives in `pages/` and is loaded on demand;
+the authentication shell and application code are also deferred on a fresh
+landing-page visit. Navigation uses real links and the History API, while Vercel
+rewrites those routes to the shared shell for direct visits and refreshes. Old
+`#play`, `#profile`, `#settings`, and `#help` bookmarks are upgraded without
+changing Supabase's email callback fragments. The original logo is in
+`public/images/shahmat-logo.png`; `public/favicon.svg` uses vector outlines and
+does not require a font download.
+
+To test production routing and lazy loading using mock Supabase responses:
+`VITE_EMAIL_OTP_READY=true npm run build`, then `npm run preview`, and in another
+terminal `npm run test:routes` (set `RESPONSIVE_BASE_URL` if needed).
+
+## Database foundations
+
+- `auth.users` is managed by Supabase Auth and contains account credentials.
+  `public.profiles` is the existing user profile table: `id` references the Auth
+  user, and it stores `username`, `bio`, `palette`, and `created_at`. Profiles
+  are created during onboarding; existing RLS only allows users to access their
+  own profile. Appearance theme is stored in Auth user metadata.
+- `public.games` stores player IDs (white and black), status, result and reason,
+  starting FEN, initial clock and increment in milliseconds, and timestamps.
+  Deleting an account sets its player reference to null to retain game history.
+- `public.game_moves` stores each half-move ordered by `ply`, its color, UCI
+  notation, optional SAN and resulting FEN, remaining clocks in milliseconds,
+  and timestamp. Deleting a game cascades to its moves.
+
+These are storage foundations, not a playable game implementation. Both game
+tables have RLS enabled and no client privileges or policies, so anonymous and
+authenticated clients cannot read or write them. A future implementation must
+add deliberate read policies and trusted server-side authorization, legal-move
+validation, clock handling, and atomic game-state updates; the SQL constraints
+alone cannot enforce chess rules or turn order. Do not expose the service role
+key to browser code. No game data is populated by this migration.
+
+The game migration is tracked locally with the same version as the applied
+Supabase migration. The older `create_profiles` migration predates this workflow:
+its local filename is `20261113140000`, while the existing remote migration
+history records it as `20261113151708`. Reconcile that historical mismatch before
+using a CLI command that automatically applies migrations to an existing project.
+
 ## Email verification and password recovery
 
 The registration and recovery UI is intentionally disabled unless the build has
