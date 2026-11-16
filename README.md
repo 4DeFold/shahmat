@@ -19,8 +19,9 @@ The checks use isolated mock authentication and profile responses, not real Supa
 
 The landing page is `/`, with PLAY opening the standalone guest demo at `/play`
 and «Войти» opening `/login`. The dashboard «Играть» link opens a separate
-`/game` page, which verifies the account with Supabase Auth before showing the
-game. Its local bot game is stored under a separate key per account and never
+`/game` page inside the persistent dashboard, with the existing sidebar and
+profile controls. Its independently loaded game document verifies the account
+with Supabase Auth before showing the game. Its local bot game is stored under a separate key per account and never
 shares the demo position. A signed-in user can start a new bot game there.
 Both pages currently offer a local white-vs-black-bot game; online matchmaking
 and rated games are not yet available. The lightweight bot searches

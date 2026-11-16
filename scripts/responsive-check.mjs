@@ -216,11 +216,12 @@ for (const device of devices) {
   assert.ok(alignment < 1.5, `${device.id}: logo must be centered in the rail (offset ${alignment}px)`);
   }
   await page.locator('#nav-play').click();
-  await page.locator('#board').waitFor({ state: 'visible' });
+  const gameFrame = page.frameLocator('#member-game-frame');
+  await gameFrame.locator('#board').waitFor({ state: 'visible' });
   assert.equal(new URL(page.url()).pathname, '/game');
-  assert.equal(await page.locator('#board [data-square]').count(), 64);
+  assert.equal(await gameFrame.locator('#board [data-square]').count(), 64);
   await page.reload();
-  await page.locator('#board').waitFor({ state: 'visible' });
+  await gameFrame.locator('#board').waitFor({ state: 'visible' });
   await page.goBack();
   await page.locator('#dashboard-home').waitFor({ state: 'visible' });
   await openDrawer();

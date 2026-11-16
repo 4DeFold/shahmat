@@ -53,3 +53,19 @@ async function start() {
 }
 retry.addEventListener('click', () => location.reload());
 void start();
+
+// In the dashboard, keep the outer page responsible for scrolling and apply
+// its selected palette. The frame is same-origin and can also run standalone.
+if (window.parent !== window) {
+  const reportHeight = () => window.parent.postMessage({ type: 'shahmat-game-height', height: document.querySelector('.member-shell').scrollHeight }, window.location.origin);
+  new ResizeObserver(reportHeight).observe(document.querySelector('.member-shell'));
+  window.addEventListener('load', reportHeight);
+  window.addEventListener('message', event => {
+    if (event.origin !== window.location.origin || event.source !== window.parent || event.data?.type !== 'shahmat-appearance') return;
+    const names = { '--page-background': '--bg', '--foreground': '--ink', '--surface': '--surface', '--surface-raised': '--surface-alt', '--line': '--line', '--button-background': '--control', '--button-text': '--control-ink' };
+    for (const [name, target] of Object.entries(names)) {
+      const value = event.data.colors?.[name];
+      if (typeof value === 'string' && value) document.documentElement.style.setProperty(target, value);
+    }
+  });
+}

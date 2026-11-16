@@ -5,7 +5,7 @@ import { JSDOM } from 'jsdom';
 
 const rootHtml = await readFile('index.html', 'utf8');
 const shellHtml = await readFile('pages/app-shell.html', 'utf8');
-const pageHtml = (await Promise.all(['home', 'profile', 'settings', 'help'].map(name => readFile(`pages/${name}.html`, 'utf8')))).join('');
+const pageHtml = (await Promise.all(['home', 'game-view', 'profile', 'settings', 'help'].map(name => readFile(`pages/${name}.html`, 'utf8')))).join('');
 // Unit tests preload views; browser checks verify the actual lazy loading.
 const html = rootHtml.replace('    </main>', shellHtml.replace('<div id="page-content"></div>', `<div id="page-content">${pageHtml}</div>`) + '    </main>');
 const source = (await readFile('app.js', 'utf8')).replace(/import .*?;\n/g, '').replace('export const appReady = initialize();', 'initialize();');
@@ -293,7 +293,13 @@ test('sidebar navigates between pages, moves the dashboard to profile and return
   assert.equal($('page-profile').hidden, true);
   assert.ok($('page-profile').contains($('dashboard-palettes')));
   assert.equal($('nav-play').getAttribute('href'), '/game');
-  assert.equal($('nav-play').hasAttribute('data-page'), false);
+  assert.equal($('nav-play').dataset.page, 'game');
+  $('nav-play').click(); await tick();
+  assert.equal($('page-game').hidden, false);
+  assert.equal($('dashboard-screen').hidden, false);
+  assert.equal($('nav-play').getAttribute('aria-current'), 'page');
+  assert.equal(window.location.pathname, '/game');
+  assert.equal($('member-game-frame').getAttribute('src'), '/pages/game.html');
   await click('account-toggle');
   assert.equal($('account-toggle').getAttribute('aria-expanded'), 'true');
   for (const name of ['profile', 'settings', 'help']) {
@@ -475,4 +481,20 @@ test('registration deep link opens the signup tab for guests', async () => {
   assert.equal(app.$('auth-screen').hidden, false);
   assert.equal(app.$('tab-signup').getAttribute('aria-pressed'), 'true');
   assert.match(app.$('auth-submit').textContent, /Создать аккаунт/);
+});
+
+test('game route keeps the sidebar and safely handles frame height messages', async () => {
+  const { $, window } = await setup({ existing: true, url: 'https://example.com/game' });
+  assert.equal($('dashboard-screen').hidden, false);
+  assert.equal($('page-game').hidden, false);
+  assert.equal($('app-sidebar').hidden, false);
+  assert.equal($('nav-play').getAttribute('aria-current'), 'page');
+  const frame = $('member-game-frame');
+  window.dispatchEvent(new window.MessageEvent('message', { origin: 'https://evil.example', source: frame.contentWindow, data: { type: 'shahmat-game-height', height: 920 } }));
+  assert.equal(frame.style.height, '');
+  window.dispatchEvent(new window.MessageEvent('message', { origin: 'https://example.com', source: frame.contentWindow, data: { type: 'shahmat-game-height', height: 920 } }));
+  assert.equal(frame.style.height, '920px');
+  window.dispatchEvent(new window.MessageEvent('message', { origin: 'https://example.com', source: frame.contentWindow, data: { type: 'shahmat-game-height', height: 1000000 } }));
+  assert.equal(frame.style.height, '920px');
+  window.close();
 });

@@ -9,3 +9,6 @@
 .game-gate p, .demo-link { color: var(--muted); font-size: 14px; line-height: 1.6; }
 .demo-link { display: inline-block; margin-top: 22px; }
 @media (max-width: 760px) { .member-intro { padding-top: 30px; } .member-shell .game-layout { padding-top: 10px; } .member-shell .game-panel { padding-top: 0; } .member-card { padding: 20px; } }
+/* The surrounding dashboard supplies its own persistent navigation. */
+.member-shell { max-width: none; padding: 0 0 30px; }
+.member-intro { padding-top: 0; }

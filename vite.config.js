@@ -9,7 +9,8 @@ const gameRoute = {
 };
 function rewriteGame(req, _res, next) {
   const path = req.url?.split('?')[0];
-  if (path === '/play' || path === '/game') req.url = req.url.replace(path, `/pages/${path.slice(1)}.html`);
+  if (path === '/play') req.url = req.url.replace(path, '/pages/play.html');
+  if (path === '/game') req.url = req.url.replace(path, '/index.html');
   next();
 }
 export default defineConfig({

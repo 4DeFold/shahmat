@@ -163,7 +163,7 @@ let navigating = false;
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const accountMenu = $('account-menu');
 const accountToggle = $('account-toggle');
-const pages = new Set(['home', 'profile', 'settings', 'help']);
+const pages = new Set(['home', 'game', 'profile', 'settings', 'help']);
 const sidebar = $('app-sidebar');
 const mobileMenuToggle = $('mobile-menu-toggle');
 let sidebarOpen = false;
@@ -230,6 +230,7 @@ function openAccountMenu() {
 // Each view is an independent, lazy-loaded page. Its chunk is requested only when visited.
 const pageLoaders = {
   home: () => import('./pages/home.html?raw'),
+  game: () => import('./pages/game-view.html?raw'),
   profile: () => import('./pages/profile.html?raw'),
   settings: () => import('./pages/settings.html?raw'),
   help: () => import('./pages/help.html?raw'),
@@ -271,7 +272,7 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
       const heading = name === 'profile' ? $('dashboard-title') : $('page-' + name + '-title');
       if (heading) { heading.setAttribute('tabindex', '-1'); heading.focus({ preventScroll: true }); }
     }
-    document.title = ({ home: 'Главная', play: 'Играть', profile: 'Профиль', settings: 'Настройки', help: 'Помощь' })[name] + ' — shahmat.xyz';
+    document.title = ({ home: 'Главная', game: 'Играть', profile: 'Профиль', settings: 'Настройки', help: 'Помощь' })[name] + ' — shahmat.xyz';
   } catch {
     if (request !== pageRequest) return;
     document.querySelectorAll('#dashboard-screen [data-view]').forEach(view => { view.hidden = true; });
@@ -279,6 +280,24 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
     $('page-content').insertAdjacentHTML('beforeend', '<section class="empty-page" id="page-load-error" role="alert"><h2>Страница не загрузилась.</h2><p>Проверь соединение и обнови страницу.</p></section>');
   }
 }
+// The game document remains a separate lazy-loaded page. Only messages from
+// our own game frame and origin can resize it or exchange appearance settings.
+function syncGameAppearance() {
+  const frame = $('member-game-frame');
+  if (!frame?.contentWindow) return;
+  const style = getComputedStyle(landing);
+  const names = ['--page-background', '--foreground', '--surface', '--surface-raised', '--line', '--button-background', '--button-text'];
+  const colors = Object.fromEntries(names.map(name => [name, style.getPropertyValue(name).trim()]));
+  frame.contentWindow.postMessage({ type: 'shahmat-appearance', colors }, window.location.origin);
+}
+window.addEventListener('message', event => {
+  const frame = $('member-game-frame');
+  if (event.origin !== window.location.origin || event.source !== frame?.contentWindow || event.data?.type !== 'shahmat-game-height') return;
+  const height = Number(event.data.height);
+  if (Number.isFinite(height) && height >= 100 && height <= 10000) frame.style.height = `${Math.ceil(height)}px`;
+});
+new MutationObserver(syncGameAppearance).observe(landing, { attributes: true, attributeFilter: ['data-palette', 'data-palette-theme', 'class'] });
+$('page-content').addEventListener('load', event => { if (event.target.id === 'member-game-frame') syncGameAppearance(); }, true);
 $('dashboard-screen').querySelectorAll('[data-page]').forEach(link => link.addEventListener('click', event => {
   if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
   event.preventDefault();
@@ -597,6 +616,7 @@ document.querySelectorAll('.signout').forEach(button => button.addEventListener(
   try {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
+    $('page-game')?.remove(); // Discard the prior account's game frame on logout.
     profile = null; applyPalette('monochrome'); applyTheme(null); $('auth-form').reset(); setMode('login');
     window.history.replaceState(null, '', '/');
     await show('auth-screen');
