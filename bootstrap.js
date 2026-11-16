@@ -1,5 +1,6 @@
 import './smooth-scroll.js';
 import './theme.js';
+import './landing-effects.js';
 
 let appPromise;
 async function loadApp() {

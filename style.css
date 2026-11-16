@@ -733,3 +733,55 @@ textarea { resize: vertical; min-height: 92px; }
 
 /* A transformed dashboard becomes a containing block for its fixed sidebar. */
 .screen.dashboard, .screen.dashboard.entering, .screen.dashboard.leaving { transform: none; }
+
+/* Entry-only effects inspired by React Bits' Blur Text, Fade Content,
+   Spotlight Card, Magnet and Click Spark. The game and dashboard remain still. */
+.landing { position: relative; }
+.entrance-atmosphere { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; opacity: 0; transition: opacity .65s ease; }
+.landing:has(#landing-screen:not([hidden])) .entrance-atmosphere,
+.landing:has(#auth-screen:not([hidden])) .entrance-atmosphere { opacity: 1; }
+.entrance-grid { position: absolute; inset: 0; opacity: .19; background-image: linear-gradient(color-mix(in srgb, var(--foreground) 12%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--foreground) 12%, transparent) 1px, transparent 1px); background-size: clamp(46px, 6vw, 82px) clamp(46px, 6vw, 82px); mask-image: radial-gradient(ellipse 72% 72% at 50% 48%, transparent 20%, #000 100%); }
+.entrance-orbit { position: absolute; width: min(72vw, 780px); aspect-ratio: 1; left: 50%; top: 50%; border: 1px solid color-mix(in srgb, var(--foreground) 9%, transparent); border-radius: 50%; transform: translate(-50%, -50%); }
+.entrance-orbit--two { width: min(94vw, 1050px); border-style: dashed; opacity: .55; }
+.entrance-piece { position: absolute; width: clamp(86px, 12vw, 175px); opacity: .09; filter: grayscale(1); }
+:root[data-theme='dark'] .entrance-piece { filter: grayscale(1) invert(1); }
+.entrance-piece--left { left: max(5vw, 30px); top: 19%; transform: rotate(-15deg); animation: entrance-float-left 8s ease-in-out infinite alternate; }
+.entrance-piece--right { right: max(5vw, 30px); bottom: 16%; transform: rotate(13deg); animation: entrance-float-right 9s ease-in-out infinite alternate; }
+@keyframes entrance-float-left { to { transform: translateY(-18px) rotate(-9deg); } }
+@keyframes entrance-float-right { to { transform: translateY(18px) rotate(8deg); } }
+.landing__content, #auth-screen { z-index: 1; }
+.hero-reveal { display: inline-block; }
+body.startup-ready #landing-screen:not([hidden]) .hero-reveal { animation: hero-focus 1.05s cubic-bezier(.22,1,.36,1) .45s both; }
+body.startup-ready #landing-screen:not([hidden]) .hero-reveal--tail { animation-delay: .57s; }
+@keyframes hero-focus { from { opacity: 0; filter: blur(12px); transform: translateY(18px); } 65% { opacity: 1; filter: blur(1px); } to { opacity: 1; filter: blur(0); transform: translateY(0); } }
+.play-button { translate: var(--magnet-x, 0px) var(--magnet-y, 0px); transition: translate .5s cubic-bezier(.22,1,.36,1), scale .28s cubic-bezier(.22,1,.36,1), background-color .35s ease, color .35s ease; overflow: visible; }
+.play-button::after, #auth-submit::after { content: ''; position: absolute; inset: 2px; border-radius: inherit; background: linear-gradient(110deg, transparent 28%, color-mix(in srgb, currentColor 20%, transparent) 48%, transparent 68%); background-size: 250% 100%; background-position: 130% 0; pointer-events: none; }
+@media (hover:hover) { .play-button:hover::after, #auth-submit:hover::after { animation: entrance-shine .9s ease-out; } }
+@keyframes entrance-shine { to { background-position: -80% 0; } }
+#auth-screen { position: relative; isolation: isolate; }
+#auth-screen::before { content: ''; position: absolute; z-index: -1; inset: -34px; border: 1px solid color-mix(in srgb, var(--foreground) 12%, transparent); background: radial-gradient(240px circle at var(--spot-x, 50%) var(--spot-y, 20%), color-mix(in srgb, var(--foreground) 7%, transparent), transparent 75%), var(--page-background); box-shadow: 0 28px 80px #0000000b; pointer-events: none; }
+#auth-screen:not([hidden]) :is(.panel-top, .wordmark, .auth-tabs) { animation: auth-focus .68s cubic-bezier(.22,1,.36,1) both; }
+#auth-screen:not([hidden]) .wordmark { animation-delay: .06s; }
+#auth-screen:not([hidden]) .auth-tabs { animation-delay: .12s; }
+#auth-screen:not([hidden]) #auth-form > :not([hidden]) { animation: auth-focus .6s cubic-bezier(.22,1,.36,1) .16s both; }
+#auth-screen:not([hidden]) #auth-form > :nth-child(2) { animation-delay: .20s; }
+#auth-screen:not([hidden]) #auth-form > :nth-child(3) { animation-delay: .24s; }
+#auth-screen:not([hidden]) #auth-form > :nth-child(4) { animation-delay: .28s; }
+#auth-screen:not([hidden]) #auth-form > :nth-child(n+5) { animation-delay: .32s; }
+@keyframes auth-focus { from { opacity: 0; filter: blur(7px); transform: translateY(12px); } to { opacity: 1; filter: blur(0); transform: translateY(0); } }
+#auth-submit { position: relative; overflow: hidden; }
+#auth-screen input:not([type='radio']) { transition: border-color .25s, box-shadow .25s; }
+#auth-screen input:focus-visible { outline: 2px solid var(--foreground); outline-offset: 3px; box-shadow: 0 6px 0 -4px var(--foreground); }
+.entrance-spark { position: fixed; z-index: 10000; display: block; width: 8px; height: 1.5px; background: var(--foreground); pointer-events: none; }
+@media (max-width: 700px) {
+  .entrance-orbit { width: 120vw; }.entrance-orbit--two { width: 160vw; }
+  .entrance-piece { width: 70px; opacity: .07; }
+  .entrance-piece--left { left: 3%; top: 11%; }.entrance-piece--right { right: 3%; bottom: 10%; }
+  #auth-screen::before { inset: -20px -10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .entrance-atmosphere, .play-button, #auth-screen input { transition: none; }
+  .entrance-piece, body.startup-ready #landing-screen:not([hidden]) .hero-reveal,
+  #auth-screen:not([hidden]) :is(.panel-top, .wordmark, .auth-tabs), #auth-screen:not([hidden]) #auth-form > :not([hidden]),
+  .play-button:hover::after, #auth-submit:hover::after { animation: none; }
+}
