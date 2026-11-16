@@ -27,6 +27,11 @@ test('board opens at starting position, modes are explicit and a real request st
   const calls = [];
   const app = setup(async body => { calls.push(body); return body.action === 'search' ? { state:'searching' } : { game:null }; });
   assert.equal(app.$('board').querySelectorAll('[data-square]').length, 64);
+  assert.equal(app.$('player-clock-card').dataset.color, 'w');
+  assert.equal(app.$('opponent-clock-card').dataset.color, 'b');
+  assert.equal(app.$('player-clock-card').nextElementSibling, app.$('opponent-clock-card'));
+  assert.equal(app.$('player-clock-label').textContent, 'Вы · Белые');
+  assert.equal(app.$('opponent-clock-label').textContent, 'Соперник · Чёрные');
   assert.equal(app.$('board').querySelector('[data-square=e2] img').getAttribute('src'), '/pieces/cburnett/wP.svg');
   assert.deepEqual([...app.$('mode-list').querySelectorAll('input')].map(input => input.value), ['blitz','rapid','classical','daily']);
   assert.equal(app.$('start-search').disabled, true);
@@ -52,6 +57,10 @@ test('matched players can only submit legal moves on their turn; black sees flip
   await app.ui.open(B); await flush();
   assert.equal(app.$('board').firstElementChild.dataset.square, 'h1');
   assert.equal(app.$('player-color').textContent, 'Чёрные');
+  assert.equal(app.$('player-clock-card').dataset.color, 'b');
+  assert.equal(app.$('opponent-clock-card').dataset.color, 'w');
+  assert.equal(app.$('player-clock-label').textContent, 'Вы · Чёрные');
+  assert.equal(app.$('opponent-clock-label').textContent, 'Соперник · Белые');
   const click = square => app.$('board').querySelector(`[data-square="${square}"]`).click();
   click('e7'); click('e5'); await flush();
   assert.equal(calls.find(call => call.action === 'move').from, 'e7');
@@ -81,5 +90,17 @@ test('leaving waits for an in-flight search before cancelling the server queue',
   assert.deepEqual(calls, ['current','search']);
   release({ state:'searching' }); await flush();
   assert.deepEqual(calls, ['current','search','cancel']); assert.match(app.$('status').textContent, /отменён/);
+  app.close();
+});
+
+
+test('clock times remain assigned to the player and opponent when playing black', async () => {
+  const clock = { ...game({ moves:['e4'], turn:'b' }), white_ms:170000, black_ms:155000 };
+  const app = setup(async body => body.action === 'current' ? { game:clock } : { game:clock });
+  await app.ui.open(B);
+  assert.equal(app.$('player-clock').textContent, '02:35');
+  assert.equal(app.$('opponent-clock').textContent, '02:50');
+  assert.equal(app.$('player-clock-card').dataset.color, 'b');
+  assert.equal(app.$('opponent-clock-card').dataset.color, 'w');
   app.close();
 });

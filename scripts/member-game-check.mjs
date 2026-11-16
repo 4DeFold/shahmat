@@ -42,6 +42,8 @@ try {
   await game.locator('#board [data-square=e2]').waitFor({ state:'visible' });
   assert.equal(new URL(page.url()).pathname, '/game');
   assert.equal(await game.locator('#board [data-square]').count(), 64);
+  assert.equal(await game.locator('#player-clock-card').getAttribute('data-color'), 'w');
+  assert.equal(await game.locator('#opponent-clock-card').getAttribute('data-color'), 'b');
   assert.equal(await game.locator('#start-search').isDisabled(), true);
   await game.locator('label:has(input[value=blitz])').click();
   assert.equal(await game.locator('#player-clock').innerText(), '03:00');
@@ -55,6 +57,18 @@ try {
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1 && document.documentElement.scrollHeight <= innerHeight + 1), true, 'game page must fit viewport');
     assert.equal(await game.locator('#board').isVisible(), true);
     assert.equal(await game.locator('.game-rail').isVisible(), true);
+    const clocks = await game.locator('.clock-pair').evaluate(pair => {
+      const [own, opponent] = [...pair.children];
+      return { ownLeft: own.getBoundingClientRect().left, opponentLeft: opponent.getBoundingClientRect().left,
+        ownBackground: getComputedStyle(own).backgroundColor, opponentBackground: getComputedStyle(opponent).backgroundColor,
+        numberSize: parseFloat(getComputedStyle(own.querySelector('strong')).fontSize) };
+    });
+    assert.ok(clocks.ownLeft < clocks.opponentLeft, 'player clock is left of opponent');
+    assert.notEqual(clocks.ownBackground, clocks.opponentBackground, 'clock backgrounds must differ');
+    assert.ok(clocks.numberSize >= 19, 'clock numbers are larger');
+    // The longest time control must fit without clipping at every viewport.
+    await game.locator('#player-clock').evaluate(el => { el.textContent = '24:00:00'; });
+    assert.equal(await game.locator('#player-clock').evaluate(el => el.scrollWidth <= el.clientWidth + 1), true, 'clock value fits');
   }
   assert.equal(await page.locator('#app-sidebar').isVisible(), true);
   console.log('✓ Viewport game, four controls, mocked search and legal move');

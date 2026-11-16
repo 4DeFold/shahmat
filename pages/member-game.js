@@ -31,8 +31,13 @@ export function createMemberGame({ document, api, now = () => performance.now() 
   function drawClocks() {
     const own = currentColor(), elapsed = snapshot?.status === 'active' ? Math.max(0, now() - receivedAt) : 0;
     const time = color => snapshot ? Math.max(0, snapshot[color === 'w' ? 'white_ms' : 'black_ms'] - (snapshot.status === 'active' && snapshot.turn === color ? elapsed : 0)) : mode ? times[mode] : null;
+    const other = own === 'w' ? 'b' : 'w';
+    $('player-clock-card').dataset.color = own;
+    $('opponent-clock-card').dataset.color = other;
+    $('player-clock-label').textContent = `Вы · ${own === 'w' ? 'Белые' : 'Чёрные'}`;
+    $('opponent-clock-label').textContent = `Соперник · ${other === 'w' ? 'Белые' : 'Чёрные'}`;
     $('player-clock').textContent = formatClock(time(own));
-    $('opponent-clock').textContent = formatClock(time(own === 'w' ? 'b' : 'w'));
+    $('opponent-clock').textContent = formatClock(time(other));
   }
   function resultText() {
     if (!snapshot || snapshot.status !== 'finished') return snapshot?.turn === currentColor() ? (chess.isCheck() ? 'Шах! Ваш ход.' : 'Ваш ход.') : 'Ход соперника.';
