@@ -111,3 +111,25 @@ Before enabling the build flag for an environment:
 For local mocked browser tests only, start the server with
 `VITE_EMAIL_OTP_READY=true npm run dev`, then run `npm run test:responsive`.
 Do not use this flag against a real auto-confirm-enabled project for signup.
+
+## Rating foundation (not deployed)
+
+`rating/rank.js` contains pure calculation helpers based on
+`RANKING_STRUCTURE.md`; it does not authorize or record results. The rating
+SQL in `supabase/proposals/` is a storage-only proposal, not an automatic
+migration and not applied to the shared database. It
+keeps rank in separate tables rather than extending client-writable profiles.
+There are deliberately no client privileges. The example files referenced in
+the ranking document were not present in this repository; this implementation
+was derived from the formulas in the document.
+
+Online matchmaking, authoritative chess and clocks, game completion, rating
+transactions, daily and opponent limits, calibration/leaderboard, division
+persistence, normalization, and database-backed mode statistics are **not yet
+implemented**. Bot games remain local, untimed and unrated. Before enabling
+rating, implement and test these mechanisms on an isolated test database,
+including concurrent games, duplicate completion, timeouts and UTC day
+boundaries. Zero-delta rated games must still count toward both limits. The
+normalization floor in the specification (200) conflicts with its stated 0–2600
+scale and should be resolved before scheduling normalization. Never accept game
+results or rating changes from the browser.

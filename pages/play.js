@@ -109,7 +109,7 @@ function render(move = null) {
   for (let rank = 8; rank >= 1; rank--) for (let file = 0; file < 8; file++) {
     const square = files[file] + rank, piece = game.get(square);
     const cell = document.createElement('button');
-    cell.type = 'button'; cell.className = `square ${(rank + file) % 2 ? 'light' : 'dark'}`;
+    cell.type = 'button'; cell.className = `square ${(rank + file) % 2 ? 'dark' : 'light'}`;
     cell.dataset.square = square;
     cell.classList.toggle('selected', selected === square);
     cell.classList.toggle('possible', legal.includes(square));

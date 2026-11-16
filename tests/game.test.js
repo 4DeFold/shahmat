@@ -32,6 +32,8 @@ test('bot chooses a legal move without changing position or history', () => {
 test('guest board allows only legal moves and saves the bot reply', async () => {
   const { document, game, click } = setup();
   assert.equal(document.querySelectorAll('[data-square]').length, 64);
+  assert.ok(document.querySelector('[data-square=a1]').classList.contains('dark'));
+  assert.ok(document.querySelector('[data-square=a8]').classList.contains('light'));
   click('e2'); assert.ok(document.querySelector('[data-square=e4]').classList.contains('possible'));
   click('e5'); assert.equal(game.history().length, 0);
   click('e2'); click('e4');
