@@ -17,19 +17,29 @@ The checks use isolated mock authentication and profile responses, not real Supa
 
 ## Pages and assets
 
-The landing page is `/`. The signed-in sections use `/home`, `/play`, `/profile`,
+The landing page is `/`, with PLAY opening the standalone `/play` HTML page
+and «Войти» opening `/login`. Guests and signed-in visitors can play a local
+white-vs-black-bot game without authentication. The lightweight bot searches
+two plies; chess.js enforces legal moves, castling, en passant, promotion and
+game-end rules. The current game (including full move history) is saved in the
+browser’s localStorage and resumes after refresh; clearing browser data removes it.
+The “Новая партия” link opens registration instead of resetting the board. No game data
+is sent to Supabase. The game uses the active account’s saved light/dark preference,
+or the device preference for guests; the game board is monochrome. Chess.com Neo piece images are in `public/pieces/neo/`; they belong to Chess.com
+and are not covered by this repository’s software license. The signed-in sections use `/home`, `/profile`,
 `/settings`, and `/help`. Their markup lives in `pages/` and is loaded on demand;
 the authentication shell and application code are also deferred on a fresh
 landing-page visit. Navigation uses real links and the History API, while Vercel
-rewrites those routes to the shared shell for direct visits and refreshes. Old
-`#play`, `#profile`, `#settings`, and `#help` bookmarks are upgraded without
-changing Supabase's email callback fragments. The original logo is in
-`public/images/shahmat-logo.png`; `public/favicon.svg` uses vector outlines and
-does not require a font download.
+rewrites routes for direct visits and refreshes. Old `#play`, `#profile`,
+`#settings`, and `#help` bookmarks are upgraded without changing Supabase's
+email callback fragments. The original logo is in `public/images/shahmat-logo.png`;
+`public/favicon.svg` uses vector outlines and does not require a font download.
 
 To test production routing and lazy loading using mock Supabase responses:
 `VITE_EMAIL_OTP_READY=true npm run build`, then `npm run preview`, and in another
 terminal `npm run test:routes` (set `RESPONSIVE_BASE_URL` if needed).
+`npm run test:game` and `npm run test:game-appearance` check guest play, themes,
+piece images, movement animations and reduced-motion behavior in the browser.
 
 ## Database foundations
 
@@ -45,7 +55,7 @@ terminal `npm run test:routes` (set `RESPONSIVE_BASE_URL` if needed).
   notation, optional SAN and resulting FEN, remaining clocks in milliseconds,
   and timestamp. Deleting a game cascades to its moves.
 
-These are storage foundations, not a playable game implementation. Both game
+These are storage foundations and are not used by the local bot game. Both game
 tables have RLS enabled and no client privileges or policies, so anonymous and
 authenticated clients cannot read or write them. A future implementation must
 add deliberate read policies and trusted server-side authorization, legal-move

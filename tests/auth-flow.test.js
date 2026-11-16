@@ -5,7 +5,7 @@ import { JSDOM } from 'jsdom';
 
 const rootHtml = await readFile('index.html', 'utf8');
 const shellHtml = await readFile('pages/app-shell.html', 'utf8');
-const pageHtml = (await Promise.all(['home', 'play', 'profile', 'settings', 'help'].map(name => readFile(`pages/${name}.html`, 'utf8')))).join('');
+const pageHtml = (await Promise.all(['home', 'profile', 'settings', 'help'].map(name => readFile(`pages/${name}.html`, 'utf8')))).join('');
 // Unit tests preload views; browser checks verify the actual lazy loading.
 const html = rootHtml.replace('    </main>', shellHtml.replace('<div id="page-content"></div>', `<div id="page-content">${pageHtml}</div>`) + '    </main>');
 const source = (await readFile('app.js', 'utf8')).replace(/import .*?;\n/g, '').replace('export const appReady = initialize();', 'initialize();');
@@ -61,7 +61,7 @@ async function setup({ existing = false, palette = 'monochrome', failSave = fals
 
 test('registration requires a profile, saves chosen palette and opens dashboard', async () => {
   const { $, click, submit, choose, getProfile, getMetadata, getSignUps, document } = await setup();
-  await click('play'); assert.equal($('auth-screen').hidden, false);
+  await click('login'); assert.equal($('auth-screen').hidden, false);
   await click('tab-signup'); $('email').value = 'player@example.com'; $('password').value = 'secret123';
   await submit('auth-form'); assert.equal(getSignUps(), 1); assert.equal($('verify-screen').hidden, false);
   $('verify-code').value = '123456'; await submit('verify-form'); assert.equal($('profile-screen').hidden, false);
@@ -175,7 +175,7 @@ test('no session reveals landing after session check', async () => {
 
 test('onboarding repeat click changes theme and saves it on confirmation', async () => {
   const { $, click, submit, getMetadata, document } = await setup();
-  await click('play'); await click('tab-signup');
+  await click('login'); await click('tab-signup');
   $('email').value = 'new@example.com'; $('password').value = 'secret123'; await submit('auth-form');
   $('verify-code').value = '123456'; await submit('verify-form');
   $('username').value = 'Player_1'; await submit('profile-form');
@@ -256,7 +256,7 @@ test('pending settings are isolated by account', async () => {
 
 test('onboarding continues while background sync is unresolved', async () => {
   const { $, click, submit, choose } = await setup({ saveHandler: () => new Promise(() => {}) });
-  await click('play'); await click('tab-signup');
+  await click('login'); await click('tab-signup');
   $('email').value = 'new@example.com'; $('password').value = 'secret123'; await submit('auth-form');
   $('verify-code').value = '123456'; await submit('verify-form');
   $('username').value = 'Player_1'; await submit('profile-form');
@@ -292,11 +292,8 @@ test('sidebar navigates between pages, moves the dashboard to profile and return
   assert.equal($('dashboard-home').textContent.trim(), 'Главная');
   assert.equal($('page-profile').hidden, true);
   assert.ok($('page-profile').contains($('dashboard-palettes')));
-  await click('nav-play');
-  assert.equal($('dashboard-home').hidden, true);
-  assert.equal($('page-play').hidden, false);
-  assert.equal(window.location.pathname, '/play');
-  assert.equal($('nav-play').getAttribute('aria-current'), 'page');
+  assert.equal($('nav-play').getAttribute('href'), '/play');
+  assert.equal($('nav-play').hasAttribute('data-page'), false);
   await click('account-toggle');
   assert.equal($('account-toggle').getAttribute('aria-expanded'), 'true');
   for (const name of ['profile', 'settings', 'help']) {
@@ -324,7 +321,8 @@ test('sidebar navigates between pages, moves the dashboard to profile and return
 
 test('sidebar sign out from a blank page clears the route and opens login', async () => {
   const { $, click, document, window } = await setup({ existing: true });
-  await click('nav-play');
+  await click('account-toggle');
+  document.querySelector('#account-menu [data-page=settings]').click(); await tick();
   await click('account-toggle');
   document.querySelector('#account-menu .signout').click(); await tick();
   assert.equal($('auth-screen').hidden, false);
@@ -388,7 +386,7 @@ test('a remote response after logout cannot restore the prior account appearance
 
 test('registration requires the correct code, supports resend and fails closed on misconfiguration', async () => {
   const app = await setup();
-  await app.click('play'); await app.click('tab-signup');
+  await app.click('login'); await app.click('tab-signup');
   app.$('email').value = 'new@example.com'; app.$('password').value = 'secret123';
   await app.submit('auth-form');
   assert.equal(app.$('verify-screen').hidden, false);
@@ -402,7 +400,7 @@ test('registration requires the correct code, supports resend and fails closed o
   assert.deepEqual({ ...app.getLastVerification() }, { email: 'new@example.com', token: '123456', type: 'email' });
   assert.equal(app.$('profile-screen').hidden, false);
   const broken = await setup({ autoConfirm: true });
-  await broken.click('play'); await broken.click('tab-signup');
+  await broken.click('login'); await broken.click('tab-signup');
   broken.$('email').value = 'new@example.com'; broken.$('password').value = 'secret123'; await broken.submit('auth-form');
   assert.equal(broken.$('auth-screen').hidden, false);
   assert.match(broken.$('auth-message').textContent, /временно недоступно/);
@@ -411,7 +409,7 @@ test('registration requires the correct code, supports resend and fails closed o
 
 test('unconfigured OTP deployment does not send registration or recovery requests', async () => {
   const app = await setup({ otpReady: false });
-  await app.click('play'); await app.click('tab-signup');
+  await app.click('login'); await app.click('tab-signup');
   app.$('email').value = 'new@example.com'; app.$('password').value = 'secret123'; await app.submit('auth-form');
   assert.equal(app.getSignUps(), 0); assert.match(app.$('auth-message').textContent, /временно недоступно/);
   await app.click('tab-login'); await app.click('forgot-password');
@@ -421,7 +419,7 @@ test('unconfigured OTP deployment does not send registration or recovery request
 
 test('recovery verifies a code before allowing a matching new password', async () => {
   const app = await setup();
-  await app.click('play'); await app.click('forgot-password');
+  await app.click('login'); await app.click('forgot-password');
   app.$('recovery-email').value = 'player@example.com'; await app.submit('recovery-form');
   assert.equal(app.getResetRequests(), 1); assert.equal(app.$('verify-screen').hidden, false);
   assert.match(app.$('verify-description').textContent, /Если аккаунт существует/);
@@ -462,11 +460,19 @@ test('signup errors give actionable messages without exposing server details', a
     [{ code: 'unknown', message: 'private server detail' }, /Не получилось выполнить действие/],
   ]) {
     const app = await setup({ signupError: error });
-    await app.click('play'); await app.click('tab-signup');
+    await app.click('login'); await app.click('tab-signup');
     app.$('email').value = 'player@example.com'; app.$('password').value = 'password123';
     await app.submit('auth-form');
     assert.match(app.$('auth-message').textContent, expected);
     assert.doesNotMatch(app.$('auth-message').textContent, /private/);
     assert.equal(app.$('verify-screen').hidden, true);
   }
+});
+
+
+test('registration deep link opens the signup tab for guests', async () => {
+  const app = await setup({ url: 'https://example.com/login?mode=signup' });
+  assert.equal(app.$('auth-screen').hidden, false);
+  assert.equal(app.$('tab-signup').getAttribute('aria-pressed'), 'true');
+  assert.match(app.$('auth-submit').textContent, /Создать аккаунт/);
 });

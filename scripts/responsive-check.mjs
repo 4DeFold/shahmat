@@ -99,11 +99,7 @@ for (const device of devices) {
   }
   assert.ok(hero.hitHeight >= 44, `${device.id}: PLAY hit area is too small`);
   await screenshot('landing');
-  // On narrow screens activate the extended touch target, outside the painted button.
-  if (device.touch && hero.height < 44) {
-    const box = await page.locator('#play').boundingBox();
-    await page.touchscreen.tap(box.x + box.width / 2, box.y - (44 - box.height) / 2 + 2);
-  } else await page.locator('#play').click();
+  await page.locator('#login').click();
   await atTop('auth-screen');
   if (device.touch) {
     const targetHeight = await page.locator('[data-action=home]').evaluate(el => el.getBoundingClientRect().height);
@@ -114,7 +110,7 @@ for (const device of devices) {
   assert.equal(await page.locator('#tab-signup').getAttribute('aria-pressed'), 'true');
   await page.locator('#tab-login').click();
   await page.locator('[data-action=home]').click(); await atTop('landing-screen');
-  await page.locator('#play').click(); await atTop('auth-screen');
+  await page.locator('#login').click(); await atTop('auth-screen');
   await page.locator('#forgot-password').click(); await atTop('recovery-screen');
   await page.locator('#recovery-email').fill('preview@example.com');
   await page.locator('#recovery-submit').click(); await atTop('verify-screen');
@@ -220,20 +216,17 @@ for (const device of devices) {
   assert.ok(alignment < 1.5, `${device.id}: logo must be centered in the rail (offset ${alignment}px)`);
   }
   await page.locator('#nav-play').click();
-  await page.locator('#page-play').waitFor({ state: 'visible' });
-  if (mobileDrawer) assert.equal(await page.locator('#app-sidebar').isVisible(), false);
-  assert.equal(await page.locator('#page-play').isVisible(), true);
-  assert.equal(await page.locator('#dashboard-home').isVisible(), false);
+  await page.locator('#board').waitFor({ state: 'visible' });
   assert.equal(new URL(page.url()).pathname, '/play');
-  await checkLayout('play');
+  assert.equal(await page.locator('#board [data-square]').count(), 64);
   await page.reload();
-  await page.locator('#page-play').waitFor({ state: 'visible' });
+  await page.locator('#board').waitFor({ state: 'visible' });
+  await page.goBack();
+  await page.locator('#dashboard-home').waitFor({ state: 'visible' });
   await openDrawer();
   await page.locator('#account-toggle').click();
   assert.equal(await page.locator('#account-toggle').getAttribute('aria-expanded'), 'true');
-  const activeColors = await page.locator('#nav-play').evaluate(el => ({ background: getComputedStyle(el).backgroundColor, color: getComputedStyle(el).color }));
-  const toggleColors = await page.locator('#account-toggle').evaluate(el => ({ background: getComputedStyle(el).backgroundColor, color: getComputedStyle(el).color }));
-  assert.deepEqual(toggleColors, activeColors, 'expanded profile control must remain legible on hover');
+  const activeColors = await page.locator('#account-toggle').evaluate(el => ({ background: getComputedStyle(el).backgroundColor, color: getComputedStyle(el).color }));
   const menuSpacing = await page.locator('#account-menu').evaluate(el => {
     const rect = el.getBoundingClientRect(), buttons = el.querySelectorAll('button, a');
     return { top: buttons[0].getBoundingClientRect().top - rect.top, bottom: rect.bottom - buttons[buttons.length - 1].getBoundingClientRect().bottom };

@@ -32,7 +32,7 @@ try {
   assert.equal(await page.locator('#auth-screen').count(), 0, 'auth shell must not be in the initial landing HTML');
   assert.ok(!requests.some(path => /\/assets\/(?:app|app-shell|profile)-/.test(path)), 'landing must not download the app or profile chunks');
   assert.equal(await page.locator('link[rel="icon"]').getAttribute('href'), '/favicon.svg');
-  await page.locator('#play').click();
+  await page.locator('#login').click();
   await page.locator('#auth-screen').waitFor({ state: 'visible' });
   await page.locator('#email').fill('test@example.com');
   await page.locator('#password').fill('password123');
@@ -41,7 +41,7 @@ try {
   assert.equal(new URL(page.url()).pathname, '/home');
   assert.equal(await page.locator('#page-profile').count(), 0, 'profile is not loaded on home');
   assert.ok(!requests.some(path => /\/assets\/profile-/.test(path)), 'profile chunk is requested only on visit');
-  for (const name of ['play', 'settings', 'help', 'profile']) {
+  for (const name of ['settings', 'help', 'profile']) {
     await page.goto(`${base}/${name}`);
     await page.locator(`#page-${name}`).waitFor({ state: 'visible' });
     assert.equal(new URL(page.url()).pathname, `/${name}`);
@@ -50,16 +50,17 @@ try {
   }
   assert.ok(requests.some(path => /\/assets\/profile-/.test(path)));
   await page.goto(`${base}/#play`);
-  await page.locator('#page-play').waitFor({ state: 'visible' });
+  await page.locator('#board').waitFor({ state: 'visible' });
   assert.equal(new URL(page.url()).pathname, '/play', 'legacy hash bookmarks must be upgraded');
-  assert.equal(new URL(page.url()).hash, '');
+  await page.goto(`${base}/settings`);
+  await page.locator('#page-settings').waitFor({ state: 'visible' });
   await page.locator('#account-toggle').click();
-  await page.locator('#account-menu [data-page=settings]').click();
-  await page.locator('#page-settings').waitFor({ state: 'visible' });
+  await page.locator('#account-menu [data-page=help]').click();
+  await page.locator('#page-help').waitFor({ state: 'visible' });
   await page.goBack();
-  await page.locator('#page-play').waitFor({ state: 'visible' });
-  await page.goForward();
   await page.locator('#page-settings').waitFor({ state: 'visible' });
+  await page.goForward();
+  await page.locator('#page-help').waitFor({ state: 'visible' });
   const guest = await browser.newPage({ reducedMotion: 'reduce' });
   await mock(guest);
   // Some single-process Chromium builds share storage between contexts.
