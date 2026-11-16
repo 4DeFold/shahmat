@@ -217,7 +217,7 @@ for (const device of devices) {
   }
   await page.locator('#nav-play').click();
   await page.locator('#board').waitFor({ state: 'visible' });
-  assert.equal(new URL(page.url()).pathname, '/play');
+  assert.equal(new URL(page.url()).pathname, '/game');
   assert.equal(await page.locator('#board [data-square]').count(), 64);
   await page.reload();
   await page.locator('#board').waitFor({ state: 'visible' });

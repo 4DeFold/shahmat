@@ -17,13 +17,17 @@ The checks use isolated mock authentication and profile responses, not real Supa
 
 ## Pages and assets
 
-The landing page is `/`, with PLAY opening the standalone `/play` HTML page
-and «Войти» opening `/login`. Guests and signed-in visitors can play a local
-white-vs-black-bot game without authentication. The lightweight bot searches
+The landing page is `/`, with PLAY opening the standalone guest demo at `/play`
+and «Войти» opening `/login`. The dashboard «Играть» link opens a separate
+`/game` page, which verifies the account with Supabase Auth before showing the
+game. Its local bot game is stored under a separate key per account and never
+shares the demo position. A signed-in user can start a new bot game there.
+Both pages currently offer a local white-vs-black-bot game; online matchmaking
+and rated games are not yet available. The lightweight bot searches
 two plies; chess.js enforces legal moves, castling, en passant, promotion and
 game-end rules. The current game (including full move history) is saved in the
 browser’s localStorage and resumes after refresh; clearing browser data removes it.
-The “Новая партия” link opens registration instead of resetting the board. No game data
+In the guest demo, “Новая партия” opens registration instead of resetting the board. No game data
 is sent to Supabase. The game uses the active account’s saved light/dark preference,
 or the device preference for guests; the game board is monochrome. Chess.com Neo piece images are in `public/pieces/neo/`; they belong to Chess.com
 and are not covered by this repository’s software license. The signed-in sections use `/home`, `/profile`,

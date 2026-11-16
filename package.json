@@ -11,7 +11,8 @@
     "test:sync": "node scripts/appearance-sync-check.mjs",
     "test:routes": "node scripts/routes-check.mjs",
     "test:game": "node scripts/game-check.mjs",
-    "test:game-appearance": "node scripts/game-appearance-check.mjs"
+    "test:game-appearance": "node scripts/game-appearance-check.mjs",
+    "test:member-game": "node scripts/member-game-check.mjs"
   },
   "repository": {
     "type": "git",

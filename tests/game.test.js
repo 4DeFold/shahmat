@@ -7,9 +7,14 @@ import { chooseBotMove } from '../pages/bot.js';
 
 const html = await readFile('pages/play.html', 'utf8');
 const source = (await readFile('pages/play.js', 'utf8')).replace(/^import .*;\n/gm, '') + '\nwindow.testGame = game; window.testRender = render;';
-function setup({ saved = null, storageError = false } = {}) {
+function setup({ saved = null, storageError = false, memberId = null } = {}) {
   const dom = new JSDOM(html, { runScripts: 'outside-only', url: 'https://example.com/play' });
-  if (saved !== null) dom.window.localStorage.setItem('shahmat.guest-game.v1', saved);
+  if (memberId) {
+    dom.window.document.body.dataset.gameUser = memberId; dom.window.confirm = () => true;
+    const anchor = dom.window.document.getElementById('new-game');
+    const button = dom.window.document.createElement('button'); button.id = 'new-game'; button.type = 'button'; anchor.replaceWith(button);
+  }
+  if (saved !== null) dom.window.localStorage.setItem(memberId ? `shahmat.member-game.v1.${memberId}` : 'shahmat.guest-game.v1', saved);
   if (storageError) Object.defineProperty(dom.window, 'localStorage', { get() { throw new Error('storage blocked'); } });
   dom.window.Chess = Chess;
   dom.window.chooseBotMove = chooseBotMove;
@@ -102,5 +107,27 @@ test('full saved history preserves repetition draw and result on reload', () => 
   const app = setup({ saved: JSON.stringify({ version: 1, moves }) });
   assert.equal(app.game.isThreefoldRepetition(), true);
   assert.match(app.document.querySelector('#status').textContent, /повторение/);
+  app.window.close();
+});
+
+
+test('member bot games are account-scoped and a new game cancels a pending bot move', async () => {
+  const app = setup({ memberId: 'user-1' });
+  app.click('e2'); app.click('e4');
+  assert.deepEqual(JSON.parse(app.window.localStorage.getItem('shahmat.member-game.v1.user-1')).moves, ['e4']);
+  assert.equal(app.window.localStorage.getItem('shahmat.guest-game.v1'), null);
+  app.document.querySelector('#new-game').click();
+  await delay(600);
+  assert.deepEqual(app.game.history(), []);
+  assert.deepEqual(JSON.parse(app.window.localStorage.getItem('shahmat.member-game.v1.user-1')).moves, []);
+  assert.equal(app.document.querySelector('#status').textContent, 'Ваш ход.');
+  app.window.close();
+});
+
+test('declining to start over preserves the member game', () => {
+  const app = setup({ memberId: 'user-1', saved: JSON.stringify({ version: 1, moves: ['e4', 'e5'] }) });
+  app.window.confirm = () => false;
+  app.document.querySelector('#new-game').click();
+  assert.deepEqual(app.game.history(), ['e4', 'e5']);
   app.window.close();
 });

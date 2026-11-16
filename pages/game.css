@@ -1,0 +1,11 @@
+.member-intro { display: flex; align-items: end; justify-content: space-between; gap: 16px; padding-top: 42px; }
+.eyebrow { font-size: 10px; font-weight: bold; letter-spacing: .14em; color: var(--muted); margin: 0 0 12px; }
+.mode-label { font-size: 10px; font-weight: bold; letter-spacing: .12em; border: 1px solid var(--line); border-radius: 100px; padding: 9px 12px; white-space: nowrap; }
+.member-shell .game-layout { padding-top: 22px; }
+.member-shell .game-panel { padding-top: 12px; }
+.member-card { background: var(--surface-alt); border: 1px solid var(--line); border-radius: 12px; padding: 24px; }
+.member-card h2 { font: 400 25px/1.2 Playfair, Georgia, serif; margin: 0 0 12px; }
+.game-gate { max-width: 480px; padding: 72px 0; }
+.game-gate p, .demo-link { color: var(--muted); font-size: 14px; line-height: 1.6; }
+.demo-link { display: inline-block; margin-top: 22px; }
+@media (max-width: 760px) { .member-intro { padding-top: 30px; } .member-shell .game-layout { padding-top: 10px; } .member-shell .game-panel { padding-top: 0; } .member-card { padding: 20px; } }

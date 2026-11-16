@@ -292,7 +292,7 @@ test('sidebar navigates between pages, moves the dashboard to profile and return
   assert.equal($('dashboard-home').textContent.trim(), 'Главная');
   assert.equal($('page-profile').hidden, true);
   assert.ok($('page-profile').contains($('dashboard-palettes')));
-  assert.equal($('nav-play').getAttribute('href'), '/play');
+  assert.equal($('nav-play').getAttribute('href'), '/game');
   assert.equal($('nav-play').hasAttribute('data-page'), false);
   await click('account-toggle');
   assert.equal($('account-toggle').getAttribute('aria-expanded'), 'true');

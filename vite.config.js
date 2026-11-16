@@ -8,12 +8,13 @@ const gameRoute = {
   configurePreviewServer(server) { server.middlewares.use(rewriteGame); },
 };
 function rewriteGame(req, _res, next) {
-  if (req.url?.split('?')[0] === '/play') req.url = req.url.replace('/play', '/pages/play.html');
+  const path = req.url?.split('?')[0];
+  if (path === '/play' || path === '/game') req.url = req.url.replace(path, `/pages/${path.slice(1)}.html`);
   next();
 }
 export default defineConfig({
   plugins: [gameRoute],
-  build: { rollupOptions: { input: { main: resolve('index.html'), game: resolve('pages/play.html') } } },
+  build: { rollupOptions: { input: { main: resolve('index.html'), demo: resolve('pages/play.html'), game: resolve('pages/game.html') } } },
   server: { host: '0.0.0.0', allowedHosts: ['.e2b.app'] },
   preview: { host: '0.0.0.0', allowedHosts: ['.e2b.app'] },
 });

@@ -11,7 +11,8 @@ const pieceSrc = (color, type) => `/pieces/neo/${color}${type.toUpperCase()}.png
 const names = { k:'король', q:'ферзь', r:'ладья', b:'слон', n:'конь', p:'пешка' };
 const files = 'abcdefgh';
 let selected = null, pending = null, botTimer = null, botThinking = false, lastMove = null;
-const storageKey = 'shahmat.guest-game.v1';
+const memberId = document.body.dataset.gameUser;
+const storageKey = memberId ? `shahmat.member-game.v1.${memberId}` : 'shahmat.guest-game.v1';
 const storageMessage = document.getElementById('storage-message');
 function storageFailure(message = 'Не удалось сохранить партию на устройстве.') {
   storageMessage.textContent = message;
@@ -154,6 +155,12 @@ board.addEventListener('click', event => {
   selected = piece?.color === 'w' && selected !== square ? square : null;
   render();
   board.querySelector(`[data-square="${square}"]`)?.focus();
+});
+if (memberId) document.getElementById('new-game').addEventListener('click', () => {
+  if (game.history().length && !window.confirm('Начать новую партию? Текущая партия будет удалена с этого устройства.')) return;
+  if (botTimer !== null) clearTimeout(botTimer);
+  botTimer = null; botThinking = false; selected = null; pending = null; lastMove = null;
+  promotion.hidden = true; game.reset(); saveGame(); render();
 });
 restoreGame();
 scheduleBot();
