@@ -42,7 +42,7 @@ try {
   const [desktop, phone] = browsers.map(browser => browser.contexts()[0].pages()[0]);
   await phone.locator('#mobile-menu-toggle').click();
   await phone.locator('#account-toggle').click();
-  await phone.locator('#account-menu [data-page=profile]').click();
+  await phone.locator('#account-menu [data-page=settings]').click();
   await phone.locator('#dashboard-palettes label[data-choice=wood]').click();
   await desktop.waitForFunction(() => document.querySelector('.landing').dataset.palette === 'wood', null, { timeout: 5000 });
   assert.equal(remote.palette, 'wood');

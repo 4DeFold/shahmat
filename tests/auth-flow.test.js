@@ -5,7 +5,7 @@ import { JSDOM } from 'jsdom';
 
 const rootHtml = await readFile('index.html', 'utf8');
 const shellHtml = await readFile('pages/app-shell.html', 'utf8');
-const pageHtml = (await Promise.all(['home', 'profile', 'settings', 'help'].map(name => readFile(`pages/${name}.html`, 'utf8')))).join('');
+const pageHtml = (await Promise.all(['home', 'game-view', 'profile', 'settings', 'help'].map(name => readFile(`pages/${name}.html`, 'utf8')))).join('');
 // Unit tests preload views; browser checks verify the actual lazy loading.
 const html = rootHtml.replace('    </main>', shellHtml.replace('<div id="page-content"></div>', `<div id="page-content">${pageHtml}</div>`) + '    </main>');
 const source = (await readFile('app.js', 'utf8')).replace(/import .*?;\n/g, '').replace('export const appReady = initialize();', 'initialize();');
@@ -291,9 +291,16 @@ test('sidebar navigates between pages, moves the dashboard to profile and return
   assert.equal($('dashboard-home').hidden, false);
   assert.equal($('dashboard-home').textContent.trim(), 'Главная');
   assert.equal($('page-profile').hidden, true);
-  assert.ok($('page-profile').contains($('dashboard-palettes')));
-  assert.equal($('nav-play').getAttribute('href'), '/play');
-  assert.equal($('nav-play').hasAttribute('data-page'), false);
+  assert.ok($('page-settings').contains($('dashboard-palettes')));
+  assert.equal($('page-profile').contains($('dashboard-palettes')), false);
+  assert.equal($('nav-play').getAttribute('href'), '/game');
+  assert.equal($('nav-play').dataset.page, 'game');
+  $('nav-play').click(); await tick();
+  assert.equal($('page-game').hidden, false);
+  assert.equal($('dashboard-screen').hidden, false);
+  assert.equal($('nav-play').getAttribute('aria-current'), 'page');
+  assert.equal(window.location.pathname, '/game');
+  assert.equal($('member-game-frame').getAttribute('src'), '/pages/game.html');
   await click('account-toggle');
   assert.equal($('account-toggle').getAttribute('aria-expanded'), 'true');
   for (const name of ['profile', 'settings', 'help']) {
@@ -475,4 +482,82 @@ test('registration deep link opens the signup tab for guests', async () => {
   assert.equal(app.$('auth-screen').hidden, false);
   assert.equal(app.$('tab-signup').getAttribute('aria-pressed'), 'true');
   assert.match(app.$('auth-submit').textContent, /Создать аккаунт/);
+});
+
+test('game route keeps the sidebar and ignores frame height messages', async () => {
+  const { $, window } = await setup({ existing: true, url: 'https://example.com/game' });
+  assert.equal($('dashboard-screen').hidden, false);
+  assert.equal($('page-game').hidden, false);
+  assert.equal($('app-sidebar').hidden, false);
+  assert.equal($('nav-play').getAttribute('aria-current'), 'page');
+  const frame = $('member-game-frame');
+  window.dispatchEvent(new window.MessageEvent('message', { origin: 'https://evil.example', source: frame.contentWindow, data: { type: 'shahmat-game-height', height: 920 } }));
+  assert.equal(frame.style.height, '');
+  window.dispatchEvent(new window.MessageEvent('message', { origin: 'https://example.com', source: frame.contentWindow, data: { type: 'shahmat-game-height', height: 920 } }));
+  assert.equal(frame.style.height, '');
+  window.dispatchEvent(new window.MessageEvent('message', { origin: 'https://example.com', source: frame.contentWindow, data: { type: 'shahmat-game-height', height: 1000000 } }));
+  assert.equal(frame.style.height, '');
+  window.close();
+});
+
+test('a guest visiting the game route returns to the landing page', async () => {
+  const { $, window } = await setup({ url: 'https://example.com/game' });
+  assert.equal(window.location.pathname, '/');
+  assert.equal($('landing-screen').hidden, false);
+  assert.equal($('dashboard-screen').hidden, true);
+  window.close();
+});
+
+test('the game frame receives board colours from the active palette', async () => {
+  const { $, window, document } = await setup({ existing: true, url: 'https://example.com/game' });
+  const frame = $('member-game-frame');
+  const sent = [];
+  frame.contentWindow.postMessage = (message, origin) => sent.push({ message, origin });
+  const landing = document.querySelector('.landing');
+  landing.style.setProperty('--board-light', '#eeeed2');
+  landing.style.setProperty('--board-dark', '#769656');
+  frame.dispatchEvent(new window.Event('load'));
+  assert.equal(sent.at(-1).origin, 'https://example.com');
+  assert.equal(sent.at(-1).message.colors['--board-light'], '#eeeed2');
+  assert.equal(sent.at(-1).message.colors['--board-dark'], '#769656');
+  window.close();
+});
+
+
+test('settings contains palette options and keeps selection when navigating', async () => {
+  const { $, choose, document, window } = await setup({ existing: true, palette: 'forest' });
+  assert.equal($('page-profile').querySelector('#dashboard-palettes'), null);
+  assert.equal($('settings-palette-heading').textContent, 'Палитры.');
+  assert.equal($('dashboard-palettes').querySelectorAll('label.palette-option').length, 5);
+  document.querySelector('#account-menu [data-page=settings]').click(); await tick();
+  assert.equal(window.location.pathname, '/settings');
+  assert.equal($('dashboard-palettes').querySelector('input:checked').value, 'forest');
+  await choose('dashboard-palettes', 'wood');
+  document.querySelector('#account-menu [data-page=profile]').click(); await tick();
+  document.querySelector('#account-menu [data-page=settings]').click(); await tick();
+  assert.equal($('dashboard-palettes').querySelector('input:checked').value, 'wood');
+  assert.equal(document.querySelector('.landing').dataset.palette, 'wood');
+});
+
+
+test('palette mouse wheel scrolls the strip and leaves page scrolling available at edges', async () => {
+  const { $, window } = await setup({ existing: true });
+  const strip = $('palette-scroll');
+  Object.defineProperties(strip, { scrollWidth: { value: 900 }, clientWidth: { value: 300 } });
+  let scroll = null;
+  strip.scrollBy = options => { scroll = options; };
+  const wheel = values => {
+    const event = new window.WheelEvent('wheel', { bubbles: true, cancelable: true, ...values });
+    strip.dispatchEvent(event); return event;
+  };
+  assert.equal(wheel({ deltaY: -30 }).defaultPrevented, false);
+  assert.equal(wheel({ deltaY: 60 }).defaultPrevented, true);
+  assert.equal(scroll.left, 60);
+  assert.equal(scroll.behavior, 'instant'); // test setup prefers reduced motion
+  scroll = null;
+  assert.equal(wheel({ deltaX: 60, deltaY: 10 }).defaultPrevented, false);
+  assert.equal(wheel({ deltaY: 50, ctrlKey: true }).defaultPrevented, false);
+  assert.equal(scroll, null);
+  strip.scrollLeft = 600;
+  assert.equal(wheel({ deltaY: 20 }).defaultPrevented, false);
 });

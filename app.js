@@ -163,7 +163,7 @@ let navigating = false;
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const accountMenu = $('account-menu');
 const accountToggle = $('account-toggle');
-const pages = new Set(['home', 'profile', 'settings', 'help']);
+const pages = new Set(['home', 'game', 'profile', 'settings', 'help']);
 const sidebar = $('app-sidebar');
 const mobileMenuToggle = $('mobile-menu-toggle');
 let sidebarOpen = false;
@@ -230,6 +230,7 @@ function openAccountMenu() {
 // Each view is an independent, lazy-loaded page. Its chunk is requested only when visited.
 const pageLoaders = {
   home: () => import('./pages/home.html?raw'),
+  game: () => import('./pages/game-view.html?raw'),
   profile: () => import('./pages/profile.html?raw'),
   settings: () => import('./pages/settings.html?raw'),
   help: () => import('./pages/help.html?raw'),
@@ -248,10 +249,12 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
     if (!$(viewId(name))) {
       const { default: html } = await pageLoaders[name]();
       if (!$(viewId(name))) $('page-content').insertAdjacentHTML('beforeend', html);
-      if (name === 'profile') { if (profile) displayProfile(); applyPalette(selectedPalette); }
+      if (name === 'profile' && profile) displayProfile();
+      if (name === 'settings') applyPalette(selectedPalette);
     }
     if (request !== pageRequest) return;
     $('page-load-error')?.remove();
+    $('member-game-frame')?.contentWindow?.postMessage({ type: name === 'game' ? 'shahmat-game-shown' : 'shahmat-game-hidden' }, window.location.origin);
     document.querySelectorAll('#dashboard-screen [data-view]').forEach(view => {
       const active = view.dataset.view === name;
       const changed = active && view.hidden;
@@ -271,7 +274,7 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
       const heading = name === 'profile' ? $('dashboard-title') : $('page-' + name + '-title');
       if (heading) { heading.setAttribute('tabindex', '-1'); heading.focus({ preventScroll: true }); }
     }
-    document.title = ({ home: 'Главная', play: 'Играть', profile: 'Профиль', settings: 'Настройки', help: 'Помощь' })[name] + ' — shahmat.xyz';
+    document.title = ({ home: 'Главная', game: 'Играть', profile: 'Профиль', settings: 'Настройки', help: 'Помощь' })[name] + ' — shahmat.xyz';
   } catch {
     if (request !== pageRequest) return;
     document.querySelectorAll('#dashboard-screen [data-view]').forEach(view => { view.hidden = true; });
@@ -279,6 +282,18 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
     $('page-content').insertAdjacentHTML('beforeend', '<section class="empty-page" id="page-load-error" role="alert"><h2>Страница не загрузилась.</h2><p>Проверь соединение и обнови страницу.</p></section>');
   }
 }
+// The game document remains a separate lazy-loaded page. Only messages from
+// our own game frame receives appearance settings.
+function syncGameAppearance() {
+  const frame = $('member-game-frame');
+  if (!frame?.contentWindow) return;
+  const style = getComputedStyle(landing);
+  const names = ['--page-background', '--foreground', '--surface', '--surface-raised', '--line', '--button-background', '--button-text', '--board-light', '--board-dark'];
+  const colors = Object.fromEntries(names.map(name => [name, style.getPropertyValue(name).trim()]));
+  frame.contentWindow.postMessage({ type: 'shahmat-appearance', colors }, window.location.origin);
+}
+new MutationObserver(syncGameAppearance).observe(landing, { attributes: true, attributeFilter: ['data-palette', 'data-palette-theme', 'class'] });
+$('page-content').addEventListener('load', event => { if (event.target.id === 'member-game-frame') syncGameAppearance(); }, true);
 $('dashboard-screen').querySelectorAll('[data-page]').forEach(link => link.addEventListener('click', event => {
   if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
   event.preventDefault();
@@ -575,13 +590,24 @@ $('palette-form').addEventListener('submit', async event => {
   displayProfile();
   await show('dashboard-screen');
 });
-// Profile controls are bound on the shared container because the page is lazy-loaded.
+// Profile and settings controls are bound on the shared container because pages are lazy-loaded.
 $('page-content').addEventListener('click', event => {
   if (event.target.closest('#edit-profile')) { editing = true; prepareProfile(); void show('profile-screen'); }
   if (event.target.matches('#dashboard-palettes input[name="dashboard-palette"]') && event.target.value === selectedPalette) {
     toggleSelectedTheme(); recordAppearance();
   }
 });
+// A mouse wheel over the palette strip scrolls it horizontally; touch and
+// horizontal trackpad gestures remain native. At either edge, let the page scroll.
+$('page-content').addEventListener('wheel', event => {
+  const strip = event.target.closest('#palette-scroll');
+  if (!strip || event.ctrlKey || event.shiftKey || Math.abs(event.deltaX) >= Math.abs(event.deltaY)) return;
+  const max = strip.scrollWidth - strip.clientWidth;
+  if (max <= 0 || (event.deltaY < 0 && strip.scrollLeft <= 0) || (event.deltaY > 0 && strip.scrollLeft >= max - 1)) return;
+  event.preventDefault();
+  const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? strip.clientWidth : 1;
+  strip.scrollBy({ left: event.deltaY * unit, behavior: reducedMotion.matches ? 'instant' : 'smooth' });
+}, { passive: false });
 $('page-content').addEventListener('change', event => {
   if (event.target.matches('#dashboard-palettes input[name="dashboard-palette"]') && event.target.value !== selectedPalette) {
     applyPalette(event.target.value); recordAppearance();
@@ -597,6 +623,7 @@ document.querySelectorAll('.signout').forEach(button => button.addEventListener(
   try {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
+    $('page-game')?.remove(); // Discard the prior account's game frame on logout.
     profile = null; applyPalette('monochrome'); applyTheme(null); $('auth-form').reset(); setMode('login');
     window.history.replaceState(null, '', '/');
     await show('auth-screen');
@@ -623,6 +650,7 @@ async function initialize() {
       await loadProfile(data.session.user, true);
     } else {
       setRecoveryPending(false);
+      if (window.location.pathname === '/game') window.history.replaceState(null, '', '/');
       await show(window.location.pathname === '/' ? 'landing-screen' : 'auth-screen', true);
     }
   } catch (error) {

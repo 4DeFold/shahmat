@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <title>Играть — shahmat.xyz</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/pages/play.css">
+  <link rel="stylesheet" href="/pages/game.css">
+  <script type="module" src="/pages/game.js"></script>
+</head>
+<body>
+  <main class="member-shell" id="member-game">
+    <section class="board-area" aria-label="Шахматная доска">
+      <div class="board-wrap">
+        <div class="player-row"><span class="avatar bot-avatar"><img src="/pieces/cburnett/bN.svg" alt=""></span><span><strong>Соперник</strong><small id="opponent-color">Чёрные</small></span></div>
+        <div class="board-frame"><div class="board" id="board" role="group" aria-label="Шахматная доска"></div></div>
+        <div class="player-row"><span class="avatar"><img src="/pieces/cburnett/wP.svg" alt=""></span><span><strong>Вы</strong><small id="player-color">Белые</small></span></div>
+        <div class="promotion" id="promotion" hidden><p>Выберите фигуру для превращения пешки:</p><div id="promotion-options"></div></div>
+      </div>
+    </section>
+    <aside class="game-rail" aria-label="Настройки партии">
+      <h1>Играть<span>.</span></h1>
+      <div class="clock-pair" aria-label="Шахматные часы">
+        <div class="clock" id="player-clock-card" data-color="w"><span id="player-clock-label">Вы · Белые</span><strong id="player-clock">—:—</strong></div>
+        <div class="clock" id="opponent-clock-card" data-color="b"><span id="opponent-clock-label">Соперник · Чёрные</span><strong id="opponent-clock">—:—</strong></div>
+      </div>
+      <div class="rail-content">
+        <p class="rail-label">ВЫБЕРИ РЕЖИМ</p>
+        <fieldset class="mode-list" id="mode-list"><legend class="visually-hidden">Режим партии</legend>
+          <label class="mode-option"><input type="radio" name="mode" value="blitz"><span><strong>Блиц</strong><small>3 минуты</small></span></label>
+          <label class="mode-option"><input type="radio" name="mode" value="rapid"><span><strong>Рапид</strong><small>10 минут</small></span></label>
+          <label class="mode-option"><input type="radio" name="mode" value="classical"><span><strong>Классика</strong><small>1 час</small></span></label>
+          <label class="mode-option"><input type="radio" name="mode" value="daily"><span><strong>Дневная</strong><small>24 часа</small></span></label>
+        </fieldset>
+        <button class="new-game" id="start-search" type="button" disabled>Начать <span>↗</span></button>
+        <button class="cancel-search" id="cancel-search" type="button" hidden>Отменить поиск</button>
+        <button class="cancel-search" id="new-game" type="button" hidden>Новая партия</button>
+        <p class="game-status" id="status" role="status" aria-live="polite">Выбери режим.</p>
+        <div class="moves" id="moves" hidden><div class="moves-header"><span>ХОДЫ</span><span id="move-count">00</span></div><ol id="move-list" aria-label="История ходов"></ol></div>
+      </div>
+    </aside>
+  </main>
+</body>
+</html>

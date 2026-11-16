@@ -7,12 +7,16 @@ const board = document.getElementById('board');
 const status = document.getElementById('status');
 const promotion = document.getElementById('promotion');
 const options = document.getElementById('promotion-options');
-const pieceSrc = (color, type) => `/pieces/neo/${color}${type.toUpperCase()}.png`;
+const pieceSrc = (color, type) => `/pieces/cburnett/${color}${type.toUpperCase()}.svg`;
 const names = { k:'король', q:'ферзь', r:'ладья', b:'слон', n:'конь', p:'пешка' };
 const files = 'abcdefgh';
 let selected = null, pending = null, botTimer = null, botThinking = false, lastMove = null;
-const storageKey = 'shahmat.guest-game.v1';
+let newGameAt = null, countdownTimer = null;
+const guestWaitMs = 60 * 60 * 1000;
+const memberId = document.body.dataset.gameUser;
+const storageKey = memberId ? `shahmat.member-game.v1.${memberId}` : 'shahmat.guest-game.v1';
 const storageMessage = document.getElementById('storage-message');
+const countdown = document.getElementById('new-game-countdown');
 function storageFailure(message = 'Не удалось сохранить партию на устройстве.') {
   storageMessage.textContent = message;
 }
@@ -20,7 +24,7 @@ function saveGame() {
   try {
     const moves = game.history();
     if (moves.length > 2000) throw new Error('Game too long');
-    localStorage.setItem(storageKey, JSON.stringify({ version: 1, moves }));
+    localStorage.setItem(storageKey, JSON.stringify({ version: 1, moves, ...(newGameAt !== null ? { newGameAt } : {}) }));
   } catch { storageFailure(); }
 }
 function restoreGame() {
@@ -33,8 +37,11 @@ function restoreGame() {
       if (typeof move !== 'string' || move.length > 20 || game.isGameOver()) throw new Error('Invalid move');
       lastMove = game.move(move);
     }
+    if (!memberId && game.isGameOver() && Number.isSafeInteger(saved.newGameAt) && saved.newGameAt > 0) {
+      newGameAt = saved.newGameAt;
+    }
   } catch {
-    game.reset(); lastMove = null;
+    game.reset(); lastMove = null; newGameAt = null;
     storageFailure('Не удалось восстановить сохранённую партию.');
   }
 }
@@ -109,7 +116,7 @@ function render(move = null) {
   for (let rank = 8; rank >= 1; rank--) for (let file = 0; file < 8; file++) {
     const square = files[file] + rank, piece = game.get(square);
     const cell = document.createElement('button');
-    cell.type = 'button'; cell.className = `square ${(rank + file) % 2 ? 'light' : 'dark'}`;
+    cell.type = 'button'; cell.className = `square ${(rank + file) % 2 ? 'dark' : 'light'}`;
     cell.dataset.square = square;
     cell.classList.toggle('selected', selected === square);
     cell.classList.toggle('possible', legal.includes(square));
@@ -155,6 +162,56 @@ board.addEventListener('click', event => {
   render();
   board.querySelector(`[data-square="${square}"]`)?.focus();
 });
+// The guest deadline is an absolute time, so closing the page does not pause it.
+function updateCountdown() {
+  if (!countdown) return;
+  if (newGameAt === null) {
+    countdown.hidden = true;
+    if (countdownTimer !== null) clearInterval(countdownTimer);
+    countdownTimer = null;
+    return;
+  }
+  const seconds = Math.max(0, Math.ceil((newGameAt - Date.now()) / 1000));
+  if (seconds === 0) {
+    newGameAt = null; lastMove = null; selected = null; pending = null;
+    promotion.hidden = true; game.reset(); saveGame(); render();
+    updateCountdown();
+    return;
+  }
+  countdown.hidden = false;
+  countdown.textContent = `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')} до новой партии`;
+  if (countdownTimer === null) countdownTimer = setInterval(updateCountdown, 1000);
+}
+
+if (!memberId) {
+  document.getElementById('new-game').addEventListener('click', () => {
+    if (game.isGameOver() && newGameAt === null) {
+      newGameAt = Date.now() + guestWaitMs;
+      saveGame();
+      updateCountdown();
+    }
+  });
+  // Reconcile tabs and pages restored from the browser's back-forward cache.
+  function syncGuestGame() {
+    try { localStorage.getItem(storageKey); } catch { updateCountdown(); return; }
+    if (botTimer !== null) clearTimeout(botTimer);
+    botTimer = null; botThinking = false; selected = null; pending = null; lastMove = null; newGameAt = null;
+    promotion.hidden = true; game.reset(); restoreGame();
+    updateCountdown(); scheduleBot(); render();
+  }
+  window.addEventListener('storage', event => {
+    if (event.key === storageKey || event.key === null) syncGuestGame();
+  });
+  window.addEventListener('pageshow', event => { if (event.persisted) syncGuestGame(); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) updateCountdown(); });
+}
+if (memberId) document.getElementById('new-game').addEventListener('click', () => {
+  if (game.history().length && !window.confirm('Начать новую партию? Текущая партия будет удалена с этого устройства.')) return;
+  if (botTimer !== null) clearTimeout(botTimer);
+  botTimer = null; botThinking = false; selected = null; pending = null; lastMove = null;
+  promotion.hidden = true; game.reset(); saveGame(); render();
+});
 restoreGame();
+updateCountdown();
 scheduleBot();
 render();

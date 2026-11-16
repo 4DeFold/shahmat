@@ -17,16 +17,28 @@ The checks use isolated mock authentication and profile responses, not real Supa
 
 ## Pages and assets
 
-The landing page is `/`, with PLAY opening the standalone `/play` HTML page
-and «Войти» opening `/login`. Guests and signed-in visitors can play a local
-white-vs-black-bot game without authentication. The lightweight bot searches
-two plies; chess.js enforces legal moves, castling, en passant, promotion and
-game-end rules. The current game (including full move history) is saved in the
-browser’s localStorage and resumes after refresh; clearing browser data removes it.
-The “Новая партия” link opens registration instead of resetting the board. No game data
-is sent to Supabase. The game uses the active account’s saved light/dark preference,
-or the device preference for guests; the game board is monochrome. Chess.com Neo piece images are in `public/pieces/neo/`; they belong to Chess.com
-and are not covered by this repository’s software license. The signed-in sections use `/home`, `/profile`,
+The landing page is `/`, with PLAY opening the standalone guest demo at `/play`
+and «Войти» opening `/login`. The dashboard «Играть» link opens a separate
+`/game` page inside the persistent dashboard, with the existing sidebar and
+profile controls. The board appears immediately; Supabase Auth is checked in the
+background. The member screen offers match search for blitz (3 minutes), rapid
+(10 minutes), classical (1 hour) and daily (24 hours), per player, without an
+increment. Search pairs distinct authenticated users with the same control.
+The Supabase `matchplay` Edge Function validates legal moves with chess.js;
+transactional SQL serializes matching and updates clocks using server time.
+An active match resumes on return. Games are currently unrated, and the
+previously requested automatic bot fallback is not implemented: search waits for
+another player. The guest demo remains an independent local bot game; its move
+history is saved in browser localStorage and clearing browser data removes it.
+In the guest demo, “Новая партия” opens registration. If the game has ended,
+the first click also starts a one-hour countdown; the completed game is preserved
+until the deadline and the board resets when it expires. The deadline is stored
+locally and survives navigation and refresh; clearing browser data removes it.
+No game data is sent to Supabase. The account palette can be changed in `/settings` (the initial choice remains in onboarding); selecting the active palette again switches light/dark theme. The account game follows the selected palette and theme;
+the guest demo uses a monochrome board and the device or saved theme preference. Chess pieces are Colin M. L. Burnett’s Cburnett SVGs, copied unmodified from
+Lichess under GPL-2.0-or-later. The source, attribution and full GPL-2.0 text
+are in `public/pieces/cburnett/`. This license applies to these assets; review
+its terms before redistribution or modifying them. The signed-in sections use `/home`, `/profile`,
 `/settings`, and `/help`. Their markup lives in `pages/` and is loaded on demand;
 the authentication shell and application code are also deferred on a fresh
 landing-page visit. Navigation uses real links and the History API, while Vercel
@@ -111,3 +123,25 @@ Before enabling the build flag for an environment:
 For local mocked browser tests only, start the server with
 `VITE_EMAIL_OTP_READY=true npm run dev`, then run `npm run test:responsive`.
 Do not use this flag against a real auto-confirm-enabled project for signup.
+
+## Rating foundation (not deployed)
+
+`rating/rank.js` contains pure calculation helpers based on
+`RANKING_STRUCTURE.md`; it does not authorize or record results. The rating
+SQL in `supabase/proposals/` is a storage-only proposal, not an automatic
+migration and not applied to the shared database. It
+keeps rank in separate tables rather than extending client-writable profiles.
+There are deliberately no client privileges. The example files referenced in
+the ranking document were not present in this repository; this implementation
+was derived from the formulas in the document.
+
+Online matchmaking, authoritative chess and clocks, game completion, rating
+transactions, daily and opponent limits, calibration/leaderboard, division
+persistence, normalization, and database-backed mode statistics are **not yet
+implemented**. Bot games remain local, untimed and unrated. Before enabling
+rating, implement and test these mechanisms on an isolated test database,
+including concurrent games, duplicate completion, timeouts and UTC day
+boundaries. Zero-delta rated games must still count toward both limits. The
+normalization floor in the specification (200) conflicts with its stated 0–2600
+scale and should be resolved before scheduling normalization. Never accept game
+results or rating changes from the browser.

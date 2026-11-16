@@ -71,6 +71,7 @@ h1 span { color: var(--muted); }
 #empty-moves { font-size: 12px; padding: 14px 0; }
 .new-game { text-decoration: none; display: flex; justify-content: space-between; align-items: center; width: 100%; border: 0; border-radius: 7px; background: var(--control); color: var(--control-ink); padding: 17px 19px; margin-top: 24px; text-align: left; font-size: 13px; }
 .new-game:hover { opacity: .8; }
+.new-game-countdown { margin: 10px 0 0; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 .footnote { color: var(--muted); line-height: 1.5; font-size: 11px; }
 .promotion { padding: 14px; margin-top: 12px; background: var(--surface-alt); border: 1px solid var(--line); border-radius: 8px; font-size: 13px; }
 .promotion p { margin: 0 0 8px; } .promotion button { background: var(--board-light); border: 0; border-radius: 5px; width: 48px; height: 48px; margin-right: 5px; padding: 2px; }

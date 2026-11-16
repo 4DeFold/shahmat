@@ -58,7 +58,7 @@ for (const device of devices) {
         screenTop: document.querySelector('.screen:not([hidden])').getBoundingClientRect().top,
         scrollY: window.scrollY,
         clippedText: [...document.querySelectorAll('.screen:not([hidden]) .dashboard-stats span, .screen:not([hidden]) .palette-name, .screen:not([hidden]) h2, .screen:not([hidden]) h3')].filter(el => el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 1).map(el => el.textContent),
-        outside: visible.filter(el => { const r = el.getBoundingClientRect(); return r.left < -1 || r.right > innerWidth + 1; }).map(el => el.id || el.className),
+        outside: visible.filter(el => { if (el.closest('#palette-scroll')) return false; const r = el.getBoundingClientRect(); return r.left < -1 || r.right > innerWidth + 1; }).map(el => el.id || el.className),
       };
     });
     assert.ok(metrics.pageWidth <= metrics.viewport + 1, `${device.id} ${screen}: horizontal document overflow: ${JSON.stringify(metrics)}`);
@@ -216,11 +216,12 @@ for (const device of devices) {
   assert.ok(alignment < 1.5, `${device.id}: logo must be centered in the rail (offset ${alignment}px)`);
   }
   await page.locator('#nav-play').click();
-  await page.locator('#board').waitFor({ state: 'visible' });
-  assert.equal(new URL(page.url()).pathname, '/play');
-  assert.equal(await page.locator('#board [data-square]').count(), 64);
+  const gameFrame = page.frameLocator('#member-game-frame');
+  await gameFrame.locator('#board').waitFor({ state: 'visible' });
+  assert.equal(new URL(page.url()).pathname, '/game');
+  assert.equal(await gameFrame.locator('#board [data-square]').count(), 64);
   await page.reload();
-  await page.locator('#board').waitFor({ state: 'visible' });
+  await gameFrame.locator('#board').waitFor({ state: 'visible' });
   await page.goBack();
   await page.locator('#dashboard-home').waitFor({ state: 'visible' });
   await openDrawer();
@@ -294,10 +295,6 @@ for (const device of devices) {
   assert.match(await page.locator('#dashboard-title').innerText(), /LongPlayerName_123456789/);
   assert.equal(await page.locator('#dashboard-title').evaluate(el => getComputedStyle(el).outlineStyle), 'none');
   assert.equal(await page.locator('#dashboard-title').evaluate(el => getComputedStyle(el).userSelect), 'none');
-  const paletteName = page.locator('#dashboard-palettes label[data-choice=gray] .palette-name');
-  assert.equal(await paletteName.evaluate(el => getComputedStyle(el).userSelect), 'none');
-  await paletteName.dblclick();
-  assert.equal(await page.evaluate(() => window.getSelection().toString()), '');
   await page.reload();
   await page.locator('#page-profile').waitFor({ state: 'visible' });
   assert.equal(new URL(page.url()).pathname, '/profile', 'profile route survives reload');
@@ -316,6 +313,20 @@ for (const device of devices) {
   await page.locator('#profile-submit').click(); await atTop('dashboard-screen');
   assert.equal(await page.locator('#page-profile').isVisible(), true, 'saving returns to profile');
   assert.equal(await page.locator('#dashboard-bio').innerText(), 'Обновлено');
+  assert.equal(await page.locator('#page-profile #dashboard-palettes').count(), 0);
+  await openDrawer();
+  await page.locator('#account-toggle').click();
+  await page.locator('#account-menu [data-page=settings]').click();
+  await page.locator('#page-settings').waitFor({ state: 'visible' });
+  assert.equal(await page.locator('#dashboard-palettes input:checked').inputValue(), 'forest');
+  const cards = await page.locator('#dashboard-palettes label').evaluateAll(labels => labels.map(label => {
+    const rect = label.getBoundingClientRect();
+    return { width: rect.width, height: rect.height, background: getComputedStyle(label.querySelector('.palette-swatch')).backgroundImage };
+  }));
+  assert.equal(cards.length, 5);
+  assert.ok(cards.every(card => card.width === cards[0].width && card.height === cards[0].height && card.background.includes('linear-gradient')));
+  assert.equal(await page.locator('#dashboard-palettes label[data-choice=gray] .palette-name').evaluate(el => getComputedStyle(el).userSelect), 'none');
+  await screenshot('settings-palettes');
   if (await page.locator('.landing').getAttribute('data-palette-theme') === 'dark') {
     const currentPalette = await page.locator('.landing').getAttribute('data-palette');
     await page.locator(`#dashboard-palettes label[data-choice=${currentPalette}]`).click();

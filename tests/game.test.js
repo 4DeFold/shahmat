@@ -7,10 +7,16 @@ import { chooseBotMove } from '../pages/bot.js';
 
 const html = await readFile('pages/play.html', 'utf8');
 const source = (await readFile('pages/play.js', 'utf8')).replace(/^import .*;\n/gm, '') + '\nwindow.testGame = game; window.testRender = render;';
-function setup({ saved = null, storageError = false } = {}) {
-  const dom = new JSDOM(html, { runScripts: 'outside-only', url: 'https://example.com/play' });
-  if (saved !== null) dom.window.localStorage.setItem('shahmat.guest-game.v1', saved);
+function setup({ saved = null, storageError = false, memberId = null, now = null } = {}) {
+  const dom = new JSDOM(html, { runScripts: 'outside-only', url: 'https://example.com/play', pretendToBeVisual: true });
+  if (memberId) {
+    dom.window.document.body.dataset.gameUser = memberId; dom.window.confirm = () => true;
+    const anchor = dom.window.document.getElementById('new-game');
+    const button = dom.window.document.createElement('button'); button.id = 'new-game'; button.type = 'button'; anchor.replaceWith(button);
+  }
+  if (saved !== null) dom.window.localStorage.setItem(memberId ? `shahmat.member-game.v1.${memberId}` : 'shahmat.guest-game.v1', saved);
   if (storageError) Object.defineProperty(dom.window, 'localStorage', { get() { throw new Error('storage blocked'); } });
+  if (now !== null) dom.window.Date.now = () => now.value;
   dom.window.Chess = Chess;
   dom.window.chooseBotMove = chooseBotMove;
   dom.window.eval(source);
@@ -32,6 +38,10 @@ test('bot chooses a legal move without changing position or history', () => {
 test('guest board allows only legal moves and saves the bot reply', async () => {
   const { document, game, click } = setup();
   assert.equal(document.querySelectorAll('[data-square]').length, 64);
+  assert.equal(document.querySelector('[data-square=e1] .piece').getAttribute('src'), '/pieces/cburnett/wK.svg');
+  assert.equal(document.querySelector('[data-square=e8] .piece').getAttribute('src'), '/pieces/cburnett/bK.svg');
+  assert.ok(document.querySelector('[data-square=a1]').classList.contains('dark'));
+  assert.ok(document.querySelector('[data-square=a8]').classList.contains('light'));
   click('e2'); assert.ok(document.querySelector('[data-square=e4]').classList.contains('possible'));
   click('e5'); assert.equal(game.history().length, 0);
   click('e2'); click('e4');
@@ -50,6 +60,7 @@ test('promotion provides all four choices and honors the selected piece', () => 
   click('a7'); click('a8');
   assert.equal(document.querySelector('#promotion').hidden, false);
   assert.equal(document.querySelectorAll('#promotion-options button').length, 4);
+  assert.deepEqual([...document.querySelectorAll('#promotion-options img')].map(img => img.getAttribute('src')), ['/pieces/cburnett/wQ.svg', '/pieces/cburnett/wR.svg', '/pieces/cburnett/wB.svg', '/pieces/cburnett/wN.svg']);
   document.querySelector('[aria-label="конь"]').click();
   assert.equal(game.get('a8').type, 'n');
   assert.match(document.querySelector('#status').textContent, /Ничья/);
@@ -101,4 +112,109 @@ test('full saved history preserves repetition draw and result on reload', () => 
   assert.equal(app.game.isThreefoldRepetition(), true);
   assert.match(app.document.querySelector('#status').textContent, /повторение/);
   app.window.close();
+});
+
+
+test('member bot games are account-scoped and a new game cancels a pending bot move', async () => {
+  const app = setup({ memberId: 'user-1' });
+  app.click('e2'); app.click('e4');
+  assert.deepEqual(JSON.parse(app.window.localStorage.getItem('shahmat.member-game.v1.user-1')).moves, ['e4']);
+  assert.equal(app.window.localStorage.getItem('shahmat.guest-game.v1'), null);
+  app.document.querySelector('#new-game').click();
+  await delay(600);
+  assert.deepEqual(app.game.history(), []);
+  assert.deepEqual(JSON.parse(app.window.localStorage.getItem('shahmat.member-game.v1.user-1')).moves, []);
+  assert.equal(app.document.querySelector('#status').textContent, 'Ваш ход.');
+  app.window.close();
+});
+
+test('declining to start over preserves the member game', () => {
+  const app = setup({ memberId: 'user-1', saved: JSON.stringify({ version: 1, moves: ['e4', 'e5'] }) });
+  app.window.confirm = () => false;
+  app.document.querySelector('#new-game').click();
+  assert.deepEqual(app.game.history(), ['e4', 'e5']);
+  app.window.close();
+});
+
+
+const finishedMoves = ['f3', 'e5', 'g4', 'Qh4#'];
+const savedGame = (moves, newGameAt) => JSON.stringify({ version: 1, moves, ...(newGameAt === undefined ? {} : { newGameAt }) });
+function clickRegistration(app) {
+  // Keep the anchor's navigation contract while avoiding jsdom navigation.
+  app.document.querySelector('#new-game').addEventListener('click', event => event.preventDefault(), { once: true });
+  app.document.querySelector('#new-game').click();
+}
+
+test('guest starts a single hour countdown only after the game ends and keeps registration link', () => {
+  const now = { value: 1_000_000 };
+  const active = setup({ saved: savedGame(['e4', 'e5']), now });
+  clickRegistration(active);
+  assert.equal(active.document.querySelector('#new-game-countdown').hidden, true);
+  assert.equal(JSON.parse(active.window.localStorage.getItem('shahmat.guest-game.v1')).newGameAt, undefined);
+  active.window.close();
+
+  const app = setup({ saved: savedGame(finishedMoves), now });
+  assert.equal(app.game.isCheckmate(), true);
+  assert.equal(app.document.querySelector('#new-game-countdown').hidden, true);
+  assert.equal(app.document.querySelector('#new-game').getAttribute('href'), '/login?mode=signup');
+  clickRegistration(app);
+  let saved = JSON.parse(app.window.localStorage.getItem('shahmat.guest-game.v1'));
+  assert.equal(saved.newGameAt, now.value + 3_600_000);
+  assert.deepEqual(saved.moves, finishedMoves);
+  assert.equal(app.document.querySelector('#new-game-countdown').textContent, '60:00 до новой партии');
+  now.value += 10_000;
+  app.window.document.dispatchEvent(new app.window.Event('visibilitychange'));
+  assert.equal(app.document.querySelector('#new-game-countdown').textContent, '59:50 до новой партии');
+  clickRegistration(app);
+  saved = JSON.parse(app.window.localStorage.getItem('shahmat.guest-game.v1'));
+  assert.equal(saved.newGameAt, 4_600_000);
+  app.window.close();
+});
+
+test('countdown survives reload and resets board at deadline, including after page was closed', () => {
+  const now = { value: 2_000_000 };
+  const app = setup({ saved: savedGame(finishedMoves, now.value + 10_000), now });
+  assert.equal(app.document.querySelector('#new-game-countdown').textContent, '00:10 до новой партии');
+  assert.deepEqual(app.game.history(), finishedMoves);
+  now.value += 10_000;
+  app.window.document.dispatchEvent(new app.window.Event('visibilitychange'));
+  assert.deepEqual(app.game.history(), []);
+  assert.equal(app.document.querySelector('#new-game-countdown').hidden, true);
+  assert.deepEqual(JSON.parse(app.window.localStorage.getItem('shahmat.guest-game.v1')).moves, []);
+  app.window.close();
+
+  const expired = setup({ saved: savedGame(finishedMoves, now.value - 1), now });
+  assert.deepEqual(expired.game.history(), []);
+  assert.equal(expired.document.querySelector('#status').textContent, 'Ваш ход.');
+  expired.window.close();
+});
+
+test('draw countdown and back-forward cache reconcile with stored state', () => {
+  const now = { value: 3_000_000 };
+  const moves = ['Nf3', 'Nf6', 'Ng1', 'Ng8', 'Nf3', 'Nf6', 'Ng1', 'Ng8'];
+  const app = setup({ saved: savedGame(moves), now });
+  clickRegistration(app);
+  assert.equal(app.document.querySelector('#new-game-countdown').textContent, '60:00 до новой партии');
+  app.window.localStorage.setItem('shahmat.guest-game.v1', savedGame(finishedMoves, now.value + 50_000));
+  app.window.dispatchEvent(new app.window.PageTransitionEvent('pageshow', { persisted: true }));
+  assert.deepEqual(app.game.history(), finishedMoves);
+  assert.equal(app.document.querySelector('#new-game-countdown').textContent, '00:50 до новой партии');
+  app.window.localStorage.setItem('shahmat.guest-game.v1', savedGame(['e4', 'e5']));
+  app.window.dispatchEvent(new app.window.StorageEvent('storage', { key: 'shahmat.guest-game.v1' }));
+  assert.deepEqual(app.game.history(), ['e4', 'e5']);
+  assert.equal(app.document.querySelector('#new-game-countdown').hidden, true);
+  app.window.close();
+});
+
+test('unfinished game ignores stale countdown and member games never start one', () => {
+  const now = { value: 1_000_000 };
+  const guest = setup({ saved: savedGame(['e4', 'e5'], now.value - 1), now });
+  assert.deepEqual(guest.game.history(), ['e4', 'e5']);
+  assert.equal(guest.document.querySelector('#new-game-countdown').hidden, true);
+  guest.window.close();
+  const member = setup({ memberId: 'user-1', saved: savedGame(finishedMoves, now.value - 1), now });
+  assert.equal(member.game.isCheckmate(), true);
+  member.document.querySelector('#new-game').click();
+  assert.deepEqual(member.game.history(), []);
+  member.window.close();
 });
