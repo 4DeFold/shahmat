@@ -131,10 +131,26 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     let step = 0; const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     nameTimer = setInterval(() => { step++; el.textContent = [...text].map((c, i) => c === ' ' || step > 5 + i ? c : letters[Math.floor(Math.random() * letters.length)]).join(''); if (step > text.length + 5) { clearInterval(nameTimer); el.textContent = text; } }, 24);
   }
+  const profileTrigger = $('opponent-profile-trigger'), profileCard = $('opponent-profile-card');
+  let profilePinned = false;
+  function showProfile(show) { profileCard.hidden = !show; profileTrigger.setAttribute('aria-expanded', String(show)); }
+  profileTrigger.addEventListener('pointerenter', event => { if (event.pointerType !== 'touch' && !profileTrigger.disabled) showProfile(true); });
+  $('opponent-profile-trigger').parentElement.addEventListener('pointerleave', () => { if (!profilePinned && document.activeElement !== profileTrigger) showProfile(false); });
+  profileTrigger.addEventListener('focus', () => { if (!profileTrigger.disabled) showProfile(true); });
+  profileTrigger.addEventListener('blur', () => { if (!profilePinned) showProfile(false); });
+  profileTrigger.addEventListener('click', () => { profilePinned = !profilePinned; showProfile(profilePinned); });
+  document.addEventListener('keydown', event => { if (event.key === 'Escape') { profilePinned = false; showProfile(false); } });
+  document.addEventListener('pointerdown', event => { if (!profileTrigger.parentElement.contains(event.target)) { profilePinned = false; showProfile(false); } });
   function loadName(game) {
     if (nameForGame === game.id) return;
-    nameForGame = game.id;
-    Promise.resolve(opponentName(game.id)).then(name => { if (nameForGame === game.id && name) revealName(name); }).catch(() => {});
+    nameForGame = game.id; profilePinned = false; showProfile(false); profileTrigger.disabled = false;
+    $('opponent-profile-name').textContent = 'Соперник'; $('opponent-profile-bio').textContent = 'Информация пока недоступна.';
+    Promise.resolve(opponentName(game.id)).then(profile => {
+      if (nameForGame !== game.id || !profile) return;
+      const name = typeof profile === 'string' ? profile : profile.username;
+      if (typeof name === 'string' && name) { revealName(name); $('opponent-profile-name').textContent = name; }
+      if (typeof profile === 'object' && 'bio' in profile) $('opponent-profile-bio').textContent = profile.bio?.trim() || 'Био пока нет.';
+    }).catch(() => {});
   }
   function playQueuedPremove() {
     if (!premove || phase !== 'active' || moving || chess.turn() !== currentColor()) return false;
@@ -331,11 +347,20 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   $('history-next').addEventListener('click', () => showHistory((historyIndex ?? chess.history().length) + 1)); $('history-last').addEventListener('click', () => showHistory(chess.history().length));
   $('mode-list').addEventListener('change', event => { if (phase === 'idle' && times[event.target.value]) { mode = event.target.value; modeControls(); drawClocks(); setStatus('Всё готово к поиску.'); } });
   start.addEventListener('click', () => void search()); cancel.addEventListener('click', () => void cancelSearch());
-  reset.addEventListener('click', () => { cancelTimer(); generation++; snapshot = null; chess = new Chess(); latestMove = null; phase = 'idle'; premove = null; historyIndex = null; nameForGame = null; clearInterval(nameTimer); $('opponent-name').textContent = 'Соперник'; modeControls(); renderBoard(); renderHistory(); drawClocks(); setStatus('Выбери режим.'); });
+  reset.addEventListener('click', () => { cancelTimer(); generation++; snapshot = null; chess = new Chess(); latestMove = null; phase = 'idle'; premove = null; historyIndex = null; nameForGame = null; profileTrigger.disabled = true; profilePinned = false; showProfile(false); clearInterval(nameTimer); $('opponent-name').textContent = 'Соперник'; modeControls(); renderBoard(); renderHistory(); drawClocks(); setStatus('Выбери режим.'); });
   function pause() { cancelDrag(); if (phase === 'searching') void cancelSearch(); else { generation++; cancelTimer(); } }
   function resume() { if (phase === 'active' || phase === 'searching') void poll(++generation); }
   const clockInterval = setInterval(() => { if (isVisible()) drawClocks(); }, 250);
-  modeControls(); renderBoard(); drawClocks(); setTimeout(() => board.classList.add('ready'), 500);
+  let revealAnimations = [];
+  function revealPieces() {
+    revealAnimations.forEach(animation => animation.cancel()); revealAnimations = [];
+    if (reducedMotion()) return;
+    board.querySelectorAll('.piece').forEach(piece => {
+      if (piece.animate) revealAnimations.push(piece.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 1000, easing: 'ease-out' }));
+    });
+  }
+  modeControls(); renderBoard(); drawClocks(); board.classList.add('ready');
+  if (win.parent === win) revealPieces();
   return {
     async open(id) {
       if (userId === id) return;
@@ -345,8 +370,8 @@ export function createMemberGame({ document, api, opponentName = async () => nul
       finally { ready = true; modeControls(); }
     },
     hide() { const wasVisible = isVisible(); viewVisible = false; if (wasVisible) pause(); },
-    show() { const wasVisible = isVisible(); viewVisible = true; if (!wasVisible && isVisible()) { board.classList.add('ready'); resume(); } },
+    show() { const wasVisible = isVisible(); const wasShown = viewVisible; viewVisible = true; if (!wasShown) revealPieces(); if (!wasVisible && isVisible()) resume(); },
     browserVisibility(value) { const wasVisible = isVisible(); browserVisible = value; if (wasVisible && !isVisible()) pause(); else if (!wasVisible && isVisible()) resume(); },
-    destroy() { generation++; cancelDrag(); cancelTimer(); clearInterval(clockInterval); clearInterval(nameTimer); sound.destroy(); },
+    destroy() { generation++; cancelDrag(); cancelTimer(); clearInterval(clockInterval); clearInterval(nameTimer); revealAnimations.forEach(animation => animation.cancel()); sound.destroy(); },
   };
 }

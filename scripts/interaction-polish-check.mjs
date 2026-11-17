@@ -12,7 +12,7 @@ try {
   await page.route('https://eswyxbyddkajysogtglp.supabase.co/**', async route => {
     const path = new URL(route.request().url()).pathname;
     if (path === '/auth/v1/user') return route.fulfill({json:user});
-    if (path === '/functions/v1/match-opponent') return route.fulfill({json:{username:'Friend'}});
+    if (path === '/functions/v1/match-opponent-preview') return route.fulfill({json:{username:'Friend'}});
     if (path === '/functions/v1/matchplay') {
       const body = JSON.parse(route.request().postData());
       if (body.action === 'current') return route.fulfill({json:{game:null}});

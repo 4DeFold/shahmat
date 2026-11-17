@@ -121,3 +121,36 @@ html, body { width: 100%; height: 100%; overflow: hidden; }
   .mode-picker, .history-content, .mode-picker-inner, .history-inner, .history-chevron, .game-notice, .clock { transition: none; }
   .mode-summary:not([hidden]), #leave-game-control:not([hidden]), .game-rail .moves:not([hidden]), .game-rail .cancel-search:not([hidden]), .game-rail .new-game:not([hidden]), .promotion:not([hidden]) { animation: none; }
 }
+
+/* Flat game controls, with a palette-coloured moving edge on the status card. */
+.game-rail :is(button, .mode-option, .mode-summary, .status-card, #move-list li, .leave-game) { border-radius: 0; }
+.game-notice { position: relative; isolation: isolate; }
+.shine-border { position: absolute; z-index: -1; inset: -1px; padding: 2px; pointer-events: none;
+  background: radial-gradient(ellipse at center, var(--accent) 0%, transparent 65%) 0 0 / 220% 220%;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude; animation: notice-shine 8s linear infinite; }
+@keyframes notice-shine { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+/* The frame rotates with the board rather than clipping its corners. */
+.board-area { position: relative; z-index: 2; }
+.board-wrap { width: min(100%, 816px); }
+.board-with-clocks { padding-left: 15%; grid-template-columns: minmax(0, min(680px, calc((100dvh - 124px) * .707), calc((100% - 132px) * .707))) minmax(120px, 1fr); }
+.board-frame { position: relative; z-index: 2; overflow: visible; padding: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.board { border: 5px solid var(--board-frame); box-shadow: 0 14px 32px #0002; }
+.clock-pair { min-width: 0; }
+.clock { width: 100%; }
+.opponent-row { position: relative; z-index: 5; }
+.opponent-trigger { display: inline-flex; align-items: center; gap: 12px; padding: 0; border: 0; color: inherit; background: transparent; text-align: left; }
+.opponent-trigger:disabled { cursor: default; }
+.opponent-profile-card { position: absolute; z-index: 10; top: calc(100% + 4px); left: 0; width: min(280px, 80vw); padding: 14px; border: 1px solid var(--line); background: var(--surface-alt); box-shadow: 0 8px 24px #0003; overflow-wrap: anywhere; animation: rail-appear .2s ease both; }
+.opponent-profile-card strong { font-size: 14px; }
+.opponent-profile-card p { margin: 8px 0 0; font-size: 13px; line-height: 1.4; white-space: pre-wrap; }
+.online-counter { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 24px; padding-top: 15px; border-top: 1px solid var(--line); }
+.online-label { color: var(--muted); font-size: 10px; font-weight: bold; letter-spacing: .12em; }
+#online-value { color: var(--ink); font: 400 24px/1 'Charis SIL', Georgia, serif; font-variant-numeric: tabular-nums; }
+@media (max-width: 700px) {
+  .board-wrap { width: 100%; }
+  .board-with-clocks { grid-template-columns: minmax(0, min(500px, max(100px, calc((100dvh - 345px) * .707)), calc((100% - 80px) * .707))) minmax(72px, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shine-border, .board.reveal-pieces .piece, .opponent-profile-card { animation: none; }
+}

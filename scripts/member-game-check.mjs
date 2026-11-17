@@ -19,7 +19,7 @@ try {
     }
     if (path === '/auth/v1/user') return route.fulfill({ json:user });
     if (path === '/rest/v1/profiles') return route.fulfill({ json:{ username:'Player', bio:'', palette:'monochrome' } });
-    if (path === '/functions/v1/match-opponent') return route.fulfill({ json:{ username:'Friend' } });
+    if (path === '/functions/v1/match-opponent-preview') return route.fulfill({ json:{ username:'Friend' } });
     if (path === '/functions/v1/matchplay') {
       const body = JSON.parse(request.postData());
       if (body.action === 'current' || body.action === 'cancel') return route.fulfill({ json:{ game:snapshot } });

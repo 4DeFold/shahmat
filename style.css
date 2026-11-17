@@ -781,3 +781,13 @@ body.startup-ready #landing-screen:not([hidden]) .hero-reveal--tail { animation-
   #auth-screen:not([hidden]) :is(.panel-top, .wordmark, .auth-tabs), #auth-screen:not([hidden]) #auth-form > :not([hidden]):not(#forgot-password),
   #auth-submit:hover::after { animation: none; }
 }
+
+/* Active Play highlight extends across the entire navigation rail. */
+#nav-play[aria-current="page"] { width: calc(100% + 28px); margin-inline: -14px; padding-inline: 26px; }
+.sidebar-icon svg { display: block; width: 24px; height: 24px; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+@media (min-width: 701px) and (max-width: 900px) {
+  #nav-play[aria-current="page"] { width: calc(100% + 10px); margin-inline: -5px; padding-inline: 7px; }
+}
+@media (max-width: 700px), (max-height: 500px) and (pointer: coarse) {
+  #nav-play[aria-current="page"] { width: calc(100% + 28px); margin-inline: -14px; padding-inline: 26px; }
+}

@@ -286,3 +286,28 @@ test('history panel can be rapidly toggled with accessible state and focus', asy
   button.click(); assert.equal(button.getAttribute('aria-expanded'), 'true');
   assert.equal(content.inert, false); assert.equal(content.classList.contains('is-collapsed'), false);
 });
+
+test('opponent card is accessible, treats bio as text, and clears between games', async () => {
+  const dom = new JSDOM(html, { url: 'https://example.com/pages/game.html' });
+  const doc = dom.window.document;
+  const ui = createMemberGame({ document:doc, api:async () => ({ game:game() }), opponentName:async () => ({ username:'Friend', bio:'<img src=x onerror=alert(1)>' }) });
+  await ui.open(A); await flush();
+  const trigger = doc.getElementById('opponent-profile-trigger'), card = doc.getElementById('opponent-profile-card');
+  trigger.focus(); assert.equal(card.hidden, false); assert.equal(trigger.getAttribute('aria-expanded'), 'true');
+  assert.equal(doc.getElementById('opponent-profile-name').textContent, 'Friend');
+  assert.equal(doc.getElementById('opponent-profile-bio').textContent, '<img src=x onerror=alert(1)>');
+  assert.equal(card.querySelector('img'), null);
+  doc.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key:'Escape' })); assert.equal(card.hidden, true);
+  trigger.click(); assert.equal(card.hidden, false); trigger.click(); assert.equal(card.hidden, true);
+  ui.destroy(); dom.window.close();
+});
+
+test('piece reveal is restarted on show but not on a move or visibility change', async () => {
+  const dom = new JSDOM(html, { url:'https://example.com/pages/game.html' });
+  let calls = 0;
+  dom.window.Element.prototype.animate = function (frames, options) { if (options.duration === 1000) calls++; return { cancel() {} }; };
+  const ui = createMemberGame({ document:dom.window.document, api:async () => ({ game:null }) });
+  assert.equal(calls, 32); ui.hide(); ui.show(); assert.equal(calls, 64);
+  ui.browserVisibility(false); ui.browserVisibility(true); assert.equal(calls, 64);
+  ui.destroy(); dom.window.close();
+});

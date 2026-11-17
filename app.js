@@ -1,3 +1,4 @@
+import { startOnlinePresence } from './pages/online-presence.js';
 import { createClient } from '@supabase/supabase-js';
 import './theme.js';
 
@@ -239,6 +240,13 @@ let pageRequest = 0;
 const viewId = name => name === 'home' ? 'dashboard-home' : `page-${name}`;
 const viewLoads = new Map();
 let frameReady = null;
+let onlineStop = null, onlineUser = null, onlineCount = null;
+function sendOnline() { $('member-game-frame')?.contentWindow?.postMessage({ type: 'shahmat-online', count: onlineCount }, window.location.origin); }
+function startOnline(id) {
+  if (onlineUser === id) return;
+  onlineStop?.(); onlineUser = id; onlineCount = null; sendOnline();
+  onlineStop = startOnlinePresence(supabase, id, count => { onlineCount = count; sendOnline(); });
+}
 let dashboardPreloadEnabled = false;
 async function loadView(name) {
   if ($(viewId(name))) return;
@@ -327,7 +335,7 @@ function syncGameAppearance() {
   frame.contentWindow.postMessage({ type: 'shahmat-appearance', colors }, window.location.origin);
 }
 new MutationObserver(syncGameAppearance).observe(landing, { attributes: true, attributeFilter: ['data-palette', 'data-palette-theme', 'class'] });
-$('page-content').addEventListener('load', event => { if (event.target.id === 'member-game-frame') syncGameAppearance(); }, true);
+$('page-content').addEventListener('load', event => { if (event.target.id === 'member-game-frame') { syncGameAppearance(); sendOnline(); } }, true);
 $('dashboard-screen').querySelectorAll('[data-page]').forEach(link => link.addEventListener('click', event => {
   if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
   event.preventDefault();
@@ -445,6 +453,7 @@ async function loadProfile(user, immediate = false) {
   const { data, error } = await supabase.from('profiles').select('username,bio,palette').eq('id', user.id).maybeSingle();
   if (error) throw error;
   profile = data;
+  startOnline(user.id);
   restoreAppearance(user);
   if (!data) { editing = false; prepareProfile(); await show('profile-screen', immediate); }
   else { displayProfile(); await show('dashboard-screen', immediate); }
@@ -699,6 +708,7 @@ document.querySelectorAll('.signout').forEach(button => button.addEventListener(
   try {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
+    onlineStop?.(); onlineStop = null; onlineUser = null; onlineCount = null;
     dashboardPreloadEnabled = false; pageRequest++;
     $('page-game')?.remove(); frameReady = null; // Discard the prior account's game frame on logout.
     profile = null; applyPalette('monochrome'); applyTheme(null); $('auth-form').reset(); setMode('login');
