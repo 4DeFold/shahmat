@@ -848,11 +848,20 @@ body.startup-ready #landing-screen:not([hidden]) .hero-reveal--tail { animation-
   .rating-row:hover .rating-player { transform: none; }
 }
 
-/* Sidebar text and icon inherit one animated colour rather than animating twice. */
+/* A light/dark inversion cannot be interpolated without foreground and
+   background crossing at the same colour. Switch the pair together and let
+   every icon shape inherit that exact colour, with no delayed stroke tween. */
 .sidebar-nav { gap: 0; }
-.landing.palette-active .app-sidebar .sidebar-item span,
-.landing.palette-active .app-sidebar .sidebar-item svg { transition: none; }
+.landing.palette-active .app-sidebar .sidebar-nav .sidebar-item {
+  transition: border-color .2s ease, transform .2s ease;
+}
+.landing.palette-active .app-sidebar .sidebar-nav .sidebar-item span,
+.landing.palette-active .app-sidebar .sidebar-nav .sidebar-item svg,
+.landing.palette-active .app-sidebar .sidebar-nav .sidebar-item svg * { transition: none; }
 .sidebar-nav .sidebar-item:active:not([aria-current='page']) { background: transparent; color: var(--ink); }
+@media (prefers-reduced-motion: reduce) {
+  .landing.palette-active .app-sidebar .sidebar-nav .sidebar-item { transition: none; }
+}
 @media (min-width: 701px) { .sidebar-brand { width: 80%; margin-inline: auto; font-size: 31px; } }
 
 /* Animata Fluid Tabs: a single continuous pill, not five separately filled buttons. */
