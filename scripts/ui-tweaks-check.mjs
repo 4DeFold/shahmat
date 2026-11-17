@@ -14,8 +14,8 @@ try {
       const path=new URL(route.request().url()).pathname;
       if(path==='/auth/v1/user') return route.fulfill({json:user});
       if(path==='/rest/v1/profiles') return route.fulfill({json:{username:'Player',bio:'',palette:'forest'}});
-      if(path==='/rest/v1/rpc/yar_leaderboard') return route.fulfill({json:Array.from({length:100},(_,i)=>({username:`Player_${i}`,yar:2000-i,ranked:true}))});
-      if(path==='/rest/v1/rpc/yar_my_position') return route.fulfill({json:[{username:'Player',yar:999,ranked:true,place:125}]});
+      if(path==='/rest/v1/rpc/rank_leaderboard') return route.fulfill({json:Array.from({length:100},(_,i)=>({username:`Player_${i}`,yar:2000-i,ranked:true}))});
+      if(path==='/rest/v1/rpc/rank_my_position') return route.fulfill({json:[{username:'Player',yar:999,ranked:true,place:125}]});
       if(path==='/rest/v1/rpc/submit_feedback') { submitted++; return route.fulfill({json:null}); }
       return route.fulfill({json:{game:null}});
     });

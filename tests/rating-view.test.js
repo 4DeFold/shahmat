@@ -17,7 +17,7 @@ test('rating switches modes, escapes names, and ignores stale requests', async (
   assert.equal(root.querySelector('[data-rating-mode="rapid"]').getAttribute('aria-pressed'),'true');
   assert.equal(root.querySelector('.rating-player').textContent,'<b>Player</b>');
   assert.equal(root.querySelector('.rating-player b'),null);
-  assert.equal(root.querySelectorAll('.rating-row')[1].querySelector('.rating-place').textContent,'—');
+  assert.equal(root.querySelectorAll('.rating-row')[1].querySelector('.rating-place').textContent,'2');
   assert.equal(root.querySelector('.rating-board').getAttribute('aria-busy'),'false');
   root.querySelector('[data-rating-mode="blitz"]').click(); await Promise.resolve(); requests[2].resolve({error:'unavailable'}); await tick();
   assert.equal(root.querySelector('.rating-retry').hidden,false);
@@ -61,13 +61,39 @@ test('personal position stays visible outside the top 100 and stale mode replies
   const first=view.refresh(); await tick();
   root.querySelector('[data-rating-mode="rapid"]').click(); await tick();
   const find=(fn,mode)=>requests.find(r=>r.fn===fn && r.args.p_mode===mode);
-  find('yar_my_position','rapid').resolve({data:[{username:'<me>',yar:1234.5,ranked:true,place:125}]});
-  find('yar_leaderboard','rapid').resolve({data:[{username:'<me>',yar:1234.5,ranked:true}]}); await tick();
-  find('yar_my_position','overall').resolve({data:[{username:'stale',yar:0,ranked:true,place:1}]});
-  find('yar_leaderboard','overall').resolve({data:[]}); await first; await tick();
+  find('rank_my_position','rapid').resolve({data:[{username:'<me>',yar:1234.5,ranked:true,place:125}]});
+  find('rank_leaderboard','rapid').resolve({data:[{username:'<me>',yar:1234.5,ranked:true}]}); await tick();
+  find('rank_my_position','overall').resolve({data:[{username:'stale',yar:0,ranked:true,place:1}]});
+  find('rank_leaderboard','overall').resolve({data:[]}); await first; await tick();
   assert.equal(root.querySelector('.rating-self').hidden,false);
   assert.equal(root.querySelector('.rating-self-place').textContent,'125');
   assert.equal(root.querySelector('.rating-self-name').textContent,'<me>');
   assert.equal(root.querySelector('.rating-row').classList.contains('rating-row-self'),true);
+  view.destroy(); dom.window.close();
+});
+
+test('switching display units changes scores without changing ЯР ordering or refetching', async () => {
+  const dom = new JSDOM(html), root = dom.window.document.querySelector('section'); let calls=0;
+  const client = {rpc:async fn => {calls++; return {data:fn==='rank_my_position' ? [{username:'Alice',yar:1200,elo:980,ranked:true,place:1}] : [{username:'Alice',yar:1200,elo:980,ranked:true},{username:'Bob',yar:1100,elo:1300,ranked:true}]};}};
+  const view = createRatingView(root,client,{showSelf:true}); await view.refresh(); await tick();
+  view.setUnit('elo');
+  assert.deepEqual([...root.querySelectorAll('.rating-player')].map(el=>el.textContent),['Alice','Bob']);
+  assert.deepEqual([...root.querySelectorAll('.rating-score')].map(el=>Number(el.textContent.replace(/\D/g,''))),[980,1300]);
+  assert.equal(root.querySelector('.rating-self-score').textContent,'980'); assert.equal(root.querySelector('.rating-unit').textContent,'ЭЛО');
+  assert.equal(calls,2); view.setUnit('yar'); assert.equal(root.querySelector('.rating-self-score').textContent.replace(/\D/g,''),'1200');
+  view.destroy(); dom.window.close();
+});
+
+
+test('calibrating players are numbered and identical forced refresh preserves rows', async () => {
+  const dom=new JSDOM(html), root=dom.window.document.querySelector('section');
+  const data=[{username:'First',yar:1005,ranked:false},{username:'Second',yar:1000,ranked:true}];
+  const view=createRatingView(root,{rpc:async fn=>({data:fn==='rank_my_position' ? [{...data[0],place:1}] : data})},{showSelf:true});
+  await view.refresh(); await tick();
+  assert.deepEqual([...root.querySelectorAll('.rating-place')].map(el=>el.textContent),['1','2']);
+  assert.equal(root.querySelector('.rating-self-place').textContent,'1');
+  const row=root.querySelector('.rating-row');
+  await view.refresh({force:true});
+  assert.equal(root.querySelector('.rating-row'),row);
   view.destroy(); dom.window.close();
 });

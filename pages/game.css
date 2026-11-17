@@ -196,3 +196,5 @@ html, body { width: 100%; height: 100%; overflow: hidden; }
   .clock { justify-self:end; width:min(112px, 40%); }
   .clock strong { font-size:clamp(13px, calc(150cqw / var(--clock-digits, 5)), 25px); }
 }
+.player-rating { font-size: .85em; opacity: .8; }
+#player-name, #opponent-name { display:inline; }

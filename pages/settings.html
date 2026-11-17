@@ -1,5 +1,15 @@
 <section class="empty-page settings-page" id="page-settings" data-view="settings" hidden aria-labelledby="page-settings-title">
   <h2 id="page-settings-title" tabindex="-1">Настройки</h2>
+  <section class="rank-setting" id="rank-setting" aria-labelledby="rank-setting-title">
+    <div class="rank-setting-line"><span id="rank-setting-title">Показать очки ранга в</span>
+      <fieldset class="rank-unit-options" id="rank-unit-options"><legend class="visually-hidden">Показать очки ранга в</legend>
+        <label><input type="radio" name="rank-unit" value="yar" checked><span>Яры</span></label>
+        <label><input type="radio" name="rank-unit" value="elo"><span>Эло</span></label>
+      </fieldset>
+      <button type="button" id="rank-info-button" class="rank-info-button" aria-label="Что такое яры и чем они отличаются от Эло?" aria-expanded="false" aria-controls="rank-info">?</button>
+    </div>
+    <div id="rank-info" class="rank-info" aria-hidden="true"><div class="rank-info-clip"><div class="rank-info-content">Яры — оценка силы в шахматах: учитывают исход, силу соперника и отдельно моделируют ничьи. Эло — классический рейтинг, который рассчитывается параллельно. Значения могут отличаться; место в рейтинге определяется только ярами. Эло начинает считаться с 1000 после запуска этой функции.</div></div></div>
+  </section>
   <section class="settings-palettes" aria-labelledby="settings-palette-heading">
     <h3 id="settings-palette-heading">Палитры<span>.</span></h3>
     <p class="palette-help" id="settings-palette-help">Выбери палитру. Нажми ещё раз, чтобы сменить тему.</p>

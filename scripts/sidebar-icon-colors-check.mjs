@@ -12,7 +12,7 @@ try {
     await page.addInitScript(v=>localStorage.setItem('sb-eswyxbyddkajysogtglp-auth-token',JSON.stringify(v)),session);
     await page.route('https://eswyxbyddkajysogtglp.supabase.co/**',route=>{
       const path=new URL(route.request().url()).pathname;
-      return route.fulfill({json:path==='/auth/v1/user'?user:path==='/rest/v1/profiles'?{username:'Player',palette:'monochrome'}:path==='/rest/v1/rpc/yar_leaderboard'?[]:path==='/rest/v1/rpc/yar_my_position'?[]:{game:null}});
+      return route.fulfill({json:path==='/auth/v1/user'?user:path==='/rest/v1/profiles'?{username:'Player',palette:'monochrome'}:path==='/rest/v1/rpc/rank_leaderboard'?[]:path==='/rest/v1/rpc/rank_my_position'?[]:{game:null}});
     });
     await page.goto(`${base}/rating`); await page.locator('#nav-rating[aria-current=page]').waitFor();
     for (const palette of ['monochrome','gray','forest','atelier','wood','earth','ocean','amber','lavender','sand']) {
