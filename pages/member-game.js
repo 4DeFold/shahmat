@@ -1,6 +1,7 @@
 import { Chess } from 'chess.js';
 import { createMemberBoard } from './member-board.js';
 import { createGameSound } from './game-sound.js';
+import { createRollingClock } from './rolling-clock.js';
 
 const times = { blitz: 180000, rapid: 600000, classical: 3600000, daily: 86400000 };
 const modeLabels = { blitz:'Блиц · 3 мин', rapid:'Рапид · 10 мин', classical:'Классика · 1 час', daily:'Дневная · 24 часа' };
@@ -26,7 +27,10 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   const setStatus = (text, urgent = false) => { const el = $('status'); if (el.textContent !== text) el.textContent = text; el.parentElement.classList.toggle('urgent', urgent); };
   const cancelTimer = () => { if (polling !== null) clearTimeout(polling); polling = null; };
   const reducedMotion = () => win.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const clocks = { player: createRollingClock($('player-clock'), reducedMotion), opponent: createRollingClock($('opponent-clock'), reducedMotion) };
   const boardView = createMemberBoard({ document, board, reducedMotion });
+  // Age is provided by the server, then advanced monotonically between snapshots.
+  const canResign = () => phase === 'active' && Number.isFinite(snapshot?.game_age_ms) && snapshot.game_age_ms + Math.max(0, now() - receivedAt) >= 60000;
   const playSound = move => sound.play(chess.isCheck() ? 'check' : move?.captured ? 'capture' : 'move');
   function modeControls() {
     const locked = phase !== 'idle';
@@ -36,11 +40,11 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     picker.inert = locked; picker.setAttribute('aria-hidden', String(locked));
     $('mode-summary').hidden = !locked || !mode;
     $('mode-summary').textContent = modeLabels[mode] || '';
-    $('resign-control').hidden = phase !== 'active';
+    $('resign-control').hidden = !canResign();
     $('offline-choice').hidden = phase !== 'active' || snapshot?.opponent_offline !== true;
     for (const id of ['resign-button','resign-confirm','offline-win','offline-draw']) $(id).disabled = actionPending || moving;
     if (phase !== 'active') closeResign();
-    start.hidden = phase !== 'idle'; start.disabled = !userId || !ready || !mode;
+    start.hidden = phase !== 'idle' || !mode; start.disabled = !userId || !ready || !mode;
     cancel.hidden = phase !== 'searching'; reset.hidden = phase !== 'finished';
     $('moves').hidden = phase !== 'active' && phase !== 'finished';
   }
@@ -55,8 +59,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
       if (card.dataset.color !== background) card.dataset.color = background;
       card.classList.toggle('running', snapshot?.status === 'active' && snapshot.turn === color);
       card.classList.toggle('low', remaining != null && remaining <= 30000 && snapshot?.status === 'active' && snapshot.turn === color);
-      const clock = $(`${id}-clock`), text = formatClock(remaining);
-      if (clock.textContent !== text) { clock.textContent = text; clock.style.setProperty('--clock-digits', String(text.length)); }
+      clocks[id].update(formatClock(remaining));
     }
     for (const [id, text] of [['player', `Вы · ${own === 'w' ? 'Белые' : 'Чёрные'}`], ['opponent', `Соперник · ${other === 'w' ? 'Белые' : 'Чёрные'}`]]) {
       const label = $(`${id}-clock-label`), value = snapshot ? text : '';
@@ -354,13 +357,13 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     if (typeof resignDialog.close === 'function') resignDialog.close(); else resignDialog.removeAttribute('open');
   }
   $('resign-button').addEventListener('click', () => {
-    if (phase !== 'active' || actionPending || moving) return;
+    if (!canResign() || actionPending || moving) return;
     if (typeof resignDialog.showModal === 'function') resignDialog.showModal(); else resignDialog.setAttribute('open','');
     $('resign-cancel').focus();
   });
   $('resign-cancel').addEventListener('click', closeResign);
   async function finishAction(action) {
-    if (phase !== 'active' || !snapshot || actionPending || moving || (action !== 'resign' && !snapshot.opponent_offline)) return;
+    if (phase !== 'active' || !snapshot || actionPending || moving || (action === 'resign' ? !canResign() : !snapshot.opponent_offline)) return;
     const gameId = snapshot.id;
     actionPending = true; closeResign(); modeControls(); cancelTimer(); ++generation;
     setStatus('Подтверждаем результат…');
@@ -382,10 +385,10 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   $('offline-draw').addEventListener('click', () => void finishAction('offline_draw'));
   $('mode-list').addEventListener('change', event => { if (phase === 'idle' && times[event.target.value]) { mode = event.target.value; modeControls(); drawClocks(); setStatus('Всё готово к поиску.'); } });
   start.addEventListener('click', () => void search()); cancel.addEventListener('click', () => void cancelSearch());
-  reset.addEventListener('click', () => { cancelTimer(); generation++; snapshot = null; chess = new Chess(); latestMove = null; phase = 'idle'; premove = null; historyIndex = null; nameForGame = null; profileTrigger.disabled = true; profilePinned = false; showProfile(false); clearInterval(nameTimer); $('opponent-name').textContent = 'Соперник'; modeControls(); renderBoard(); renderHistory(); drawClocks(); setStatus('Выбери режим.'); });
+  reset.addEventListener('click', () => { cancelTimer(); generation++; snapshot = null; chess = new Chess(); latestMove = null; phase = 'idle'; mode = null; $('mode-list').querySelectorAll('input').forEach(input => { input.checked = false; }); premove = null; historyIndex = null; nameForGame = null; profileTrigger.disabled = true; profilePinned = false; showProfile(false); clearInterval(nameTimer); $('opponent-name').textContent = 'Соперник'; modeControls(); renderBoard(); renderHistory(); drawClocks(); setStatus('Выбери режим.'); });
   function pause() { cancelDrag(); if (phase === 'searching') void cancelSearch(); else { generation++; cancelTimer(); } }
   function resume() { if (phase === 'active' || phase === 'searching') void poll(++generation); }
-  const clockInterval = setInterval(() => { if (isVisible()) drawClocks(); }, 250);
+  const clockInterval = setInterval(() => { if (isVisible()) { drawClocks(); if (phase === 'active' && $('resign-control').hidden && canResign()) modeControls(); } }, 250);
   let revealAnimations = [];
   function revealPieces() {
     revealAnimations.forEach(animation => animation.cancel()); revealAnimations = [];
@@ -407,6 +410,6 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     hide() { const wasVisible = isVisible(); viewVisible = false; if (wasVisible) pause(); },
     show() { const wasVisible = isVisible(); const wasShown = viewVisible; viewVisible = true; if (!wasShown) revealPieces(); if (!wasVisible && isVisible()) resume(); },
     browserVisibility(value) { const wasVisible = isVisible(); browserVisible = value; if (wasVisible && !isVisible()) pause(); else if (!wasVisible && isVisible()) resume(); },
-    destroy() { generation++; cancelDrag(); cancelTimer(); clearInterval(clockInterval); clearInterval(nameTimer); revealAnimations.forEach(animation => animation.cancel()); sound.destroy(); },
+    destroy() { generation++; cancelDrag(); cancelTimer(); clearInterval(clockInterval); clearInterval(nameTimer); revealAnimations.forEach(animation => animation.cancel()); Object.values(clocks).forEach(clock => clock.destroy()); sound.destroy(); },
   };
 }

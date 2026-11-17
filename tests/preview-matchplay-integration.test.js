@@ -13,7 +13,7 @@ test('two preview players match, exchange moves, and resignation is authoritativ
   const db = await PGlite.create();
   try {
     await db.exec('create role anon; create role authenticated; create role service_role; create schema auth; create table auth.users(id uuid primary key);');
-    for (const file of ['20261117031548_isolated_preview_matchplay_actions.sql']) await db.exec(await readFile(`supabase/migrations/${file}`, 'utf8'));
+    for (const file of ['20261117031548_isolated_preview_matchplay_actions.sql', '20261117042549_preview_game_age.sql']) await db.exec(await readFile(`supabase/migrations/${file}`, 'utf8'));
     await db.query('insert into auth.users values ($1),($2),($3)', [A,B,C]);
     const client = {
       auth:{ getUser: async token => [A,B,C].includes(token) ? { data:{ user:{id:token} } } : { data:{user:null}, error:'invalid' } },

@@ -8,10 +8,14 @@ test('isolated match actions serialize resignation, disconnection claims, reconn
  try {
   await db.exec('create role anon; create role authenticated; create role service_role; create schema auth; create table auth.users(id uuid primary key);');
   await db.exec(await readFile('supabase/migrations/20261117031548_isolated_preview_matchplay_actions.sql','utf8'));
+  await db.exec(await readFile('supabase/migrations/20261117042549_preview_game_age.sql','utf8'));
   await db.query('insert into auth.users values ($1),($2),($3)',[A,B,C]);
   const call=async(sql,args)=>(await db.query(`select public.${sql} as result`,args)).rows[0].result;
   const match=async()=>{ await call('preview_online_find($1,$2)',[A,'rapid']); return (await call('preview_online_find($1,$2)',[B,'rapid'])).game_id; };
   let id=await match();
+  assert.ok((await call('preview_online_match_snapshot($1,$2)',[A,id])).game_age_ms < 60000);
+  await db.query("update public.preview_online_games set created_at=clock_timestamp()-interval '61 seconds' where id=$1",[id]);
+  assert.ok((await call('preview_online_match_snapshot($1,$2)',[A,id])).game_age_ms >= 60000);
   assert.equal(await call('preview_online_finish($1,$2,$3)',[C,id,'resign']), null);
   let game=await call('preview_online_finish($1,$2,$3)',[A,id,'resign']);
   assert.equal(game.result,'black_win'); assert.equal(game.reason,'resignation'); assert.equal(game.status,'finished');

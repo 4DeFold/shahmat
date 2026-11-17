@@ -730,9 +730,9 @@ textarea { resize: vertical; min-height: 92px; }
 /* Entry-only effects inspired by React Bits' Blur Text, Fade Content,
    Spotlight Card, Magnet and Click Spark. The game and dashboard remain still. */
 .landing { position: relative; }
-.entrance-atmosphere { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; opacity: 0; transition: opacity .65s ease; }
-.landing:has(#landing-screen:not([hidden])) .entrance-atmosphere,
-.landing:has(#auth-screen:not([hidden])) .entrance-atmosphere { opacity: 1; }
+.entrance-atmosphere { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; opacity: 0; visibility: hidden; transition: opacity .65s ease; }
+body.startup-ready .landing:has(#landing-screen:not([hidden])) .entrance-atmosphere,
+body.startup-ready .landing:has(#auth-screen:not([hidden])) .entrance-atmosphere { opacity: 1; visibility: visible; }
 .entrance-grid { position: absolute; inset: 0; opacity: .19; background-image: linear-gradient(color-mix(in srgb, var(--foreground) 12%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--foreground) 12%, transparent) 1px, transparent 1px); background-size: clamp(46px, 6vw, 82px) clamp(46px, 6vw, 82px); mask-image: radial-gradient(ellipse 72% 72% at 50% 48%, transparent 20%, #000 100%); }
 .entrance-orbit { position: absolute; width: min(72vw, 780px); aspect-ratio: 1; left: 50%; top: 50%; border: 1px solid color-mix(in srgb, var(--foreground) 9%, transparent); border-radius: 50%; transform: translate(-50%, -50%); }
 .entrance-orbit--two { width: min(94vw, 1050px); border-style: dashed; opacity: .55; }

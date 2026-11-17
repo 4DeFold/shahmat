@@ -14,7 +14,7 @@ function setup(api, now = () => 0) {
   return { dom, ui, $: id => dom.window.document.getElementById(id), close() { ui.destroy(); dom.window.close(); } };
 }
 function game({ moves = [], turn = 'w', version = moves.length, status = 'active', result = null, reason = null } = {}) {
-  return { id:'game', white_id:A, black_id:B, mode:'blitz', moves, turn, version, status, result, reason, white_ms:180000, black_ms:180000 };
+  return { id:'game', white_id:A, black_id:B, mode:'blitz', moves, turn, version, status, result, reason, white_ms:180000, black_ms:180000, game_age_ms:60000 };
 }
 
 test('clock formatting covers all requested controls', () => {
@@ -34,10 +34,10 @@ test('board opens at starting position, modes are explicit and a real request st
   assert.equal(app.$('opponent-clock-label').hidden, true);
   assert.equal(app.$('board').querySelector('[data-square=e2] img').getAttribute('src'), '/pieces/cburnett/wP.svg');
   assert.deepEqual([...app.$('mode-list').querySelectorAll('input')].map(input => input.value), ['blitz','rapid','classical','daily']);
-  assert.equal(app.$('start-search').disabled, true);
+  assert.equal(app.$('start-search').disabled, true); assert.equal(app.$('start-search').hidden, true);
   await app.ui.open(A);
   const rapid = app.$('mode-list').querySelector('[value=rapid]'); rapid.checked = true; rapid.dispatchEvent(new app.dom.window.Event('change', { bubbles:true }));
-  assert.equal(app.$('player-clock').textContent, '10:00'); assert.equal(app.$('start-search').disabled, false);
+  assert.equal(app.$('player-clock').getAttribute('aria-label'), '10:00'); assert.equal(app.$('start-search').disabled, false); assert.equal(app.$('start-search').hidden, false);
   app.$('start-search').click(); await flush();
   assert.deepEqual(calls.at(-1), { action:'search', mode:'rapid' });
   assert.match(app.$('status').textContent, /Ищем/);
@@ -99,8 +99,8 @@ test('clock times remain assigned to the player and opponent when playing black'
   const clock = { ...game({ moves:['e4'], turn:'b' }), white_ms:170000, black_ms:155000 };
   const app = setup(async body => body.action === 'current' ? { game:clock } : { game:clock });
   await app.ui.open(B);
-  assert.equal(app.$('player-clock').textContent, '02:35');
-  assert.equal(app.$('opponent-clock').textContent, '02:50');
+  assert.equal(app.$('player-clock').getAttribute('aria-label'), '02:35');
+  assert.equal(app.$('opponent-clock').getAttribute('aria-label'), '02:50');
   assert.equal(app.$('player-clock-card').dataset.color, 'b');
   assert.equal(app.$('opponent-clock-card').dataset.color, 'w');
   app.close();
@@ -349,4 +349,20 @@ test('failed resignation does not fabricate a loss', async t => {
   app.$('resign-button').click(); app.$('resign-confirm').click(); await flush();
   assert.equal(app.$('resign-control').hidden,false); assert.equal(app.$('new-game').hidden,true);
   assert.doesNotMatch(app.$('status').textContent,/Вы проиграли/);
+});
+
+
+test('resignation appears one minute after match creation, including after reopening', async t => {
+  let time = 0, age = 59000;
+  const app = setup(async () => ({game:{...game(),game_age_ms:age}}), () => time);
+  t.after(() => app.close()); await app.ui.open(A);
+  assert.equal(app.$('resign-control').hidden, true);
+  app.$('resign-button').click(); assert.equal(app.$('resign-dialog').hasAttribute('open'), false);
+  time = 999; await new Promise(resolve => setTimeout(resolve, 270));
+  assert.equal(app.$('resign-control').hidden, true);
+  time = 1000; await new Promise(resolve => setTimeout(resolve, 270));
+  assert.equal(app.$('resign-control').hidden, false);
+  const reopened = setup(async () => ({game:{...game(),game_age_ms:60000}}));
+  t.after(() => reopened.close()); await reopened.ui.open(A);
+  assert.equal(reopened.$('resign-control').hidden, false);
 });

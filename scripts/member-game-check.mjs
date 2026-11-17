@@ -26,7 +26,7 @@ try {
       if (body.action === 'resign') { snapshot = {...snapshot, status:'finished', result:'black_win',reason:'resignation',version:snapshot.version+1}; return route.fulfill({json:{game:snapshot}}); }
       if (body.action === 'current' || body.action === 'cancel') return route.fulfill({ json:{ game:snapshot } });
       if (body.action === 'search') {
-        snapshot = { id:'fixture', white_id:user.id, black_id:'opponent', mode:body.mode, moves:[], turn:'w', version:0, status:'active', white_ms:180000, black_ms:180000 };
+        snapshot = { id:'fixture', white_id:user.id, black_id:'opponent', mode:body.mode, moves:[], turn:'w', version:0, status:'active', white_ms:180000, black_ms:180000, game_age_ms:60000 };
         return route.fulfill({ json:{ state:'matched', game:snapshot } });
       }
       if (body.action === 'move') {
@@ -50,8 +50,9 @@ try {
   assert.equal(await game.locator('#opponent-clock-card').getAttribute('data-color'), 'neutral');
   assert.equal(await game.locator('#player-clock-label').isHidden(), true);
   assert.equal(await game.locator('#start-search').isDisabled(), true);
+  assert.equal(await game.locator('#start-search').isHidden(), true);
   await game.locator('label:has(input[value=blitz])').click();
-  assert.equal(await game.locator('#player-clock').innerText(), '03:00');
+  assert.equal(await game.locator('#player-clock').getAttribute('aria-label'), '03:00');
   await game.locator('#start-search').click();
   await game.locator('#status').filter({ hasText:'Ваш ход' }).waitFor();
   assert.equal(await game.locator('#mode-picker').getAttribute('aria-hidden'), 'true');
@@ -93,25 +94,21 @@ try {
     assert.ok(Math.abs((clocks.ownBottom + clocks.opponentTop) / 2 - clocks.boardMiddle) <= 1, 'clock pair is centered on the board');
     assert.notEqual(clocks.ownBackground, clocks.opponentBackground, 'clock backgrounds must differ');
     assert.ok(clocks.numberSize >= 12, 'clock numbers are legible');
-    // Check actual rendered glyph widths, not just the full-width strong element.
-    const values = await game.locator('#player-clock').evaluate(async el => {
-      await document.fonts.load('400 16px "Instrument Serif"', '24:00:00');
-      return ['03:00', '24:00:00'].map(value => {
-        el.textContent = value; el.style.setProperty('--clock-digits', value.length);
-        const range = document.createRange(); range.selectNodeContents(el);
-        return { value, width: range.getBoundingClientRect().width, available: el.clientWidth };
-      });
+    const clock = await game.locator('#player-clock').evaluate(async el => {
+      await document.fonts.load('400 16px "Instrument Serif"');
+      const slots = [...el.querySelectorAll('.clock-digit')];
+      const canvas = document.createElement('canvas'), context = canvas.getContext('2d');
+      context.font = getComputedStyle(el).font;
+      return { available:el.clientWidth, display:el.querySelector('.clock-digits').getBoundingClientRect().width,
+        slot:slots[0].getBoundingClientRect().width, digit:context.measureText('0').width };
     });
-    for (const value of values) {
-      assert.ok(value.width <= value.available + 1, `${size.width}: clock value overflows ${JSON.stringify(value)}`);
-      assert.ok(value.width >= value.available * .7, `${size.width}: clock value should fill most of the width ${JSON.stringify(value)}`);
-    }
+    assert.ok(clock.display <= clock.available + 1 && clock.digit <= clock.slot + 1, `${size.width}: digits fit ${JSON.stringify(clock)}`);
     const online = await game.locator('#online-counter').evaluate(el => {
       const number = el.querySelector('#online-value'), label = el.querySelector('.online-label');
-      return { numberLeft: number.getBoundingClientRect().left, labelLeft: label.getBoundingClientRect().left,
+      return { numberLeft: number.getBoundingClientRect().left, numberRight: number.getBoundingClientRect().right, labelLeft: label.getBoundingClientRect().left,
         numberSize: parseFloat(getComputedStyle(number).fontSize), labelSize: parseFloat(getComputedStyle(label).fontSize) };
     });
-    assert.ok(online.numberLeft < online.labelLeft && online.labelSize < online.numberSize, 'online number precedes a smaller label');
+    assert.ok(online.numberLeft < online.labelLeft && online.labelLeft - online.numberRight <= 9 && online.labelSize < online.numberSize, 'online number precedes a smaller label');
   }
   assert.equal(await page.locator('#app-sidebar').isVisible(), true);
   await page.locator('.sidebar-brand').click();

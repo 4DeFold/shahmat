@@ -9,8 +9,8 @@ html, body { width: 100%; height: 100%; overflow: hidden; }
 .game-rail { min-width: 0; min-height: 0; overflow-y: auto; background: var(--surface-alt); border-left: 1px solid var(--line); padding: 28px 22px; container-type: inline-size; }
 .clock-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .clock { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 10px; border: 1px solid #a2a2a0; border-radius: 9px; padding: 12px 8px; }
-.clock[data-color='w'] { background: #f7f7f5; color: #181817; }
-.clock[data-color='b'] { background: #242423; border-color: #242423; color: #fff; }
+.clock[data-color='w'] { background: var(--surface); color: var(--ink); border-color: var(--line); }
+.clock[data-color='b'] { background: var(--control); border-color: var(--control); color: var(--control-ink); }
 .clock span { font-size: 10px; line-height: 1.2; opacity: .8; }
 .clock strong { max-width: 100%; font: 700 clamp(19px, 9cqw, 25px)/1 'Charis SIL', Georgia, serif; font-variant-numeric: tabular-nums; letter-spacing: -.04em; white-space: nowrap; }
 .rail-label { margin: 30px 0 12px; color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .12em; }
@@ -143,7 +143,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; }
 .opponent-profile-card strong { font: 400 20px/1.2 Playfair, Georgia, serif; }
 .opponent-profile-card .bio-label { display: block; margin-top: 12px; color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
 .opponent-profile-card p { margin: 4px 0 0; font-size: 13px; line-height: 1.4; white-space: pre-wrap; }
-.online-counter { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-top: 24px; padding-top: 15px; border-top: 1px solid var(--line); }
+.online-counter { display: flex; align-items: baseline; justify-content: flex-start; gap: 8px; margin-top: 24px; padding-top: 15px; border-top: 1px solid var(--line); }
 .online-label { color: var(--muted); font-size: 10px; font-weight: bold; letter-spacing: .12em; }
 #online-value { color: var(--ink); font: 400 24px/1 'Charis SIL', Georgia, serif; font-variant-numeric: tabular-nums; }
 @media (prefers-reduced-motion: reduce) {
@@ -154,8 +154,15 @@ html, body { width: 100%; height: 100%; overflow: hidden; }
 /* Keep both clocks centred together to the right of the board. */
 .clock-pair { justify-content: center; gap: 12px; }
 .clock { container-type: inline-size; position: relative; padding: 4px 5px; gap: 0; }
-.clock span:not([hidden]) { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+.clock > span:not([hidden]), .clock-readable { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 .clock strong { display: block; width: 100%; max-width: 100%; font: 400 clamp(10px, calc(220cqw / var(--clock-digits, 5)), 44px)/1 'Instrument Serif', Georgia, serif; font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.clock .clock-digits { display: flex; width: 100%; height: 1em; line-height: 1; font-size: inherit; opacity: 1; }
+.clock .clock-digit { position: relative; display: block; flex: 1 1 0; min-width: 0; height: 1em; overflow: hidden; font-size: inherit; line-height: 1; opacity: 1; }
+.clock .clock-reel { display: block; width: 100%; font-size: inherit; line-height: 1; opacity: 1; }
+.clock .clock-reel > span { display: block; height: 1em; text-align: center; font-size: inherit; line-height: 1; opacity: 1; }
+.clock .clock-separator { flex: .55 1 0; min-width: 0; text-align: center; font-size: inherit; line-height: 1; opacity: 1; }
+.game-rail #start-search { font-size: 18px; }
+@media (prefers-reduced-motion: reduce) { .game-rail #start-search:not([hidden]) { animation: none; } }
 .leave-game { width: 100%; background: transparent; font-family: inherit; cursor: pointer; }
 .offline-choice { margin-top: 12px; padding: 12px; border: 1px solid var(--line); background: var(--surface); }
 .offline-choice p { margin: 0 0 10px; font-size: 13px; line-height: 1.4; }
