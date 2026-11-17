@@ -14,13 +14,13 @@ function setup(api, now = () => 0) {
   return { dom, ui, $: id => dom.window.document.getElementById(id), close() { ui.destroy(); dom.window.close(); } };
 }
 function game({ moves = [], turn = 'w', version = moves.length, status = 'active', result = null, reason = null } = {}) {
-  return { id:'game', white_id:A, black_id:B, mode:'blitz', moves, turn, version, status, result, reason, white_ms:180000, black_ms:180000 };
+  return { id:'game', white_id:A, black_id:B, mode:'blitz', moves, turn, version, status, result, reason, white_ms:180000, black_ms:180000, game_age_ms:60000 };
 }
 
 test('clock formatting covers all requested controls', () => {
   assert.equal(formatClock(180000), '03:00'); assert.equal(formatClock(600000), '10:00');
   assert.equal(formatClock(3600000), '1:00:00'); assert.equal(formatClock(86400000), '24:00:00');
-  assert.equal(formatClock(0), '00:00');
+  assert.equal(formatClock(0), '00:00'); assert.equal(formatClock(null), '00:00');
 });
 
 test('board opens at starting position, modes are explicit and a real request starts search', async () => {
@@ -32,12 +32,14 @@ test('board opens at starting position, modes are explicit and a real request st
   assert.equal(app.$('opponent-clock-card').nextElementSibling, app.$('player-clock-card'));
   assert.equal(app.$('player-clock-label').hidden, true);
   assert.equal(app.$('opponent-clock-label').hidden, true);
+  assert.equal(app.$('player-clock').getAttribute('aria-label'), '00:00');
+  assert.equal(app.$('opponent-clock').getAttribute('aria-label'), '00:00');
   assert.equal(app.$('board').querySelector('[data-square=e2] img').getAttribute('src'), '/pieces/cburnett/wP.svg');
   assert.deepEqual([...app.$('mode-list').querySelectorAll('input')].map(input => input.value), ['blitz','rapid','classical','daily']);
-  assert.equal(app.$('start-search').disabled, true);
+  assert.equal(app.$('start-search').disabled, true); assert.equal(app.$('start-search').hidden, true);
   await app.ui.open(A);
   const rapid = app.$('mode-list').querySelector('[value=rapid]'); rapid.checked = true; rapid.dispatchEvent(new app.dom.window.Event('change', { bubbles:true }));
-  assert.equal(app.$('player-clock').textContent, '10:00'); assert.equal(app.$('start-search').disabled, false);
+  assert.equal(app.$('player-clock').getAttribute('aria-label'), '10:00'); assert.equal(app.$('start-search').disabled, false); assert.equal(app.$('start-search').hidden, false);
   app.$('start-search').click(); await flush();
   assert.deepEqual(calls.at(-1), { action:'search', mode:'rapid' });
   assert.match(app.$('status').textContent, /Ищем/);
@@ -99,8 +101,8 @@ test('clock times remain assigned to the player and opponent when playing black'
   const clock = { ...game({ moves:['e4'], turn:'b' }), white_ms:170000, black_ms:155000 };
   const app = setup(async body => body.action === 'current' ? { game:clock } : { game:clock });
   await app.ui.open(B);
-  assert.equal(app.$('player-clock').textContent, '02:35');
-  assert.equal(app.$('opponent-clock').textContent, '02:50');
+  assert.equal(app.$('player-clock').getAttribute('aria-label'), '02:35');
+  assert.equal(app.$('opponent-clock').getAttribute('aria-label'), '02:50');
   assert.equal(app.$('player-clock-card').dataset.color, 'b');
   assert.equal(app.$('opponent-clock-card').dataset.color, 'w');
   app.close();
@@ -249,14 +251,13 @@ test('mode selector is replaced during search and restored on cancellation', asy
   assert.equal(app.$('mode-picker').classList.contains('is-collapsed'), false); assert.equal(app.$('mode-picker').getAttribute('aria-hidden'), 'false'); assert.equal(app.$('mode-summary').hidden, true);
 });
 
-test('active games show the mode and leave link; clocks always put player below opponent', async t => {
+test('active games show the mode and resign button; clocks always put player below opponent', async t => {
   for (const user of [A, B]) {
     const app = setup(async () => ({game:game()})); t.after(() => app.close());
     await app.ui.open(user); await flush();
     assert.equal(app.$('mode-picker').classList.contains('is-collapsed'), true); assert.equal(app.$('mode-summary').textContent, 'Блиц · 3 мин');
-    assert.equal(app.$('leave-game-control').hidden, false);
-    assert.equal(app.$('leave-game-control').querySelector('a').getAttribute('href'), '/home');
-    assert.equal(app.$('leave-game-control').querySelector('a').target, '_top');
+    assert.equal(app.$('resign-control').hidden, false);
+    assert.equal(app.$('resign-button').textContent, 'Сдаться');
     assert.equal(app.$('opponent-clock-card').nextElementSibling, app.$('player-clock-card'));
     assert.equal(app.$('player-clock-card').dataset.color, user === A ? 'w' : 'b');
     assert.equal(app.$('opponent-clock-card').dataset.color, user === A ? 'b' : 'w');
@@ -264,11 +265,11 @@ test('active games show the mode and leave link; clocks always put player below 
 });
 
 
-test('finished games retain the mode and provide both new game and exit', async t => {
+test('finished games retain the mode and offer a new game without resignation', async t => {
   const app = setup(async () => ({ game:game({ status:'finished', result:'draw', reason:'stalemate' }) }));
   t.after(() => app.close()); await app.ui.open(A); await flush();
   assert.equal(app.$('mode-summary').textContent, 'Блиц · 3 мин');
-  assert.equal(app.$('leave-game-control').hidden, false);
+  assert.equal(app.$('resign-control').hidden, true);
   assert.equal(app.$('new-game').hidden, false);
   app.$('new-game').click();
   assert.equal(app.$('mode-picker').classList.contains('is-collapsed'), false); assert.equal(app.$('mode-summary').hidden, true);
@@ -285,4 +286,85 @@ test('history panel can be rapidly toggled with accessible state and focus', asy
   assert.equal(content.getAttribute('aria-hidden'), 'true');
   button.click(); assert.equal(button.getAttribute('aria-expanded'), 'true');
   assert.equal(content.inert, false); assert.equal(content.classList.contains('is-collapsed'), false);
+});
+
+test('opponent card is accessible, treats bio as text, and clears between games', async () => {
+  const dom = new JSDOM(html, { url: 'https://example.com/pages/game.html' });
+  const doc = dom.window.document;
+  const ui = createMemberGame({ document:doc, api:async () => ({ game:game() }), opponentName:async () => ({ username:'Friend', bio:'<img src=x onerror=alert(1)>' }) });
+  await ui.open(A); await flush();
+  const trigger = doc.getElementById('opponent-profile-trigger'), card = doc.getElementById('opponent-profile-card');
+  trigger.focus(); assert.equal(card.hidden, false); assert.equal(trigger.getAttribute('aria-expanded'), 'true');
+  assert.equal(doc.getElementById('opponent-profile-name').textContent, 'Friend');
+  assert.equal(doc.getElementById('opponent-profile-bio').textContent, '<img src=x onerror=alert(1)>');
+  assert.equal(card.querySelector('img'), null);
+  doc.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key:'Escape' })); assert.equal(card.hidden, true);
+  trigger.click(); assert.equal(card.hidden, false); trigger.click(); assert.equal(card.hidden, true);
+  ui.destroy(); dom.window.close();
+});
+
+test('piece reveal is restarted on show but not on a move or visibility change', async () => {
+  const dom = new JSDOM(html, { url:'https://example.com/pages/game.html' });
+  let calls = 0;
+  dom.window.Element.prototype.animate = function (frames, options) { if (options.duration === 1000) calls++; return { cancel() {} }; };
+  const ui = createMemberGame({ document:dom.window.document, api:async () => ({ game:null }) });
+  assert.equal(calls, 32); ui.hide(); ui.show(); assert.equal(calls, 64);
+  ui.browserVisibility(false); ui.browserVisibility(true); assert.equal(calls, 64);
+  ui.destroy(); dom.window.close();
+});
+
+
+test('resign requires confirmation and remains on the game screen', async t => {
+  const calls = []; let state = game();
+  const app = setup(async body => { calls.push(body); if (body.action === 'resign') state = {...state,status:'finished',result:'black_win',reason:'resignation',version:1}; return {game:state}; });
+  t.after(() => app.close()); await app.ui.open(A); await flush();
+  app.$('resign-button').click(); assert.equal(app.$('resign-dialog').hasAttribute('open'),true);
+  app.$('resign-cancel').click(); assert.equal(app.$('resign-dialog').hasAttribute('open'),false);
+  assert.equal(calls.some(body => body.action === 'resign'),false);
+  app.$('resign-button').click(); app.$('resign-confirm').click(); await flush();
+  assert.equal(calls.filter(body => body.action === 'resign').length,1);
+  assert.match(app.$('status').textContent,/Вы проиграли.*вы сдались/);
+  assert.equal(app.$('resign-control').hidden,true); assert.equal(app.$('new-game').hidden,false);
+  assert.equal(app.dom.window.location.pathname,'/pages/game.html');
+});
+
+test('offline decisions appear only when confirmed by the server and handle reconnect', async t => {
+  const calls = []; let state = {...game(),opponent_offline:true};
+  const app = setup(async body => { calls.push(body); if (body.action === 'offline_win') state = {...state,opponent_offline:false}; return {game:state}; });
+  t.after(() => app.close()); await app.ui.open(A); await flush();
+  assert.equal(app.$('offline-choice').hidden,false); app.$('offline-win').click(); await flush();
+  assert.equal(calls.some(body => body.action === 'offline_win'),true);
+  assert.equal(app.$('offline-choice').hidden,true);
+  assert.equal(app.$('resign-control').hidden,false);
+});
+
+test('offline draw is final only after server response', async t => {
+  let state = {...game(),opponent_offline:true};
+  const app = setup(async body => { if (body.action === 'offline_draw') state = {...state,status:'finished',result:'draw',reason:'opponent_offline',version:1}; return {game:state}; });
+  t.after(() => app.close()); await app.ui.open(A); await flush(); app.$('offline-draw').click(); await flush();
+  assert.match(app.$('status').textContent,/Ничья/); assert.equal(app.$('offline-choice').hidden,true);
+});
+
+test('failed resignation does not fabricate a loss', async t => {
+  const app = setup(async body => { if (body.action === 'resign') throw new Error('offline'); return {game:game()}; });
+  t.after(() => app.close()); await app.ui.open(A); await flush();
+  app.$('resign-button').click(); app.$('resign-confirm').click(); await flush();
+  assert.equal(app.$('resign-control').hidden,false); assert.equal(app.$('new-game').hidden,true);
+  assert.doesNotMatch(app.$('status').textContent,/Вы проиграли/);
+});
+
+
+test('resignation appears one minute after match creation, including after reopening', async t => {
+  let time = 0, age = 59000;
+  const app = setup(async () => ({game:{...game(),game_age_ms:age}}), () => time);
+  t.after(() => app.close()); await app.ui.open(A);
+  assert.equal(app.$('resign-control').hidden, true);
+  app.$('resign-button').click(); assert.equal(app.$('resign-dialog').hasAttribute('open'), false);
+  time = 999; await new Promise(resolve => setTimeout(resolve, 270));
+  assert.equal(app.$('resign-control').hidden, true);
+  time = 1000; await new Promise(resolve => setTimeout(resolve, 270));
+  assert.equal(app.$('resign-control').hidden, false);
+  const reopened = setup(async () => ({game:{...game(),game_age_ms:60000}}));
+  t.after(() => reopened.close()); await reopened.ui.open(A);
+  assert.equal(reopened.$('resign-control').hidden, false);
 });

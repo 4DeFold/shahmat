@@ -14,8 +14,8 @@ function fixture({ user = A, moves = [], turn = 'w' } = {}) {
   const db = { auth: { getUser: async token => token === 'valid' ? { data:{ user:{ id:user } } } : { data:{ user:null }, error:'unauthorized' } },
     rpc: async (name,args) => {
       calls.push({ name,args });
-      if (name === 'online_snapshot') return { data: (args.p_user === A || args.p_user === B) ? snapshot : null };
-      if (name === 'online_commit') return { data:{ ...snapshot, moves:[...moves,args.p_san], turn:args.p_next_turn, result:args.p_result, reason:args.p_reason } };
+      if (name === 'online_match_snapshot') return { data: (args.p_user === A || args.p_user === B) ? snapshot : null };
+      if (name === 'online_commit') { Object.assign(snapshot, { moves:[...moves,args.p_san], turn:args.p_next_turn, result:args.p_result, reason:args.p_reason }); return { data:snapshot }; }
       if (name === 'online_find') return { data:{state:'searching'} };
       return { data:null };
     } };

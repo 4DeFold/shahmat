@@ -19,12 +19,14 @@ try {
     }
     if (path === '/auth/v1/user') return route.fulfill({ json:user });
     if (path === '/rest/v1/profiles') return route.fulfill({ json:{ username:'Player', bio:'', palette:'monochrome' } });
-    if (path === '/functions/v1/match-opponent') return route.fulfill({ json:{ username:'Friend' } });
     if (path === '/functions/v1/matchplay') {
       const body = JSON.parse(request.postData());
+      if (body.action === 'heartbeat') return route.fulfill({json:{ok:true}});
+      if (body.action === 'opponent') return route.fulfill({json:{username:'Friend',bio:'Bio'}});
+      if (body.action === 'resign') { snapshot = {...snapshot, status:'finished', result:'black_win',reason:'resignation',version:snapshot.version+1}; return route.fulfill({json:{game:snapshot}}); }
       if (body.action === 'current' || body.action === 'cancel') return route.fulfill({ json:{ game:snapshot } });
       if (body.action === 'search') {
-        snapshot = { id:'fixture', white_id:user.id, black_id:'opponent', mode:body.mode, moves:[], turn:'w', version:0, status:'active', white_ms:180000, black_ms:180000 };
+        snapshot = { id:'fixture', white_id:user.id, black_id:'opponent', mode:body.mode, moves:[], turn:'w', version:0, status:'active', white_ms:180000, black_ms:180000, game_age_ms:60000 };
         return route.fulfill({ json:{ state:'matched', game:snapshot } });
       }
       if (body.action === 'move') {
@@ -48,14 +50,15 @@ try {
   assert.equal(await game.locator('#opponent-clock-card').getAttribute('data-color'), 'neutral');
   assert.equal(await game.locator('#player-clock-label').isHidden(), true);
   assert.equal(await game.locator('#start-search').isDisabled(), true);
+  assert.equal(await game.locator('#start-search').isHidden(), true);
   await game.locator('label:has(input[value=blitz])').click();
-  assert.equal(await game.locator('#player-clock').innerText(), '03:00');
+  assert.equal(await game.locator('#player-clock').getAttribute('aria-label'), '03:00');
   await game.locator('#start-search').click();
   await game.locator('#status').filter({ hasText:'Ваш ход' }).waitFor();
   assert.equal(await game.locator('#mode-picker').getAttribute('aria-hidden'), 'true');
   assert.equal(await game.locator('#mode-picker').evaluate(el => el.getBoundingClientRect().height), 0);
   assert.equal(await game.locator('#mode-summary').innerText(), 'Блиц · 3 мин');
-  assert.equal(await game.locator('#leave-game-control').isVisible(), true);
+  assert.equal(await game.locator('#resign-control').isVisible(), true);
   await game.locator('[data-square=e2]').click(); await game.locator('[data-square=e4]').click();
   await game.locator('#status').filter({ hasText:'Ход соперника' }).waitFor();
   assert.equal(await game.locator('[data-square=e4] img').count(), 1);
@@ -73,7 +76,7 @@ try {
   await game.locator('#toggle-moves').click(); assert.equal(await game.locator('#history-content').getAttribute('aria-hidden'), 'true');
   assert.equal(await game.locator('#history-content').evaluate(el => el.getBoundingClientRect().height), 0);
 
-  for (const size of [{ width:390,height:844 },{ width:1440,height:900 }]) {
+  for (const size of [{ width:280,height:653 }, { width:390,height:844 }, { width:768,height:1024 }, { width:1440,height:900 }, { width:2560,height:1080 }]) {
     await page.setViewportSize(size);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1 && document.documentElement.scrollHeight <= innerHeight + 1), true, 'game page must fit viewport');
     assert.equal(await game.locator('#board').isVisible(), true);
@@ -82,22 +85,43 @@ try {
       const own = pair.querySelector('#player-clock-card'), opponent = pair.querySelector('#opponent-clock-card');
       return { clockLeft: pair.getBoundingClientRect().left, boardRight: document.getElementById('board').getBoundingClientRect().right,
         ownBackground: getComputedStyle(own).backgroundColor, opponentBackground: getComputedStyle(opponent).backgroundColor,
-        numberSize: parseFloat(getComputedStyle(own.querySelector('strong')).fontSize), ownTop:own.getBoundingClientRect().top, opponentBottom:opponent.getBoundingClientRect().bottom, ownCenter:(own.getBoundingClientRect().top + own.getBoundingClientRect().bottom) / 2, opponentCenter:(opponent.getBoundingClientRect().top + opponent.getBoundingClientRect().bottom) / 2, boardMiddle: (document.getElementById('board').getBoundingClientRect().top + document.getElementById('board').getBoundingClientRect().bottom) / 2 };
+        numberSize: parseFloat(getComputedStyle(own.querySelector('strong')).fontSize), ownTop:own.getBoundingClientRect().top, ownBottom:own.getBoundingClientRect().bottom, opponentTop:opponent.getBoundingClientRect().top, opponentBottom:opponent.getBoundingClientRect().bottom, ownCenter:(own.getBoundingClientRect().top + own.getBoundingClientRect().bottom) / 2, opponentCenter:(opponent.getBoundingClientRect().top + opponent.getBoundingClientRect().bottom) / 2, boardMiddle: (document.getElementById('board').getBoundingClientRect().top + document.getElementById('board').getBoundingClientRect().bottom) / 2 };
     });
     assert.ok(clocks.clockLeft >= clocks.boardRight, 'clocks are next to the board');
     assert.ok(clocks.ownTop >= clocks.opponentBottom, 'player clock is below opponent');
     assert.ok(clocks.ownCenter >= clocks.boardMiddle && clocks.opponentCenter <= clocks.boardMiddle, 'clocks are in the correct halves');
+    assert.ok(clocks.ownTop - clocks.opponentBottom <= 13, 'clocks form a compact pair');
+    assert.ok(Math.abs((clocks.ownBottom + clocks.opponentTop) / 2 - clocks.boardMiddle) <= 1, 'clock pair is centered on the board');
     assert.notEqual(clocks.ownBackground, clocks.opponentBackground, 'clock backgrounds must differ');
     assert.ok(clocks.numberSize >= 12, 'clock numbers are legible');
-    // The longest time control must fit without clipping at every viewport.
-    await game.locator('#player-clock').evaluate(el => { el.textContent = '24:00:00'; });
-    assert.equal(await game.locator('#player-clock').evaluate(el => el.scrollWidth <= el.clientWidth + 1), true, 'clock value fits');
+    const clock = await game.locator('#player-clock').evaluate(async el => {
+      await document.fonts.load('600 16px Geist');
+      const slots = [...el.querySelectorAll('.clock-digit')];
+      const canvas = document.createElement('canvas'), context = canvas.getContext('2d');
+      context.font = getComputedStyle(el).font;
+      return { available:el.clientWidth, display:el.querySelector('.clock-digits').getBoundingClientRect().width,
+        slot:slots[0].getBoundingClientRect().width, digit:context.measureText('0').width };
+    });
+    assert.ok(clock.display <= clock.available + 1 && clock.digit <= clock.slot + 1, `${size.width}: digits fit ${JSON.stringify(clock)}`);
+    const online = await game.locator('#online-counter').evaluate(el => {
+      const number = el.querySelector('#online-value'), label = el.querySelector('.online-label');
+      return { numberLeft: number.getBoundingClientRect().left, numberRight: number.getBoundingClientRect().right, labelLeft: label.getBoundingClientRect().left,
+        numberSize: parseFloat(getComputedStyle(number).fontSize), labelSize: parseFloat(getComputedStyle(label).fontSize) };
+    });
+    assert.ok(online.numberLeft < online.labelLeft && online.labelLeft - online.numberRight <= 9 && online.labelSize < online.numberSize, 'online number precedes a smaller label');
   }
   assert.equal(await page.locator('#app-sidebar').isVisible(), true);
-  await game.locator('.leave-game').click();
+  await page.locator('.sidebar-brand').click();
   await page.waitForURL('**/home');
   await page.locator('#nav-play').click();
   await page.frameLocator('#member-game-frame').locator('#status').filter({hasText:'Ход соперника'}).waitFor();
   assert.deepEqual(snapshot.moves, ['e4','e5','Nf3'], 'leaving must not end the game');
+  await game.locator('#resign-button').click(); assert.equal(await game.locator('#resign-dialog').evaluate(el => el.open),true);
+  await game.locator('#resign-cancel').click(); assert.equal(snapshot.status,'active');
+  await game.locator('#resign-button').click(); await game.locator('#resign-confirm').click();
+  await game.locator('#status').filter({hasText:'вы сдались'}).waitFor(); assert.equal(snapshot.status,'finished');
+  assert.equal(new URL(page.url()).pathname,'/game');
+  assert.match(await game.locator('#player-clock').evaluate(el => getComputedStyle(el).fontFamily), /Geist/);
+
   console.log('✓ Viewport game, four controls, mocked search and legal move');
 } finally { await browser.close(); }

@@ -12,9 +12,10 @@ try {
   await page.route('https://eswyxbyddkajysogtglp.supabase.co/**', async route => {
     const path = new URL(route.request().url()).pathname;
     if (path === '/auth/v1/user') return route.fulfill({json:user});
-    if (path === '/functions/v1/match-opponent') return route.fulfill({json:{username:'Friend'}});
     if (path === '/functions/v1/matchplay') {
       const body = JSON.parse(route.request().postData());
+      if (body.action === 'heartbeat') return route.fulfill({json:{ok:true}});
+      if (body.action === 'opponent') return route.fulfill({json:{username:'Friend', bio:'Люблю шахматы'}});
       if (body.action === 'current') return route.fulfill({json:{game:null}});
       const game={id:'fixture',white_id:'opponent',black_id:user.id,mode:'blitz',moves:[],turn:'w',version:0,status:'active',white_ms:180000,black_ms:180000};
       return route.fulfill({json:{game}});
@@ -32,11 +33,13 @@ try {
   assert.ok(Math.abs(await angle()) < 1, 'pieces upright while board is sideways');
   assert.equal(await page.locator('#player-clock-label').isHidden(),true);
   const gap = await page.locator('.clock-pair').evaluate(el => {const [a,b] = el.children; return b.getBoundingClientRect().top-a.getBoundingClientRect().bottom;});
-  assert.ok(gap > 12, 'clocks are separated towards opposite sides');
+  assert.ok(gap >= 8 && gap <= 16, `clocks should be grouped: ${gap}`);
   const pickerHeight = await page.locator('#mode-picker').evaluate(el => el.getBoundingClientRect().height);
+  const boardWidth = await page.locator('#board').evaluate(el => el.offsetWidth);
   await page.locator('label:has(input[value=blitz])').click(); await page.locator('#start-search').click();
   await page.locator('#board.black').waitFor();
   await page.waitForTimeout(80);
+  assert.equal(await page.locator('#board').evaluate(el => el.offsetWidth), boardWidth, 'board size stays constant while rotating');
   const collapsingPicker = await page.locator('#mode-picker').evaluate(el => el.getBoundingClientRect().height);
   assert.ok(collapsingPicker > 0 && collapsingPicker < pickerHeight, `mode picker collapses smoothly: ${pickerHeight} -> ${collapsingPicker}`);
   assert.equal(await page.locator('#mode-picker').getAttribute('aria-hidden'), 'true');
@@ -56,6 +59,12 @@ try {
     assert.ok(Math.abs(await angle()) < 3, 'pieces stay upright during rotation and redraw');
   }
   assert.equal(await page.locator('#player-clock-label').isVisible(),true);
+  await page.locator('#opponent-profile-trigger').hover();
+  await page.locator('#opponent-profile-bio').filter({hasText:'Люблю шахматы'}).waitFor();
+  assert.equal(await page.locator('.bio-label').innerText(), 'БИО');
+  const cardType = await page.locator('#opponent-profile-card').evaluate(card => ({name:getComputedStyle(card.querySelector('strong')).fontFamily, nameSize:parseFloat(getComputedStyle(card.querySelector('strong')).fontSize), bioSize:parseFloat(getComputedStyle(card.querySelector('p')).fontSize)}));
+  assert.match(cardType.name, /Playfair/); assert.ok(cardType.nameSize > cardType.bioSize);
+
   // Exercise wheel smoothing of a nested scroll area with motion enabled.
   await page.evaluate(() => { const box = document.createElement('div'); box.id='scroll-test'; Object.assign(box.style,{position:'fixed',top:'0',left:'0',width:'200px',height:'100px',overflowY:'auto',zIndex:'9999'}); const content=document.createElement('div'); content.style.height='2000px'; box.append(content); document.body.append(box); });
   await page.mouse.move(50,50); await page.mouse.wheel(0,200); await page.waitForTimeout(60);

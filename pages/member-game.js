@@ -1,6 +1,7 @@
 import { Chess } from 'chess.js';
 import { createMemberBoard } from './member-board.js';
 import { createGameSound } from './game-sound.js';
+import { createRollingClock } from './rolling-clock.js';
 
 const times = { blitz: 180000, rapid: 600000, classical: 3600000, daily: 86400000 };
 const modeLabels = { blitz:'Блиц · 3 мин', rapid:'Рапид · 10 мин', classical:'Классика · 1 час', daily:'Дневная · 24 часа' };
@@ -8,7 +9,7 @@ const names = { k:'король', q:'ферзь', r:'ладья', b:'слон', 
 const files = 'abcdefgh';
 const pieceSrc = (color, type) => `/pieces/cburnett/${color}${type.toUpperCase()}.svg`;
 export function formatClock(ms) {
-  if (ms == null) return '—:—';
+  if (ms == null) return '00:00';
   const seconds = Math.max(0, Math.ceil(ms / 1000));
   const h = Math.floor(seconds / 3600), m = Math.floor(seconds % 3600 / 60), s = seconds % 60;
   return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
@@ -20,13 +21,16 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   const promotion = $('promotion'), options = $('promotion-options');
   let userId = null, ready = false, chess = new Chess(), latestMove = null, mode = null, phase = 'idle', selected = null, pending = null;
   let snapshot = null, receivedAt = 0, polling = null, generation = 0, moving = false, pendingSearch = null, viewVisible = true, browserVisible = true, pollFailures = 0;
-  let premove = null, historyIndex = null, nameForGame = null, nameTimer = null, drag = null, suppressClick = false;
+  let premove = null, historyIndex = null, nameForGame = null, nameTimer = null, drag = null, suppressClick = false, actionPending = false;
   const sound = createGameSound(win);
   const isVisible = () => viewVisible && browserVisible;
   const setStatus = (text, urgent = false) => { const el = $('status'); if (el.textContent !== text) el.textContent = text; el.parentElement.classList.toggle('urgent', urgent); };
   const cancelTimer = () => { if (polling !== null) clearTimeout(polling); polling = null; };
   const reducedMotion = () => win.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const clocks = { player: createRollingClock($('player-clock'), reducedMotion), opponent: createRollingClock($('opponent-clock'), reducedMotion) };
   const boardView = createMemberBoard({ document, board, reducedMotion });
+  // Age is provided by the server, then advanced monotonically between snapshots.
+  const canResign = () => phase === 'active' && Number.isFinite(snapshot?.game_age_ms) && snapshot.game_age_ms + Math.max(0, now() - receivedAt) >= 60000;
   const playSound = move => sound.play(chess.isCheck() ? 'check' : move?.captured ? 'capture' : 'move');
   function modeControls() {
     const locked = phase !== 'idle';
@@ -36,8 +40,11 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     picker.inert = locked; picker.setAttribute('aria-hidden', String(locked));
     $('mode-summary').hidden = !locked || !mode;
     $('mode-summary').textContent = modeLabels[mode] || '';
-    $('leave-game-control').hidden = phase !== 'active' && phase !== 'finished';
-    start.hidden = phase !== 'idle'; start.disabled = !userId || !ready || !mode;
+    $('resign-control').hidden = !canResign();
+    $('offline-choice').hidden = phase !== 'active' || snapshot?.opponent_offline !== true;
+    for (const id of ['resign-button','resign-confirm','offline-win','offline-draw']) $(id).disabled = actionPending || moving;
+    if (phase !== 'active') closeResign();
+    start.hidden = phase !== 'idle' || !mode; start.disabled = !userId || !ready || !mode;
     cancel.hidden = phase !== 'searching'; reset.hidden = phase !== 'finished';
     $('moves').hidden = phase !== 'active' && phase !== 'finished';
   }
@@ -52,8 +59,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
       if (card.dataset.color !== background) card.dataset.color = background;
       card.classList.toggle('running', snapshot?.status === 'active' && snapshot.turn === color);
       card.classList.toggle('low', remaining != null && remaining <= 30000 && snapshot?.status === 'active' && snapshot.turn === color);
-      const clock = $(`${id}-clock`), text = formatClock(remaining);
-      if (clock.textContent !== text) clock.textContent = text;
+      clocks[id].update(formatClock(remaining));
     }
     for (const [id, text] of [['player', `Вы · ${own === 'w' ? 'Белые' : 'Чёрные'}`], ['opponent', `Соперник · ${other === 'w' ? 'Белые' : 'Чёрные'}`]]) {
       const label = $(`${id}-clock-label`), value = snapshot ? text : '';
@@ -63,9 +69,9 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   }
   function resultText() {
     if (!snapshot || snapshot.status !== 'finished') return snapshot?.turn === currentColor() ? (chess.isCheck() ? 'Шах! Защитите короля — ваш ход.' : 'Ваш ход.') : (chess.isCheck() ? 'Шах сопернику. Ожидаем ход.' : 'Ход соперника. Можно подготовить свой ход.');
-    if (snapshot.result === 'draw') return snapshot.reason === 'stalemate' ? 'Пат. Ничья.' : 'Ничья.';
+    if (snapshot.result === 'draw') return snapshot.reason === 'stalemate' ? 'Пат. Ничья.' : snapshot.reason === 'opponent_offline' ? 'Ничья: игрок отключился.' : 'Ничья.';
     const won = snapshot.result === (currentColor() === 'w' ? 'white_win' : 'black_win');
-    return `${won ? 'Вы победили' : 'Вы проиграли'}${snapshot.reason === 'timeout' ? ' по времени' : snapshot.reason === 'checkmate' ? ': мат' : ''}.`;
+    return `${won ? 'Вы победили' : 'Вы проиграли'}${snapshot.reason === 'timeout' ? ' по времени' : snapshot.reason === 'checkmate' ? ': мат' : snapshot.reason === 'resignation' ? (won ? ': соперник сдался' : ': вы сдались') : snapshot.reason === 'opponent_offline' ? (won ? ': соперник не в сети' : ': соединение прервалось') : ''}.`;
   }
   function statusGame() { setStatus(resultText(), chess.isCheck() || snapshot?.status === 'finished'); }
   function displayChess() {
@@ -131,10 +137,26 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     let step = 0; const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     nameTimer = setInterval(() => { step++; el.textContent = [...text].map((c, i) => c === ' ' || step > 5 + i ? c : letters[Math.floor(Math.random() * letters.length)]).join(''); if (step > text.length + 5) { clearInterval(nameTimer); el.textContent = text; } }, 24);
   }
+  const profileTrigger = $('opponent-profile-trigger'), profileCard = $('opponent-profile-card');
+  let profilePinned = false;
+  function showProfile(show) { profileCard.hidden = !show; profileTrigger.setAttribute('aria-expanded', String(show)); }
+  profileTrigger.addEventListener('pointerenter', event => { if (event.pointerType !== 'touch' && !profileTrigger.disabled) showProfile(true); });
+  $('opponent-profile-trigger').parentElement.addEventListener('pointerleave', () => { if (!profilePinned && document.activeElement !== profileTrigger) showProfile(false); });
+  profileTrigger.addEventListener('focus', () => { if (!profileTrigger.disabled) showProfile(true); });
+  profileTrigger.addEventListener('blur', () => { if (!profilePinned) showProfile(false); });
+  profileTrigger.addEventListener('click', () => { profilePinned = !profilePinned; showProfile(profilePinned); });
+  document.addEventListener('keydown', event => { if (event.key === 'Escape') { profilePinned = false; showProfile(false); } });
+  document.addEventListener('pointerdown', event => { if (!profileTrigger.parentElement.contains(event.target)) { profilePinned = false; showProfile(false); } });
   function loadName(game) {
     if (nameForGame === game.id) return;
-    nameForGame = game.id;
-    Promise.resolve(opponentName(game.id)).then(name => { if (nameForGame === game.id && name) revealName(name); }).catch(() => {});
+    nameForGame = game.id; profilePinned = false; showProfile(false); profileTrigger.disabled = false;
+    $('opponent-profile-name').textContent = 'Соперник'; $('opponent-profile-bio').textContent = 'Информация пока недоступна.';
+    Promise.resolve(opponentName(game.id)).then(profile => {
+      if (nameForGame !== game.id || !profile) return;
+      const name = typeof profile === 'string' ? profile : profile.username;
+      if (typeof name === 'string' && name) { revealName(name); $('opponent-profile-name').textContent = name; }
+      if (typeof profile === 'object' && 'bio' in profile) $('opponent-profile-bio').textContent = profile.bio?.trim() || 'Био пока нет.';
+    }).catch(() => {});
   }
   function playQueuedPremove() {
     if (!premove || phase !== 'active' || moving || chess.turn() !== currentColor()) return false;
@@ -146,7 +168,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   function applyGame(game) {
     if (!game || !Array.isArray(game.moves) || (snapshot && snapshot.id === game.id && game.version < snapshot.version)) return;
     if (snapshot && snapshot.id === game.id && game.version === snapshot.version && game.status === snapshot.status && !moving) {
-      snapshot = game; receivedAt = now(); drawClocks(); playQueuedPremove(); return;
+      snapshot = game; receivedAt = now(); modeControls(); drawClocks(); playQueuedPremove(); return;
     }
     const previous = snapshot, localMoves = chess.history();
     const sameGame = previous?.id === game.id;
@@ -217,7 +239,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     try { move = chess.move({ from, to, ...(piece ? { promotion:piece } : {}) }); } catch { return; }
     // Invalidate any old snapshot request before it can overwrite the optimistic move.
     cancelTimer(); const moveGeneration = ++generation;
-    moving = true; selected = null; pending = null; promotion.hidden = true; historyIndex = null; latestMove = move;
+    moving = true; modeControls(); selected = null; pending = null; promotion.hidden = true; historyIndex = null; latestMove = move;
     renderBoard(animate ? move : null); renderHistory(); playSound(move); setStatus('Отправляем ход…');
     try {
       const result = await api({ action:'move', gameId:saved.id, version:saved.version, from, to, ...(piece ? { promotion:piece } : {}) });
@@ -241,7 +263,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
         setStatus('Нет связи. Позиция восстановится после подключения.', true);
       }
     } finally {
-      moving = false;
+      moving = false; modeControls();
       if (moveGeneration === generation && isVisible() && phase === 'active') {
         if (!playQueuedPremove()) { cancelTimer(); void poll(++generation); }
       }
@@ -329,13 +351,54 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   });
   $('history-first').addEventListener('click', () => showHistory(0)); $('history-prev').addEventListener('click', () => showHistory((historyIndex ?? chess.history().length) - 1));
   $('history-next').addEventListener('click', () => showHistory((historyIndex ?? chess.history().length) + 1)); $('history-last').addEventListener('click', () => showHistory(chess.history().length));
+  const resignDialog = $('resign-dialog');
+  function closeResign() {
+    if (!resignDialog?.open) return;
+    if (typeof resignDialog.close === 'function') resignDialog.close(); else resignDialog.removeAttribute('open');
+  }
+  $('resign-button').addEventListener('click', () => {
+    if (!canResign() || actionPending || moving) return;
+    if (typeof resignDialog.showModal === 'function') resignDialog.showModal(); else resignDialog.setAttribute('open','');
+    $('resign-cancel').focus();
+  });
+  $('resign-cancel').addEventListener('click', closeResign);
+  async function finishAction(action) {
+    if (phase !== 'active' || !snapshot || actionPending || moving || (action === 'resign' ? !canResign() : !snapshot.opponent_offline)) return;
+    const gameId = snapshot.id;
+    actionPending = true; closeResign(); modeControls(); cancelTimer(); ++generation;
+    setStatus('Подтверждаем результат…');
+    try {
+      const response = await api({ action, gameId });
+      if (!response.game) throw new Error('missing snapshot');
+      if (snapshot?.id !== gameId) return;
+      applyGame(response.game);
+      if (response.game.status === 'active') setStatus(action === 'resign' ? 'Не удалось подтвердить сдачу.' : 'Соперник вернулся или отключение ещё не подтверждено.', true);
+    } catch {
+      if (snapshot?.id === gameId) setStatus('Результат не подтверждён. Проверяем соединение…', true);
+    } finally {
+      actionPending = false; modeControls();
+      if (isVisible() && phase === 'active' && snapshot?.id === gameId) void poll(++generation);
+    }
+  }
+  $('resign-confirm').addEventListener('click', () => void finishAction('resign'));
+  $('offline-win').addEventListener('click', () => void finishAction('offline_win'));
+  $('offline-draw').addEventListener('click', () => void finishAction('offline_draw'));
   $('mode-list').addEventListener('change', event => { if (phase === 'idle' && times[event.target.value]) { mode = event.target.value; modeControls(); drawClocks(); setStatus('Всё готово к поиску.'); } });
   start.addEventListener('click', () => void search()); cancel.addEventListener('click', () => void cancelSearch());
-  reset.addEventListener('click', () => { cancelTimer(); generation++; snapshot = null; chess = new Chess(); latestMove = null; phase = 'idle'; premove = null; historyIndex = null; nameForGame = null; clearInterval(nameTimer); $('opponent-name').textContent = 'Соперник'; modeControls(); renderBoard(); renderHistory(); drawClocks(); setStatus('Выбери режим.'); });
+  reset.addEventListener('click', () => { cancelTimer(); generation++; snapshot = null; chess = new Chess(); latestMove = null; phase = 'idle'; mode = null; $('mode-list').querySelectorAll('input').forEach(input => { input.checked = false; }); premove = null; historyIndex = null; nameForGame = null; profileTrigger.disabled = true; profilePinned = false; showProfile(false); clearInterval(nameTimer); $('opponent-name').textContent = 'Соперник'; modeControls(); renderBoard(); renderHistory(); drawClocks(); setStatus('Выбери режим.'); });
   function pause() { cancelDrag(); if (phase === 'searching') void cancelSearch(); else { generation++; cancelTimer(); } }
   function resume() { if (phase === 'active' || phase === 'searching') void poll(++generation); }
-  const clockInterval = setInterval(() => { if (isVisible()) drawClocks(); }, 250);
-  modeControls(); renderBoard(); drawClocks(); setTimeout(() => board.classList.add('ready'), 500);
+  const clockInterval = setInterval(() => { if (isVisible()) { drawClocks(); if (phase === 'active' && $('resign-control').hidden && canResign()) modeControls(); } }, 250);
+  let revealAnimations = [];
+  function revealPieces() {
+    revealAnimations.forEach(animation => animation.cancel()); revealAnimations = [];
+    if (reducedMotion()) return;
+    board.querySelectorAll('.piece').forEach(piece => {
+      if (piece.animate) revealAnimations.push(piece.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 1000, easing: 'ease-out' }));
+    });
+  }
+  modeControls(); renderBoard(); drawClocks(); board.classList.add('ready');
+  if (win.parent === win) revealPieces();
   return {
     async open(id) {
       if (userId === id) return;
@@ -345,8 +408,8 @@ export function createMemberGame({ document, api, opponentName = async () => nul
       finally { ready = true; modeControls(); }
     },
     hide() { const wasVisible = isVisible(); viewVisible = false; if (wasVisible) pause(); },
-    show() { const wasVisible = isVisible(); viewVisible = true; if (!wasVisible && isVisible()) { board.classList.add('ready'); resume(); } },
+    show() { const wasVisible = isVisible(); const wasShown = viewVisible; viewVisible = true; if (!wasShown) revealPieces(); if (!wasVisible && isVisible()) resume(); },
     browserVisibility(value) { const wasVisible = isVisible(); browserVisible = value; if (wasVisible && !isVisible()) pause(); else if (!wasVisible && isVisible()) resume(); },
-    destroy() { generation++; cancelDrag(); cancelTimer(); clearInterval(clockInterval); clearInterval(nameTimer); sound.destroy(); },
+    destroy() { generation++; cancelDrag(); cancelTimer(); clearInterval(clockInterval); clearInterval(nameTimer); revealAnimations.forEach(animation => animation.cancel()); Object.values(clocks).forEach(clock => clock.destroy()); sound.destroy(); },
   };
 }

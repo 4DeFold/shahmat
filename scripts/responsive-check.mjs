@@ -233,6 +233,8 @@ for (const device of devices) {
     return { top: buttons[0].getBoundingClientRect().top - rect.top, bottom: rect.bottom - buttons[buttons.length - 1].getBoundingClientRect().bottom };
   });
   assert.ok(menuSpacing.top >= 8 && menuSpacing.bottom >= 8, `${device.id}: profile menu needs vertical padding ${JSON.stringify(menuSpacing)}`);
+  const profileGap = await page.evaluate(() => document.querySelector('#account-toggle').getBoundingClientRect().top - document.querySelector('#account-menu').getBoundingClientRect().bottom);
+  assert.ok(Math.abs(profileGap) <= 1, `${device.id}: profile menu must meet its button (gap ${profileGap}px)`);
   if (mobileDrawer) {
     const separation = await page.evaluate(() => ({
       playBottom: document.querySelector('#nav-play').getBoundingClientRect().bottom,

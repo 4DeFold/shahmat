@@ -22,16 +22,17 @@ try {
     }
     window.AudioContext = FakeAudioContext;
     const animate = Element.prototype.animate;
-    Element.prototype.animate = function(...args) { if (this.classList.contains('piece')) window.pieceAnimations = (window.pieceAnimations || 0) + 1; return animate.apply(this,args); };
+    Element.prototype.animate = function(...args) { if (this.classList.contains('piece') && args[1]?.duration === 165) window.pieceAnimations = (window.pieceAnimations || 0) + 1; return animate.apply(this,args); };
   }, session);
   let state = {id:'fixture',white_id:user.id,black_id:'opponent',mode:'blitz',moves:[],turn:'w',version:0,status:'active',white_ms:180000,black_ms:180000};
   let release; const delayed = new Promise(resolve => { release = resolve; });
   await page.route('https://eswyxbyddkajysogtglp.supabase.co/**', async route => {
     const path = new URL(route.request().url()).pathname;
     if (path === '/auth/v1/user') return route.fulfill({json:user});
-    if (path === '/functions/v1/match-opponent') return route.fulfill({json:{username:'Friend'}});
     if (path === '/functions/v1/matchplay') {
       const body = JSON.parse(route.request().postData());
+      if (body.action === 'heartbeat') return route.fulfill({json:{ok:true}});
+      if (body.action === 'opponent') return route.fulfill({json:{username:'Friend'}});
       if (body.action === 'move') { await delayed; state = {...state,moves:['e4'],turn:'b',version:1}; }
       return route.fulfill({json:{game:state}});
     }
@@ -68,7 +69,7 @@ try {
     return { body:getComputedStyle(document.body).fontFamily, clock:getComputedStyle(document.querySelector('#player-clock')).fontFamily,
       loaded:document.fonts.check("16px 'Charis SIL'", 'Жывы') && document.fonts.check('16px Playfair', 'Играть') };
   });
-  assert.match(fonts.body, /Charis SIL/); assert.match(fonts.clock, /Charis SIL/); assert.equal(fonts.loaded, true);
+  assert.match(fonts.body, /Charis SIL/); assert.match(fonts.clock, /Geist/); assert.equal(fonts.loaded, true);
   assert.equal(await page.locator('#sound-toggle, .sound-toggle, .game-rail h1, .leave-note').count(), 0);
   await page.evaluate(() => document.documentElement.style.setProperty('--accent', '#3d5a40'));
   await page.waitForTimeout(300);

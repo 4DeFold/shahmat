@@ -10,12 +10,12 @@ function setup(user = A) {
   let handler, lookedUp = null;
   const db = { auth:{ getUser:async token => token === 'ok' ? { data:{user:{id:user}} } : { data:{user:null},error:true } },
     rpc:async (name, args) => ({ data: args.p_user === A || args.p_user === B ? { white_id:A, black_id:B } : null }),
-    from:table => ({ select:fields => ({ eq:(key, id) => ({ maybeSingle:async () => { lookedUp = {table,fields,key,id}; return {data:{username:'Friend'}}; } }) }) }) };
+    from:table => ({ select:fields => ({ eq:(key, id) => ({ maybeSingle:async () => { lookedUp = {table,fields,key,id}; return {data:{username:'Friend',bio:'Hello'}}; } }) }) }) };
   vm.runInNewContext(code, { createClient:() => db, Response, Deno:{env:{get:()=> 'configured'},serve:fn=>{handler=fn;}} });
   return { request:(gameId = GAME, token='ok') => handler(new Request('https://example.com', { method:'POST', headers:{ Authorization:`Bearer ${token}` }, body:JSON.stringify({gameId}) })), lookup:()=>lookedUp };
 }
 test('nickname endpoint exposes only opponent username to a participant', async () => {
-  const app = setup(); const res = await app.request(); assert.equal(res.status, 200); assert.equal((await res.json()).username, 'Friend');
+  const app = setup(); const res = await app.request(); assert.equal(res.status, 200); assert.deepEqual(await res.json(), { username:'Friend' });
   assert.deepEqual(app.lookup(), { table:'profiles', fields:'username', key:'id', id:B });
   const black = setup(B); await black.request(); assert.equal(black.lookup().id, A);
   const outsider = setup(OUT); assert.equal((await outsider.request()).status, 404); assert.equal(outsider.lookup(), null);

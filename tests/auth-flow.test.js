@@ -54,6 +54,8 @@ async function setup({ existing = false, palette = 'monochrome', failSave = fals
   const realSetTimeout = window.setTimeout.bind(window);
   window.setTimeout = (cb, delay, ...args) => delay >= 3000 ? 1 : realSetTimeout(cb, delay, ...args);
   window.createClient = () => db;
+  window.startOnlinePresence = () => () => {};
+  window.startMatchHeartbeat = () => () => {};
   window.eval(source.replace("import.meta.env.VITE_EMAIL_OTP_READY === 'true'", String(otpReady)));
   await tick();
   const $ = id => window.document.getElementById(id);
@@ -151,6 +153,8 @@ test('startup waits for session and profile before revealing dashboard', async (
   window.setInterval = () => 1; window.clearInterval = () => {};
   window.requestAnimationFrame = cb => cb();
   window.scrollTo = () => {};
+  window.startOnlinePresence = () => () => {};
+  window.startMatchHeartbeat = () => () => {};
   window.createClient = () => ({
     auth: { getSession: () => new Promise(resolve => { resolveSession = resolve; }) },
     from: () => ({ select: () => ({ eq: () => ({ maybeSingle: () => new Promise(resolve => { resolveProfile = resolve; }) }) }) })
@@ -522,10 +526,11 @@ test('the game frame receives board colours from the active palette', async () =
   landing.style.setProperty('--board-dark', '#769656');
   landing.style.setProperty('--accent', '#3d5a40');
   frame.dispatchEvent(new window.Event('load'));
-  assert.equal(sent.at(-1).origin, 'https://example.com');
-  assert.equal(sent.at(-1).message.colors['--board-light'], '#eeeed2');
-  assert.equal(sent.at(-1).message.colors['--board-dark'], '#769656');
-  assert.equal(sent.at(-1).message.colors['--accent'], '#3d5a40');
+  const appearance = sent.findLast(item => item.message.type === 'shahmat-appearance');
+  assert.equal(appearance.origin, 'https://example.com');
+  assert.equal(appearance.message.colors['--board-light'], '#eeeed2');
+  assert.equal(appearance.message.colors['--board-dark'], '#769656');
+  assert.equal(appearance.message.colors['--accent'], '#3d5a40');
   window.close();
 });
 

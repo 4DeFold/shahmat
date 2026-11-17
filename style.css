@@ -676,7 +676,7 @@ textarea { resize: vertical; min-height: 92px; }
 @media (max-height: 450px) and (pointer: coarse) {
   .landing.palette-active .dashboard .sidebar-nav,
   .landing.palette-active .dashboard .sidebar-account { flex-shrink: 0; }
-  .landing.palette-active .dashboard .account-menu { position: static; margin-bottom: 8px; }
+  .landing.palette-active .dashboard .account-menu { position: static; margin: 0 -14px; }
 }
 
 /* Secondary authentication actions follow the existing monochrome form style. */
@@ -730,9 +730,9 @@ textarea { resize: vertical; min-height: 92px; }
 /* Entry-only effects inspired by React Bits' Blur Text, Fade Content,
    Spotlight Card, Magnet and Click Spark. The game and dashboard remain still. */
 .landing { position: relative; }
-.entrance-atmosphere { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; opacity: 0; transition: opacity .65s ease; }
-.landing:has(#landing-screen:not([hidden])) .entrance-atmosphere,
-.landing:has(#auth-screen:not([hidden])) .entrance-atmosphere { opacity: 1; }
+.entrance-atmosphere { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; opacity: 0; visibility: hidden; transition: opacity .65s ease; }
+body.startup-ready .landing:has(#landing-screen:not([hidden])) .entrance-atmosphere,
+body.startup-ready .landing:has(#auth-screen:not([hidden])) .entrance-atmosphere { opacity: 1; visibility: visible; }
 .entrance-grid { position: absolute; inset: 0; opacity: .19; background-image: linear-gradient(color-mix(in srgb, var(--foreground) 12%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--foreground) 12%, transparent) 1px, transparent 1px); background-size: clamp(46px, 6vw, 82px) clamp(46px, 6vw, 82px); mask-image: radial-gradient(ellipse 72% 72% at 50% 48%, transparent 20%, #000 100%); }
 .entrance-orbit { position: absolute; width: min(72vw, 780px); aspect-ratio: 1; left: 50%; top: 50%; border: 1px solid color-mix(in srgb, var(--foreground) 9%, transparent); border-radius: 50%; transform: translate(-50%, -50%); }
 .entrance-orbit--two { width: min(94vw, 1050px); border-style: dashed; opacity: .55; }
@@ -780,4 +780,23 @@ body.startup-ready #landing-screen:not([hidden]) .hero-reveal--tail { animation-
   .entrance-piece, body.startup-ready #landing-screen:not([hidden]) .hero-reveal,
   #auth-screen:not([hidden]) :is(.panel-top, .wordmark, .auth-tabs), #auth-screen:not([hidden]) #auth-form > :not([hidden]):not(#forgot-password),
   #auth-submit:hover::after { animation: none; }
+}
+
+/* The wordmark fills roughly 90% of the full 208px desktop rail. */
+.sidebar-brand { width: calc(100% + 28px); margin-inline: -14px; padding-inline: 0; font-size: 36px; }
+
+/* Navigation hit areas and highlights span the rail without shifting their contents. */
+.sidebar-nav > .sidebar-item, .sidebar-account > .sidebar-item {
+  width: calc(100% + 28px); margin-inline: -14px; padding-inline: 26px;
+}
+.sidebar-icon svg { display: block; width: 24px; height: 24px; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.account-menu { left: -14px; bottom: 100%; width: calc(100% + 28px); min-width: 0; border-inline: 0; }
+.account-menu-content { padding: 8px 0; }
+.account-menu :is(button, a) { padding-inline: 26px; }
+.account-menu a[aria-current='page'],
+.sidebar-account:has(.account-menu a[aria-current='page']) > .sidebar-account-toggle {
+  background: var(--accent); color: var(--accent-ink); border-color: var(--accent);
+}
+@media (hover: hover) {
+  .account-menu a[aria-current='page']:hover { background: var(--accent); border-color: var(--accent); }
 }
