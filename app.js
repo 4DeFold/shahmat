@@ -1,3 +1,4 @@
+import { createRatingView } from './pages/rating.js';
 import { startOnlinePresence } from './pages/online-presence.js';
 import { startMatchHeartbeat } from './pages/match-heartbeat.js';
 import { createClient } from '@supabase/supabase-js';
@@ -165,7 +166,7 @@ let navigating = false;
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const accountMenu = $('account-menu');
 const accountToggle = $('account-toggle');
-const pages = new Set(['home', 'game', 'profile', 'settings', 'help']);
+const pages = new Set(['home', 'game', 'rating', 'profile', 'settings', 'help']);
 const sidebar = $('app-sidebar');
 const mobileMenuToggle = $('mobile-menu-toggle');
 let sidebarOpen = false;
@@ -233,6 +234,7 @@ function openAccountMenu() {
 const pageLoaders = {
   home: () => import('./pages/home.html?raw'),
   game: () => import('./pages/game-view.html?raw'),
+  rating: () => import('./pages/rating.html?raw'),
   profile: () => import('./pages/profile.html?raw'),
   settings: () => import('./pages/settings.html?raw'),
   help: () => import('./pages/help.html?raw'),
@@ -240,7 +242,7 @@ const pageLoaders = {
 let pageRequest = 0;
 const viewId = name => name === 'home' ? 'dashboard-home' : `page-${name}`;
 const viewLoads = new Map();
-let frameReady = null;
+let frameReady = null, ratingView = null;
 let onlineStop = null, heartbeatStop = null, onlineUser = null, onlineCount = null;
 function sendOnline() { $('member-game-frame')?.contentWindow?.postMessage({ type: 'shahmat-online', count: onlineCount }, window.location.origin); }
 function startOnline(id) {
@@ -257,6 +259,7 @@ async function loadView(name) {
     const { default: html } = await pageLoaders[name]();
     if (!dashboardPreloadEnabled || $('dashboard-screen').hidden || $(viewId(name))) return;
     $('page-content').insertAdjacentHTML('beforeend', html);
+    if (name === 'rating') ratingView = createRatingView($('page-rating'), supabase);
     if (name === 'profile' && profile) displayProfile();
     if (name === 'settings') applyPalette(selectedPalette);
     if (name === 'game') {
@@ -294,6 +297,7 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
     if (request !== pageRequest) return;
     $('page-load-error')?.remove();
     $('page-loading')?.remove();
+    if (name === 'rating') void ratingView?.refresh();
     $('member-game-frame')?.contentWindow?.postMessage({ type: name === 'game' ? 'shahmat-game-shown' : 'shahmat-game-hidden' }, window.location.origin);
     document.querySelectorAll('#dashboard-screen [data-view]').forEach(view => {
       const active = view.dataset.view === name;
@@ -314,7 +318,7 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
       const heading = name === 'profile' ? $('dashboard-title') : $('page-' + name + '-title');
       if (heading) { heading.setAttribute('tabindex', '-1'); heading.focus({ preventScroll: true }); }
     }
-    document.title = ({ home: 'Главная', game: 'Играть', profile: 'Профиль', settings: 'Настройки', help: 'Помощь' })[name] + ' — shahmat.xyz';
+    document.title = ({ home: 'Главная', game: 'Играть', rating: 'Рейтинг', profile: 'Профиль', settings: 'Настройки', help: 'Помощь' })[name] + ' — shahmat.xyz';
   } catch {
     if (request !== pageRequest) return;
     document.querySelectorAll('#dashboard-screen [data-view]').forEach(view => { view.hidden = true; });
@@ -712,7 +716,9 @@ document.querySelectorAll('.signout').forEach(button => button.addEventListener(
     if (error) throw error;
     onlineStop?.(); heartbeatStop?.(); onlineStop = null; heartbeatStop = null; onlineUser = null; onlineCount = null;
     dashboardPreloadEnabled = false; pageRequest++;
-    $('page-game')?.remove(); frameReady = null; // Discard the prior account's game frame on logout.
+    // Discard account-specific views on logout.
+    $('page-game')?.remove(); frameReady = null;
+    $('page-rating')?.remove(); ratingView = null;
     profile = null; applyPalette('monochrome'); applyTheme(null); $('auth-form').reset(); setMode('login');
     window.history.replaceState(null, '', '/');
     await show('auth-screen');

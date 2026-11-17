@@ -1,0 +1,16 @@
+<section class="rating-page" id="page-rating" data-view="rating" hidden aria-labelledby="page-rating-title">
+  <header class="rating-heading"><h2 id="page-rating-title" tabindex="-1">Рейтинг<span>.</span></h2><span class="rating-top">ТОП 100</span></header>
+  <div class="rating-filters" role="group" aria-label="Режим рейтинга">
+    <button type="button" class="rating-filter" data-rating-mode="overall" aria-pressed="true">Общий</button>
+    <button type="button" class="rating-filter" data-rating-mode="blitz" aria-pressed="false">Блиц</button>
+    <button type="button" class="rating-filter" data-rating-mode="rapid" aria-pressed="false">Рапид</button>
+    <button type="button" class="rating-filter" data-rating-mode="classical" aria-pressed="false">Классика</button>
+    <button type="button" class="rating-filter" data-rating-mode="daily" aria-pressed="false">Дневная</button>
+  </div>
+  <div class="rating-board" aria-busy="false">
+    <div class="rating-columns" aria-hidden="true"><span>№</span><span>Игрок</span><span>ЯР</span></div>
+    <ol class="rating-list" aria-label="Рейтинг игроков"></ol>
+    <p class="rating-status" role="status" aria-live="polite" hidden></p>
+    <button class="rating-retry" type="button" hidden>Повторить</button>
+  </div>
+</section>

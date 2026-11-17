@@ -1,0 +1,26 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { JSDOM } from 'jsdom';
+import { createRatingView } from '../pages/rating.js';
+const html = await readFile('pages/rating.html','utf8');
+const tick = () => new Promise(resolve => setTimeout(resolve,0));
+test('rating switches modes, escapes names, and ignores stale requests', async () => {
+  const dom=new JSDOM(html); const root=dom.window.document.querySelector('section');
+  const requests=[]; const client={rpc:(fn,args)=>new Promise(resolve=>requests.push({fn,args,resolve}))};
+  const view=createRatingView(root,client); const first=view.refresh();
+  root.querySelector('[data-rating-mode="rapid"]').click();
+  assert.deepEqual(requests.map(r=>r.args.p_mode),['overall','rapid']);
+  requests[1].resolve({data:[{username:'<b>Player</b>',yar:1234.5,ranked:true},{username:'New',yar:1000,ranked:false}],error:null}); await tick();
+  requests[0].resolve({data:[{username:'stale',yar:20,ranked:true}],error:null}); await first;
+  assert.equal(root.querySelector('[data-rating-mode="rapid"]').getAttribute('aria-pressed'),'true');
+  assert.equal(root.querySelector('.rating-player').textContent,'<b>Player</b>');
+  assert.equal(root.querySelector('.rating-player b'),null);
+  assert.equal(root.querySelectorAll('.rating-row')[1].querySelector('.rating-place').textContent,'—');
+  assert.equal(root.querySelector('.rating-board').getAttribute('aria-busy'),'false');
+  root.querySelector('[data-rating-mode="blitz"]').click(); requests[2].resolve({error:'unavailable'}); await tick();
+  assert.equal(root.querySelector('.rating-retry').hidden,false);
+  root.querySelector('.rating-retry').click(); requests[3].resolve({data:[],error:null}); await tick();
+  assert.equal(root.querySelector('.rating-status').textContent,'Пока нет игроков');
+  dom.window.close();
+});
