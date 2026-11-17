@@ -13,6 +13,7 @@
     "test:game": "node scripts/game-check.mjs",
     "test:game-appearance": "node scripts/game-appearance-check.mjs",
     "test:member-game": "node scripts/member-game-check.mjs",
+    "test:bot": "node scripts/bot-check.mjs",
     "test:landing-effects": "node scripts/landing-effects-check.mjs"
   },
   "repository": {
@@ -26,7 +27,8 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.119.0",
     "chess.js": "^1.4.0",
-    "lenis": "^1.3.27"
+    "lenis": "^1.3.27",
+    "stockfish": "17.1.0"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.16",

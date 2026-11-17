@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff"><title>Бот — shahmat.xyz</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/pages/play.css"><link rel="stylesheet" href="/pages/game.css"><link rel="stylesheet" href="/pages/bot-game.css">
+  <script type="module" src="/pages/bot-game.js"></script>
+</head>
+<body>
+<main class="member-shell bot-shell" id="bot-app" data-phase="choose">
+  <section class="board-area bot-stage" aria-label="Выбор бота и шахматная доска">
+    <div class="bot-showcase" id="bot-showcase">
+      <div class="showcase-top"><span>ТРЕНИРОВКА / <span id="level-index">01</span></span><span>06</span></div>
+      <div class="orbit-stage" id="orbit-stage" aria-hidden="true"><div class="orbit-ring orbit-ring-outer"></div><div class="orbit-ring orbit-ring-inner"></div><div id="orbit-boards"></div><div class="bot-glow"></div><img class="hero-piece" id="hero-piece" src="/pieces/cburnett/wP.svg" alt=""></div>
+      <div class="bot-selector"><button id="bot-prev" class="bot-arrow" type="button" aria-label="Предыдущий бот">←</button><div class="bot-title"><p>ВЫБЕРИ СОПЕРНИКА</p><h1 id="bot-name">Пешка</h1><span id="bot-subtitle">Уровень 1 из 6</span></div><button id="bot-next" class="bot-arrow" type="button" aria-label="Следующий бот">→</button></div>
+      <div class="bot-dots" id="bot-dots" aria-label="Уровни ботов"></div>
+      <button id="bot-play" class="bot-play" type="button"><span>Играть с ботом</span><span aria-hidden="true">↗</span></button>
+    </div>
+    <div class="board-wrap bot-board-wrap" id="bot-board-wrap" aria-hidden="true" inert>
+      <div class="player-row opponent-row"><span class="avatar bot-avatar"><img id="game-bot-piece" src="/pieces/cburnett/bP.svg" alt=""></span><span><strong id="game-bot-name">Пешка</strong><small>Stockfish · бот</small></span></div>
+      <div class="board-with-clocks"><div class="board-frame" id="target-board"><div class="board ready" id="board" role="group" aria-label="Шахматная доска"></div></div><div class="clock-pair bot-clocks" aria-label="Партия без ограничения времени"><div class="clock" id="opponent-clock-card" data-color="b"><span>БОТ</span><strong>∞</strong></div><div class="clock" id="player-clock-card" data-color="w"><span>ВЫ</span><strong>∞</strong></div></div></div>
+      <div class="player-row"><span class="avatar"><img src="/pieces/cburnett/wP.svg" alt=""></span><span><strong>Вы</strong><small>Белые</small></span></div>
+      <div class="bot-reveal" id="promotion" aria-hidden="true" inert><div class="bot-reveal-inner"><div class="promotion"><p>Выберите фигуру для превращения пешки:</p><div id="promotion-options"></div></div></div></div>
+    </div>
+  </section>
+  <aside class="game-rail bot-rail" aria-label="Информация о партии">
+    <div class="rail-content">
+      <div class="bot-rail-heading"><span class="rail-label">ИГРА С БОТОМ</span><span class="bot-rail-marker">✳</span></div>
+      <h2 id="rail-name">Пешка<span>.</span></h2><p id="rail-description" class="bot-description">Первый шаг: знакомство с игрой.</p>
+      <div class="bot-strength"><div><span>УРОВЕНЬ</span><strong id="rail-level">01 / 06</strong></div><div class="strength-track"><span id="strength-fill"></span></div><small id="strength-copy">1/6 от максимального уровня</small></div>
+      <div class="bot-separator"></div>
+      <div class="bot-fact"><span>ДВИЖОК</span><strong>Stockfish 17.1</strong></div><div class="bot-fact"><span>РЕЖИМ</span><strong>Без времени</strong></div><div class="bot-fact"><span>РЕЙТИНГ</span><strong>Без изменения ЯР</strong></div>
+      <div class="status-card game-notice"><span class="status-dot"></span><p class="game-status" id="status" role="status" aria-live="polite">Выбери соперника.</p></div>
+      <p class="bot-save-status" id="save-status" role="status" aria-live="polite"></p>
+      <div class="bot-actions" id="bot-actions" aria-hidden="true" inert><div class="bot-actions-inner">
+        <div class="bot-reveal" id="retry-wrap" aria-hidden="true" inert><div class="bot-reveal-inner"><button class="cancel-search" id="retry-bot" type="button">Повторить ход бота</button></div></div>
+        <div class="bot-reveal" id="resign-wrap" aria-hidden="true" inert><div class="bot-reveal-inner"><button class="leave-game" id="resign-button" type="button">Сдаться</button></div></div>
+        <button class="cancel-search" id="return-button" type="button">К выбору бота</button>
+      </div></div>
+      <div class="moves bot-moves" id="moves" aria-hidden="true" inert><div class="bot-moves-inner"><div class="moves-header"><button id="toggle-moves" type="button" aria-expanded="true" aria-controls="history-content">ХОДЫ <span id="move-count">00</span> <span class="history-chevron" aria-hidden="true">▾</span></button></div><div id="history-content" class="history-content"><div class="history-inner"><ol id="move-list" aria-label="История ходов"></ol></div></div></div></div>
+      <p class="bot-license">Движок: <a href="https://github.com/nmrugg/stockfish.js/tree/602fd7e1a571a2be71f242942db90483731f2a1f" target="_blank" rel="noopener noreferrer">Stockfish.js 17.1</a> · <a href="/stockfish/COPYING.txt" target="_blank" rel="noopener noreferrer">GPLv3</a></p>
+    </div>
+  </aside>
+</main>
+<dialog class="resign-dialog" id="resign-dialog" aria-labelledby="resign-title"><h2 id="resign-title">Сдаться?</h2><p>Партия завершится поражением, но ЯР не изменится.</p><div class="dialog-actions"><button type="button" id="resign-cancel">Продолжить</button><button type="button" id="resign-confirm">Да, сдаться</button></div></dialog>
+</body></html>

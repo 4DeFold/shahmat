@@ -5,6 +5,7 @@
   "rewrites": [
     { "source": "/home", "destination": "/index.html" },
     { "source": "/play", "destination": "/pages/play.html" },
+    { "source": "/bot", "destination": "/index.html" },
     { "source": "/game", "destination": "/index.html" },
     { "source": "/rating", "destination": "/index.html" },
     { "source": "/login", "destination": "/index.html" },
