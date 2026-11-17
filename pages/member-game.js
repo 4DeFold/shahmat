@@ -2,6 +2,8 @@ import { Chess } from 'chess.js';
 import { createMemberBoard } from './member-board.js';
 import { createGameSound } from './game-sound.js';
 import { createRollingClock } from './rolling-clock.js';
+import { retryMessage } from './match-api.js';
+import { createClockSync } from './clock-sync.js';
 
 const times = { blitz: 180000, rapid: 600000, classical: 3600000, daily: 86400000 };
 const modeLabels = { blitz:'Блиц · 3 мин', rapid:'Рапид · 10 мин', classical:'Классика · 1 час', daily:'Дневная · 24 часа' };
@@ -21,8 +23,10 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   const promotion = $('promotion'), options = $('promotion-options');
   let userId = null, ready = false, chess = new Chess(), latestMove = null, mode = null, phase = 'idle', selected = null, pending = null;
   let snapshot = null, receivedAt = 0, polling = null, generation = 0, moving = false, pendingSearch = null, viewVisible = true, browserVisible = true, pollFailures = 0;
+  let currentRequest = null, destroyed = false, reconciling = false, cancelPending = false;
   let premove = null, historyIndex = null, nameForGame = null, nameTimer = null, drag = null, suppressClick = false, actionPending = false;
   const sound = createGameSound(win);
+  const clockSync = createClockSync();
   const isVisible = () => viewVisible && browserVisible;
   const setStatus = (text, urgent = false) => { const el = $('status'); if (el.textContent !== text) el.textContent = text; el.parentElement.classList.toggle('urgent', urgent); };
   const cancelTimer = () => { if (polling !== null) clearTimeout(polling); polling = null; };
@@ -45,13 +49,13 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     for (const id of ['resign-button','resign-confirm','offline-win','offline-draw']) $(id).disabled = actionPending || moving;
     if (phase !== 'active') closeResign();
     start.hidden = phase !== 'idle' || !mode; start.disabled = !userId || !ready || !mode;
-    cancel.hidden = phase !== 'searching'; reset.hidden = phase !== 'finished';
+    cancel.hidden = phase !== 'searching' && phase !== 'cancelling'; cancel.disabled = phase === 'cancelling'; reset.hidden = phase !== 'finished';
     $('moves').hidden = phase !== 'active' && phase !== 'finished';
   }
   function currentColor() { return snapshot?.black_id === userId ? 'b' : 'w'; }
   function drawClocks() {
-    const own = currentColor(), elapsed = snapshot?.status === 'active' ? Math.max(0, now() - receivedAt) : 0;
-    const time = color => snapshot ? Math.max(0, snapshot[color === 'w' ? 'white_ms' : 'black_ms'] - (snapshot.status === 'active' && snapshot.turn === color ? elapsed : 0)) : mode ? times[mode] : null;
+    const own = currentColor();
+    const time = color => snapshot ? clockSync.value(color, now()) : mode ? times[mode] : null;
     const other = own === 'w' ? 'b' : 'w';
     for (const [id, color] of [['player', own], ['opponent', other]]) {
       const card = $(`${id}-clock-card`), remaining = time(color);
@@ -159,7 +163,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     }).catch(() => {});
   }
   function playQueuedPremove() {
-    if (!premove || phase !== 'active' || moving || chess.turn() !== currentColor()) return false;
+    if (!premove || phase !== 'active' || moving || reconciling || chess.turn() !== currentColor()) return false;
     const move = premove; premove = null;
     const valid = chess.moves({ square:move.from, verbose:true }).some(m => m.to === move.to && (!m.promotion || m.promotion === move.promotion));
     if (valid) { void submitMove(move.from, move.to, move.promotion); return true; }
@@ -168,9 +172,9 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   function applyGame(game) {
     if (!game || !Array.isArray(game.moves) || (snapshot && snapshot.id === game.id && game.version < snapshot.version)) return;
     if (snapshot && snapshot.id === game.id && game.version === snapshot.version && game.status === snapshot.status && !moving) {
-      snapshot = game; receivedAt = now(); modeControls(); drawClocks(); playQueuedPremove(); return;
+      snapshot = game; receivedAt = now(); clockSync.update(game, receivedAt); modeControls(); drawClocks(); playQueuedPremove(); return;
     }
-    const previous = snapshot, localMoves = chess.history();
+    const previous = snapshot, localMoves = chess.history(), selectedPiece = selected ? chess.get(selected) : null;
     const sameGame = previous?.id === game.id;
     const alreadyDisplayed = sameGame && localMoves.length === game.moves.length && localMoves.every((move, i) => move === game.moves[i]);
     let next = chess, nextLast = latestMove;
@@ -187,8 +191,8 @@ export function createMemberGame({ document, api, opponentName = async () => nul
       }
     }
     const newMove = sameGame && game.moves.length === previous.moves.length + 1 && !alreadyDisplayed ? nextLast : null;
-    snapshot = game; receivedAt = now(); chess = next; latestMove = nextLast;
-    if (!alreadyDisplayed) { cancelDrag(); selected = null; pending = null; promotion.hidden = true; }
+    snapshot = game; receivedAt = now(); clockSync.update(game, receivedAt); chess = next; latestMove = nextLast;
+    if (!alreadyDisplayed) { cancelDrag(); const piece = selected && next.get(selected); if (!sameGame || !selectedPiece || !piece || piece.color !== currentColor() || piece.type !== selectedPiece.type || piece.color !== selectedPiece.color) selected = null; pending = null; promotion.hidden = true; }
     phase = game.status === 'active' ? 'active' : 'finished'; mode = game.mode;
     if (phase === 'finished') premove = null;
     const input = $('mode-list').querySelector(`input[value="${mode}"]`); if (input) input.checked = true;
@@ -209,10 +213,16 @@ export function createMemberGame({ document, api, opponentName = async () => nul
       let response;
       try { response = await request; } finally { if (pendingSearch === request) pendingSearch = null; }
       if (expected !== generation) return;
+      if (searching ? !response?.game && response?.state !== 'searching' : !response?.game) throw Error('missing game state');
+      if (response.game && (!Array.isArray(response.game.moves) || (!searching && (response.game.id !== snapshot.id || response.game.version < snapshot.version)))) throw Error('invalid game state');
+      const recovering = pollFailures > 0 || reconciling;
       pollFailures = 0;
-      if (response.game && !moving) applyGame(response.game);
+      if (response.game && !moving) {
+        reconciling = false; applyGame(response.game);
+        if (recovering && historyIndex === null && !premove && !moving) statusGame();
+      }
       else if (phase === 'searching' && response.state === 'searching') setStatus('Ищем соперника с таким же режимом…');
-    } catch { if (expected === generation) { pollFailures = Math.min(pollFailures + 1, 5); setStatus('Нет связи. Повторяем попытку…', true); } }
+    } catch (error) { if (expected === generation) { pollFailures = Math.min(pollFailures + 1, 5); setStatus(retryMessage(error, 'Не удалось связаться с игровым сервисом. Повторяем попытку…'), true); } }
     // Faster updates while waiting for the opponent, but back off on outages.
     const delay = pollFailures ? Math.min(10000, 800 * 2 ** (pollFailures - 1)) : phase === 'active' && mode === 'daily' ? 15000 : phase === 'active' && snapshot?.turn !== currentColor() ? 450 : 900;
     if (expected === generation && isVisible() && ['searching','active'].includes(phase)) polling = setTimeout(() => poll(expected), delay);
@@ -223,18 +233,33 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     cancelTimer(); const expected = ++generation; await poll(expected);
   }
   async function cancelSearch() {
-    if (phase !== 'searching') return;
-    cancel.disabled = true; ++generation; cancelTimer();
+    if (destroyed || !['searching', 'cancelling'].includes(phase) || cancelPending) return;
+    if (phase === 'searching') {
+      phase = 'cancelling'; ++generation; cancelTimer(); modeControls();
+      setStatus('Отменяем поиск…');
+    }
+    cancelPending = true; cancelTimer();
     try {
+      // Do not send a fresh search after the user has asked to cancel, even
+      // if the preceding request failed or its response was lost.
       if (pendingSearch) await pendingSearch.catch(() => {});
+      if (destroyed) return;
       const response = await api({ action:'cancel' });
-      if (response.game) { applyGame(response.game); if (phase === 'active') void poll(generation); }
+      if (destroyed) return;
+      if (!response || !Object.hasOwn(response, 'game') || (response.game && !Array.isArray(response.game.moves))) throw Error('invalid cancellation state');
+      pollFailures = 0;
+      if (response.game) { applyGame(response.game); if (phase === 'active' && isVisible()) void poll(generation); }
       else { phase = 'idle'; modeControls(); setStatus('Поиск отменён.'); }
-    } catch { setStatus('Не удалось отменить поиск. Проверь соединение.', true); if (phase === 'searching') polling = setTimeout(() => poll(generation), 2500); }
-    finally { cancel.disabled = false; }
+    } catch (error) {
+      if (destroyed || phase !== 'cancelling') return;
+      pollFailures = Math.min(pollFailures + 1, 5);
+      setStatus(retryMessage(error, 'Не удалось подтвердить отмену. Повторяем попытку…'), true);
+      // Cancellation must keep retrying even while the game view is hidden.
+      polling = setTimeout(() => { polling = null; void cancelSearch(); }, Math.min(10000, 800 * 2 ** (pollFailures - 1)));
+    } finally { cancelPending = false; }
   }
   async function submitMove(from, to, piece = null, animate = true) {
-    if (moving || phase !== 'active' || !snapshot || chess.turn() !== currentColor()) return;
+    if (moving || reconciling || phase !== 'active' || !snapshot || chess.turn() !== currentColor()) return;
     const saved = snapshot, priorMoves = chess.history(), savedLast = latestMove; let move;
     try { move = chess.move({ from, to, ...(piece ? { promotion:piece } : {}) }); } catch { return; }
     // Invalidate any old snapshot request before it can overwrite the optimistic move.
@@ -258,19 +283,19 @@ export function createMemberGame({ document, api, opponentName = async () => nul
         applyGame(result.game);
       } catch {
         if (moveGeneration !== generation) return;
-        chess = new Chess(); priorMoves.forEach(m => chess.move(m)); latestMove = savedLast;
+        reconciling = true; chess = new Chess(); priorMoves.forEach(m => chess.move(m)); latestMove = savedLast;
         premove = null; selected = null; renderBoard(); renderHistory();
-        setStatus('Нет связи. Позиция восстановится после подключения.', true);
+        setStatus('Позиция не подтверждена. Проверяем игровой сервис…', true);
       }
     } finally {
       moving = false; modeControls();
-      if (moveGeneration === generation && isVisible() && phase === 'active') {
+      if (isVisible() && phase === 'active' && (moveGeneration === generation || reconciling)) {
         if (!playQueuedPremove()) { cancelTimer(); void poll(++generation); }
       }
     }
   }
   function attempt(from, to, animate = true) {
-    if (historyIndex !== null || phase !== 'active' || (moving && chess.turn() === currentColor()) || pending || !from || !to) return false;
+    if (historyIndex !== null || phase !== 'active' || reconciling || (moving && chess.turn() === currentColor()) || pending || !from || !to) return false;
     const choices = legalFor(from).filter(move => move.to === to);
     if (!choices.length) return false;
     if (chess.turn() !== currentColor()) {
@@ -288,7 +313,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     void submitMove(from, to, null, animate); return true;
   }
   function choose(square) {
-    if (!square || phase !== 'active' || (moving && chess.turn() === currentColor()) || pending || historyIndex !== null) return;
+    if (!square || phase !== 'active' || reconciling || (moving && chess.turn() === currentColor()) || pending || historyIndex !== null) return;
     if (premove && (premove.from === square || premove.to === square)) { premove = null; selected = null; renderBoard(); statusGame(); return; }
     if (selected && attempt(selected, square)) return;
     const piece = chess.get(square); selected = piece?.color === currentColor() && selected !== square ? square : null; renderBoard();
@@ -310,7 +335,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   }
   board.addEventListener('pointerdown', event => {
     sound.prime();
-    if (event.button !== 0 || phase !== 'active' || (moving && chess.turn() === currentColor()) || pending || historyIndex !== null) return;
+    if (event.button !== 0 || phase !== 'active' || reconciling || (moving && chess.turn() === currentColor()) || pending || historyIndex !== null) return;
     const cell = event.target.closest('[data-square]'), square = cell?.dataset.square, piece = square && chess.get(square);
     if (!piece || piece.color !== currentColor()) return;
     drag = { from:square, x:event.clientX, y:event.clientY, xNow:event.clientX, yNow:event.clientY, pointer:event.pointerId, cell, ghost:null, raf:null };
@@ -383,11 +408,40 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   $('resign-confirm').addEventListener('click', () => void finishAction('resign'));
   $('offline-win').addEventListener('click', () => void finishAction('offline_win'));
   $('offline-draw').addEventListener('click', () => void finishAction('offline_draw'));
-  $('mode-list').addEventListener('change', event => { if (phase === 'idle' && times[event.target.value]) { mode = event.target.value; modeControls(); drawClocks(); setStatus('Всё готово к поиску.'); } });
+  $('mode-list').addEventListener('change', event => { if (phase === 'idle' && times[event.target.value]) { mode = event.target.value; modeControls(); drawClocks(); if (ready) setStatus('Всё готово к поиску.'); } });
   start.addEventListener('click', () => void search()); cancel.addEventListener('click', () => void cancelSearch());
-  reset.addEventListener('click', () => { cancelTimer(); generation++; snapshot = null; chess = new Chess(); latestMove = null; phase = 'idle'; mode = null; $('mode-list').querySelectorAll('input').forEach(input => { input.checked = false; }); premove = null; historyIndex = null; nameForGame = null; profileTrigger.disabled = true; profilePinned = false; showProfile(false); clearInterval(nameTimer); $('opponent-name').textContent = 'Соперник'; modeControls(); renderBoard(); renderHistory(); drawClocks(); setStatus('Выбери режим.'); });
-  function pause() { cancelDrag(); if (phase === 'searching') void cancelSearch(); else { generation++; cancelTimer(); } }
-  function resume() { if (phase === 'active' || phase === 'searching') void poll(++generation); }
+  reset.addEventListener('click', () => { cancelTimer(); generation++; snapshot = null; clockSync.clear(); chess = new Chess(); latestMove = null; phase = 'idle'; mode = null; $('mode-list').querySelectorAll('input').forEach(input => { input.checked = false; }); premove = null; historyIndex = null; nameForGame = null; profileTrigger.disabled = true; profilePinned = false; showProfile(false); clearInterval(nameTimer); $('opponent-name').textContent = 'Соперник'; modeControls(); renderBoard(); renderHistory(); drawClocks(); setStatus('Выбери режим.'); });
+  function pause() { cancelDrag(); if (moving) reconciling = true; if (phase === 'searching') void cancelSearch(); else if (phase !== 'cancelling') { generation++; cancelTimer(); } }
+  function resume() {
+    if (!userId || destroyed) return;
+    if (!ready) { cancelTimer(); void checkCurrent(); return; }
+    if (phase === 'cancelling') { if (!cancelPending) void cancelSearch(); return; }
+    if ((phase === 'active' && !moving && !actionPending) || (phase === 'searching' && !pendingSearch && !cancel.disabled)) {
+      cancelTimer(); void poll(++generation);
+    }
+  }
+  async function checkCurrent() {
+    if (currentRequest || ready || destroyed || !userId) return currentRequest;
+    const id = userId;
+    currentRequest = (async () => {
+      try {
+        const result = await api({ action:'current' });
+        if (destroyed || userId !== id) return;
+        if (!result || !Object.hasOwn(result, 'game') || (result.game && !Array.isArray(result.game.moves))) throw Error('invalid current state');
+        ready = true; pollFailures = 0;
+        if (result.game && phase === 'idle') applyGame(result.game);
+        else if (phase === 'idle') setStatus(mode ? 'Всё готово к поиску.' : 'Выбери режим.');
+        modeControls();
+        if (isVisible() && phase === 'active') void poll(++generation);
+      } catch (error) {
+        if (destroyed || userId !== id) return;
+        pollFailures = Math.min(pollFailures + 1, 5);
+        setStatus(retryMessage(error, 'Не удалось проверить партию. Повторяем попытку…'), true);
+        if (isVisible()) polling = setTimeout(() => { polling = null; void checkCurrent(); }, Math.min(10000, 800 * 2 ** (pollFailures - 1)));
+      } finally { currentRequest = null; }
+    })();
+    return currentRequest;
+  }
   const clockInterval = setInterval(() => { if (isVisible()) { drawClocks(); if (phase === 'active' && $('resign-control').hidden && canResign()) modeControls(); } }, 250);
   let revealAnimations = [];
   function revealPieces() {
@@ -401,15 +455,14 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   if (win.parent === win) revealPieces();
   return {
     async open(id) {
-      if (userId === id) return;
+      if (userId === id || destroyed) return;
       userId = id; modeControls();
-      try { const result = await api({ action:'current' }); if (result.game && phase === 'idle') { applyGame(result.game); if (phase === 'active') void poll(++generation); } }
-      catch { if (phase === 'idle') setStatus('Не удалось проверить текущую партию. Проверь соединение.', true); }
-      finally { ready = true; modeControls(); }
+      await checkCurrent();
     },
+    online() { if (isVisible()) resume(); },
     hide() { const wasVisible = isVisible(); viewVisible = false; if (wasVisible) pause(); },
     show() { const wasVisible = isVisible(); const wasShown = viewVisible; viewVisible = true; if (!wasShown) revealPieces(); if (!wasVisible && isVisible()) resume(); },
     browserVisibility(value) { const wasVisible = isVisible(); browserVisible = value; if (wasVisible && !isVisible()) pause(); else if (!wasVisible && isVisible()) resume(); },
-    destroy() { generation++; cancelDrag(); cancelTimer(); clearInterval(clockInterval); clearInterval(nameTimer); revealAnimations.forEach(animation => animation.cancel()); Object.values(clocks).forEach(clock => clock.destroy()); sound.destroy(); },
+    destroy() { destroyed = true; generation++; cancelDrag(); cancelTimer(); clearInterval(clockInterval); clearInterval(nameTimer); revealAnimations.forEach(animation => animation.cancel()); Object.values(clocks).forEach(clock => clock.destroy()); sound.destroy(); },
   };
 }

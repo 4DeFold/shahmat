@@ -1,6 +1,6 @@
 // Read only the active account's local settings; guests never need an API call.
 const system = window.matchMedia('(prefers-color-scheme: dark)');
-const palettes = new Set(['monochrome', 'gray', 'forest', 'atelier', 'wood']);
+const palettes = new Set(['monochrome', 'gray', 'forest', 'atelier', 'wood', 'earth', 'ocean', 'amber', 'lavender', 'sand']);
 function selectedTheme() {
   try {
     const session = JSON.parse(localStorage.getItem('sb-eswyxbyddkajysogtglp-auth-token') || 'null');

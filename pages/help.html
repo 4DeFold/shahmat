@@ -1,1 +1,13 @@
-        <section class="empty-page" id="page-help" data-view="help" hidden aria-labelledby="page-help-title"><h2 id="page-help-title" tabindex="-1">Помощь</h2></section>
+<section class="empty-page help-page" id="page-help" data-view="help" hidden aria-labelledby="page-help-title">
+  <h2 id="page-help-title" tabindex="-1">Помощь</h2>
+  <form id="feedback-form" class="feedback-form">
+    <h3>Обратная связь<span>.</span></h3>
+    <label for="feedback-category">Что ты хочешь отправить?</label>
+    <select id="feedback-category" required><option value="bug">Сообщить об ошибке</option><option value="idea">Предложить идею</option></select>
+    <label for="feedback-message">Сообщение</label>
+    <textarea id="feedback-message" minlength="5" maxlength="2000" rows="6" required placeholder="Расскажи подробнее"></textarea>
+    <p>Не отправляй пароли или другие секретные данные.</p>
+    <p id="feedback-status" role="status" aria-live="polite"></p>
+    <button class="primary" type="submit">Отправить <span aria-hidden="true">↗</span></button>
+  </form>
+</section>

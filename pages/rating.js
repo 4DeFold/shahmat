@@ -1,6 +1,6 @@
 // Animata's Fluid Tabs, adapted to native buttons without React or animation dependencies.
 // Only nicknames and scores are returned; player text is never interpolated as HTML.
-export function createRatingView(root, client) {
+export function createRatingView(root, client, { showSelf = false } = {}) {
   const list = root.querySelector('.rating-list');
   const board = root.querySelector('.rating-board');
   const status = root.querySelector('.rating-status');
@@ -8,6 +8,8 @@ export function createRatingView(root, client) {
   const filters = root.querySelector('.rating-filters');
   const indicator = root.querySelector('.rating-indicator');
   const buttons = [...root.querySelectorAll('[data-rating-mode]')];
+  const self = root.querySelector('.rating-self');
+  let ownName = null;
   const win = root.ownerDocument.defaultView;
   const number = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 });
   const cache = new Map(), pending = new Map();
@@ -38,6 +40,7 @@ export function createRatingView(root, client) {
     const fragment = root.ownerDocument.createDocumentFragment();
     for (const [index, player] of data.slice(0,100).entries()) {
       const row = root.ownerDocument.createElement('li'); row.className = 'rating-row';
+      if (ownName && player.username === ownName) row.classList.add('rating-row-self');
       if (index < 12) { row.classList.add('rating-row-reveal'); row.style.setProperty('--row', String(index)); }
       const place = root.ownerDocument.createElement('span'); place.className='rating-place'; place.textContent = player.ranked ? String(index + 1) : '—';
       const name = root.ownerDocument.createElement('span'); name.className='rating-player'; name.textContent = String(player.username ?? '');
@@ -75,9 +78,24 @@ export function createRatingView(root, client) {
     return promise;
   }
 
+  async function refreshSelf(requestedMode, request) {
+    if (!showSelf || !self) return;
+    self.hidden = true; ownName = null;
+    try {
+      const { data, error } = await client.rpc('yar_my_position', { p_mode:requestedMode });
+      if (error || destroyed || request !== sequence || !Array.isArray(data) || !data[0]) return;
+      const player = data[0]; ownName = player.username;
+      self.querySelector('.rating-self-place').textContent = player.ranked && player.place != null ? String(player.place) : '—';
+      self.querySelector('.rating-self-name').textContent = String(player.username ?? '');
+      self.querySelector('.rating-self-score').textContent = number.format(Number(player.yar));
+      self.hidden = false;
+      for (const row of list.children) row.classList.toggle('rating-row-self', row.querySelector('.rating-player')?.textContent === ownName);
+    } catch { /* The leaderboard remains usable if the personal row is unavailable. */ }
+  }
   async function refresh({ force = false } = {}) {
     const request = ++sequence, requestedMode = mode;
     const cached = cache.get(requestedMode);
+    void refreshSelf(requestedMode, request);
     retry.hidden = true;
     if (cached) render(cached.data);
     if (!force && cached && Date.now() - cached.at < freshness) {

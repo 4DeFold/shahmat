@@ -48,14 +48,14 @@ test('board opens at starting position, modes are explicit and a real request st
   app.close();
 });
 
-test('matched players can only submit legal moves on their turn; black sees flipped board', async () => {
+test('matched players can only submit legal moves on their turn; black sees flipped board', async t => {
   const calls = [], chess = new Chess();
   const app = setup(async body => {
     calls.push(body);
     if (body.action === 'current') return { game: game({ moves:['e4'], turn:'b' }) };
     if (body.action === 'move') { chess.move('e4'); chess.move({ from:body.from,to:body.to }); return { game: game({ moves:chess.history(), turn:'w' }) }; }
-    return { game: game({ moves:['e4'], turn:'b' }) };
-  });
+    return { game: chess.history().length ? game({ moves:chess.history(), turn:chess.turn() }) : game({ moves:['e4'], turn:'b' }) };
+  }); t.after(() => app.close());
   await app.ui.open(B); await flush();
   assert.equal(app.$('board').firstElementChild.dataset.square, 'a8');
   assert.equal(app.$('board').classList.contains('black'), true);
@@ -70,15 +70,14 @@ test('matched players can only submit legal moves on their turn; black sees flip
   assert.equal(calls.find(call => call.action === 'move').to, 'e5');
   assert.equal(app.$('move-count').textContent, '01');
   assert.match(app.$('status').textContent, /Ход соперника/);
-  app.close();
 });
 
-test('a failed cancel remains searching rather than pretending to cancel', async () => {
+test('a failed cancel stays pending instead of restarting search or pretending to cancel', async () => {
   const app = setup(async body => { if (body.action === 'cancel') throw Error('offline'); return body.action === 'search' ? { state:'searching' } : { game:null }; });
   await app.ui.open(A);
   const blitz = app.$('mode-list').querySelector('[value=blitz]'); blitz.checked = true; blitz.dispatchEvent(new app.dom.window.Event('change', { bubbles:true }));
   app.$('start-search').click(); await flush(); app.$('cancel-search').click(); await flush();
-  assert.match(app.$('status').textContent, /Не удалось отменить/); assert.equal(app.$('cancel-search').hidden, false);
+  assert.match(app.$('status').textContent, /Не удалось подтвердить отмену/); assert.equal(app.$('cancel-search').hidden, false); assert.equal(app.$('cancel-search').disabled, true);
   app.close();
 });
 
@@ -367,4 +366,109 @@ test('resignation appears one minute after match creation, including after reope
   const reopened = setup(async () => ({game:{...game(),game_age_ms:60000}}));
   t.after(() => reopened.close()); await reopened.ui.open(A);
   assert.equal(reopened.$('resign-control').hidden, false);
+});
+
+test('initial failure retries without a refresh and cannot start a search before recovery', async t => {
+  let calls = 0;
+  const app = setup(async body => {
+    if (body.action === 'current') { if (++calls === 1) throw Error('offline'); return {game:game({moves:['e4'],turn:'b'})}; }
+    return {game:game({moves:['e4'],turn:'b'})};
+  }); t.after(() => app.close());
+  await app.ui.open(A);
+  const blitz = app.$('mode-list').querySelector('[value=blitz]'); blitz.checked = true; blitz.dispatchEvent(new app.dom.window.Event('change', {bubbles:true}));
+  assert.equal(app.$('start-search').disabled, true);
+  assert.match(app.$('status').textContent, /Повторяем/);
+  await new Promise(resolve => setTimeout(resolve, 950));
+  assert.equal(calls, 2); assert.equal(app.$('player-color').textContent, 'Белые');
+  assert.ok(app.$('board').querySelector('[data-square=e4] img'));
+});
+
+test('current check is single-flight across hidden and online events', async t => {
+  let resolveCurrent, calls = 0;
+  const app = setup(async body => {
+    if (body.action === 'current') { calls++; return new Promise(resolve => { resolveCurrent = resolve; }); }
+    return {game:null};
+  }); t.after(() => app.close());
+  const opening = app.ui.open(A);
+  app.ui.hide(); app.ui.show(); app.ui.online();
+  assert.equal(calls, 1);
+  resolveCurrent({game:null}); await opening;
+  assert.equal(calls, 1);
+});
+
+test('uncertain move blocks new moves until server snapshot recovers, without resending it', async t => {
+  let online = true, moves = 0, committed = false;
+  const app = setup(async body => {
+    if (body.action === 'current') return {game:game()};
+    if (body.action === 'move') { moves++; committed = true; online = false; throw Error('lost response'); }
+    if (!online) throw Error('offline');
+    return {game:game({moves:committed ? ['e4'] : [],turn:committed ? 'b':'w'})};
+  }); t.after(() => app.close());
+  await app.ui.open(A); await flush();
+  const click = sq => app.$('board').querySelector(`[data-square=${sq}]`).click();
+  click('e2'); click('e4'); await flush();
+  click('d2'); click('d4'); await flush(); assert.equal(moves, 1);
+  online = true; app.ui.online(); await flush();
+  assert.equal(moves, 1); assert.ok(app.$('board').querySelector('[data-square=e4] img'));
+  assert.match(app.$('status').textContent, /Ход соперника/);
+});
+
+test('same version snapshot clears a transient polling error after reconnect', async t => {
+  let online = true;
+  const app = setup(async body => { if (!online) throw Error('offline'); return {game:game()}; }); t.after(() => app.close());
+  await app.ui.open(A); await flush(); online = false; app.ui.online(); await flush();
+  assert.match(app.$('status').textContent, /Повторяем/);
+  online = true; app.ui.online(); await flush();
+  assert.match(app.$('status').textContent, /Ваш ход/);
+});
+
+test('cancel retries after a temporary outage without rejoining the matchmaking queue', async t => {
+  const calls = []; let available = false;
+  const app = setup(async body => {
+    calls.push(body.action);
+    if (body.action === 'cancel' && !available) throw Error('network failure');
+    if (body.action === 'search') return {state:'searching'};
+    return {game:null};
+  }); t.after(() => app.close());
+  await app.ui.open(A);
+  const blitz = app.$('mode-list').querySelector('[value=blitz]'); blitz.checked = true; blitz.dispatchEvent(new app.dom.window.Event('change', {bubbles:true}));
+  app.$('start-search').click(); await flush(); app.$('cancel-search').click(); await flush();
+  assert.match(app.$('status').textContent, /Повторяем/);
+  assert.deepEqual(calls, ['current','search','cancel']);
+  app.ui.hide(); available = true;
+  await new Promise(resolve => setTimeout(resolve, 950));
+  assert.deepEqual(calls, ['current','search','cancel','cancel']);
+  assert.match(app.$('status').textContent, /Поиск отменён/);
+  app.ui.show(); await flush(); assert.deepEqual(calls, ['current','search','cancel','cancel']);
+});
+
+test('a match created before cancellation is restored instead of discarded', async t => {
+  let release, cancelCalls = 0;
+  const pending = new Promise(resolve => { release = resolve; });
+  const app = setup(async body => {
+    if (body.action === 'search') return pending;
+    if (body.action === 'cancel') { cancelCalls++; return {game:game()}; }
+    if (body.action === 'snapshot') return {game:game()};
+    return {game:null};
+  }); t.after(() => app.close());
+  await app.ui.open(A);
+  const blitz = app.$('mode-list').querySelector('[value=blitz]'); blitz.checked = true; blitz.dispatchEvent(new app.dom.window.Event('change', {bubbles:true}));
+  app.$('start-search').click(); await flush(); app.$('cancel-search').click(); await flush();
+  assert.equal(cancelCalls,0);
+  release({state:'matched',game:game()}); await flush();
+  assert.equal(cancelCalls,1); assert.match(app.$('status').textContent,/Ваш ход/);
+});
+
+test('selection survives an opponent move but clears when the selected piece is captured', async t => {
+  let position = game({moves:['e4'],turn:'b'});
+  const app = setup(async () => ({game:position})); t.after(() => app.close());
+  await app.ui.open(A); await flush();
+  const square = sq => app.$('board').querySelector(`[data-square=${sq}]`);
+  square('g1').click(); assert.equal(square('g1').classList.contains('selected'),true);
+  position = game({moves:['e4','e5'],turn:'w'}); app.ui.hide(); app.ui.show(); await flush();
+  assert.equal(square('g1').classList.contains('selected'),true);
+  position = game({moves:['e4','d5','exd5'],turn:'b',version:3}); app.ui.hide(); app.ui.show(); await flush();
+  square('d5').click(); assert.equal(square('d5').classList.contains('selected'),true);
+  position = game({moves:['e4','d5','exd5','Qxd5'],turn:'w',version:4}); app.ui.hide(); app.ui.show(); await flush();
+  assert.equal(square('d5').classList.contains('selected'),false);
 });
