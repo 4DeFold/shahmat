@@ -14,13 +14,13 @@
   <main class="member-shell" id="member-game">
     <section class="board-area" aria-label="Шахматная доска">
       <div class="board-wrap">
-        <div class="player-row opponent-row"><button type="button" class="opponent-trigger" id="opponent-profile-trigger" aria-expanded="false" aria-controls="opponent-profile-card" disabled><span class="avatar bot-avatar"><img src="/pieces/cburnett/bN.svg" alt=""></span><span><strong id="opponent-name">Соперник</strong><small id="opponent-color">Чёрные</small></span></button><div class="opponent-profile-card" id="opponent-profile-card" hidden><strong id="opponent-profile-name">Соперник</strong><span class="bio-label">Био</span><p id="opponent-profile-bio">Информация пока недоступна.</p></div></div>
+        <div class="player-row opponent-row"><button type="button" class="opponent-trigger" id="opponent-profile-trigger" aria-expanded="false" aria-controls="opponent-profile-card" disabled><span class="avatar bot-avatar"><img src="/pieces/cburnett/bN.svg" alt=""></span><span><strong id="opponent-name">Соперник</strong> <span class="player-rating" id="opponent-rating"></span><small id="opponent-color">Чёрные</small></span></button><div class="opponent-profile-card" id="opponent-profile-card" hidden><strong id="opponent-profile-name">Соперник</strong><span class="bio-label">Био</span><p id="opponent-profile-bio">Информация пока недоступна.</p></div></div>
         <div class="board-with-clocks"><div class="board-frame"><div class="board waiting" id="board" role="group" aria-label="Шахматная доска"></div></div>
           <div class="clock-pair" aria-label="Шахматные часы">
             <div class="clock" id="opponent-clock-card" data-color="neutral"><span id="opponent-clock-label" hidden></span><strong id="opponent-clock">00:00</strong></div>
             <div class="clock" id="player-clock-card" data-color="neutral"><span id="player-clock-label" hidden></span><strong id="player-clock">00:00</strong></div>
           </div></div>
-        <div class="player-row"><span class="avatar"><img src="/pieces/cburnett/wP.svg" alt=""></span><span><strong>Вы</strong><small id="player-color">Белые</small></span></div>
+        <div class="player-row"><span class="avatar"><img src="/pieces/cburnett/wP.svg" alt=""></span><span><strong id="player-name">Вы</strong> <span class="player-rating" id="player-rating"></span><small id="player-color">Белые</small></span></div>
         <div class="promotion" id="promotion" hidden><p>Выберите фигуру для превращения пешки:</p><div id="promotion-options"></div></div>
       </div>
     </section>

@@ -607,3 +607,12 @@ test('feedback submits once and reports success or an unconfirmed response witho
   failed=true; $('feedback-message').value='This is a bug'; await submit('feedback-form');
   assert.equal(sent.length,2); assert.equal($('feedback-message').value,'This is a bug'); assert.match($('feedback-status').textContent,/Не удалось/);
 });
+
+test('rank unit preference saves with appearance and follows remote changes', async () => {
+  const app=await setup({existing:true});
+  await app.choose('rank-unit-options','elo');
+  assert.equal(app.getMetadata().rank_unit,'elo');
+  assert.equal(JSON.parse(app.window.localStorage.getItem('shahmat.appearance.user-1')).rankUnit,'elo');
+  app.setMetadata({rank_unit:'yar'}); await app.poll();
+  assert.equal(app.$('rank-unit-options').querySelector('[value=yar]').checked,true);
+});

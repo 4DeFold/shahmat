@@ -15,7 +15,7 @@ try {
         const path=new URL(route.request().url()).pathname;
         if (path==='/auth/v1/user') return route.fulfill({json:user});
         if (path==='/rest/v1/profiles') return route.fulfill({json:{username:'Player',bio:'',palette:'monochrome'}});
-        if (path==='/rest/v1/rpc/yar_leaderboard') {
+        if (path==='/rest/v1/rpc/rank_leaderboard') {
           const mode=route.request().postDataJSON().p_mode; modes.push(mode);
           return route.fulfill({json:[{username:'Player_One',yar:mode==='rapid'?1250:1100,ranked:true},{username:'New_Player',yar:1000,ranked:false}]});
         }

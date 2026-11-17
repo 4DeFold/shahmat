@@ -17,7 +17,7 @@ export function formatClock(ms) {
   return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-export function createMemberGame({ document, api, opponentName = async () => null, now = () => performance.now() }) {
+export function createMemberGame({ document, api, opponentName = async () => null, playerRatings = async () => null, now = () => performance.now() }) {
   const $ = id => document.getElementById(id), win = document.defaultView;
   const board = $('board'), start = $('start-search'), cancel = $('cancel-search'), reset = $('new-game');
   const promotion = $('promotion'), options = $('promotion-options');
@@ -25,6 +25,26 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   let snapshot = null, receivedAt = 0, polling = null, generation = 0, moving = false, pendingSearch = null, viewVisible = true, browserVisible = true, pollFailures = 0;
   let currentRequest = null, destroyed = false, reconciling = false, cancelPending = false;
   let premove = null, historyIndex = null, nameForGame = null, nameTimer = null, drag = null, suppressClick = false, actionPending = false;
+  let rankUnit = 'yar', scores = null, ratingsKey = null, ratingsRequest = 0, ratingsRetryAt = 0;
+  const format = value => value == null || !Number.isFinite(Number(value)) ? '' : `(${new Intl.NumberFormat('ru-RU', { maximumFractionDigits:1 }).format(Number(value))} ${rankUnit === 'elo' ? 'Эло' : 'ЯР'})`;
+  function renderRatings() {
+    for (const who of ['player','opponent']) {
+      const rating = $(who + '-rating'); if (rating) rating.textContent = format(scores?.[who === 'player' ? 'self' : who]?.[rankUnit]);
+    }
+  }
+  function loadRatings(game) {
+    const key = `${game.id}:${game.status}`;
+    if (ratingsKey === key || (ratingsRetryAt && snapshot?.id === game.id && now() < ratingsRetryAt)) return;
+    if (ratingsKey && !ratingsKey.startsWith(game.id + ':')) { scores = null; renderRatings(); }
+    ratingsKey = key; const request = ++ratingsRequest;
+    Promise.resolve().then(() => playerRatings(game.id)).then(rows => {
+      if (destroyed || request !== ratingsRequest || snapshot?.id !== game.id) return;
+      if (!Array.isArray(rows)) throw new Error('missing ratings');
+      scores = Object.fromEntries(rows.filter(row => row.player === 'self' || row.player === 'opponent').map(row => [row.player,row]));
+      const name = scores.self?.username; if (typeof name === 'string' && name && $('player-name')) $('player-name').textContent = name;
+      renderRatings();
+    }).catch(() => { if (request === ratingsRequest) { ratingsKey = null; ratingsRetryAt = now() + 8000; } });
+  }
   const sound = createGameSound(win);
   const clockSync = createClockSync();
   const isVisible = () => viewVisible && browserVisible;
@@ -172,10 +192,11 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   function applyGame(game) {
     if (!game || !Array.isArray(game.moves) || (snapshot && snapshot.id === game.id && game.version < snapshot.version)) return;
     if (snapshot && snapshot.id === game.id && game.version === snapshot.version && game.status === snapshot.status && !moving) {
-      snapshot = game; receivedAt = now(); clockSync.update(game, receivedAt); modeControls(); drawClocks(); playQueuedPremove(); return;
+      snapshot = game; receivedAt = now(); clockSync.update(game, receivedAt); loadRatings(game); modeControls(); drawClocks(); playQueuedPremove(); return;
     }
     const previous = snapshot, localMoves = chess.history(), selectedPiece = selected ? chess.get(selected) : null;
     const sameGame = previous?.id === game.id;
+    if (!sameGame) { ratingsKey = null; ratingsRetryAt = 0; ratingsRequest++; scores = null; renderRatings(); }
     const alreadyDisplayed = sameGame && localMoves.length === game.moves.length && localMoves.every((move, i) => move === game.moves[i]);
     let next = chess, nextLast = latestMove;
     if (!alreadyDisplayed) {
@@ -196,7 +217,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     phase = game.status === 'active' ? 'active' : 'finished'; mode = game.mode;
     if (phase === 'finished') premove = null;
     const input = $('mode-list').querySelector(`input[value="${mode}"]`); if (input) input.checked = true;
-    loadName(game); modeControls();
+    loadName(game); loadRatings(game); modeControls();
     // Confirming our optimistic move must not restart its animation or replace pieces.
     if (!alreadyDisplayed) renderBoard(newMove);
     renderHistory(); drawClocks();
@@ -410,7 +431,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   $('offline-draw').addEventListener('click', () => void finishAction('offline_draw'));
   $('mode-list').addEventListener('change', event => { if (phase === 'idle' && times[event.target.value]) { mode = event.target.value; modeControls(); drawClocks(); if (ready) setStatus('Всё готово к поиску.'); } });
   start.addEventListener('click', () => void search()); cancel.addEventListener('click', () => void cancelSearch());
-  reset.addEventListener('click', () => { cancelTimer(); generation++; snapshot = null; clockSync.clear(); chess = new Chess(); latestMove = null; phase = 'idle'; mode = null; $('mode-list').querySelectorAll('input').forEach(input => { input.checked = false; }); premove = null; historyIndex = null; nameForGame = null; profileTrigger.disabled = true; profilePinned = false; showProfile(false); clearInterval(nameTimer); $('opponent-name').textContent = 'Соперник'; modeControls(); renderBoard(); renderHistory(); drawClocks(); setStatus('Выбери режим.'); });
+  reset.addEventListener('click', () => { cancelTimer(); generation++; snapshot = null; scores = null; ratingsKey = null; ratingsRetryAt = 0; ratingsRequest++; renderRatings(); clockSync.clear(); chess = new Chess(); latestMove = null; phase = 'idle'; mode = null; $('mode-list').querySelectorAll('input').forEach(input => { input.checked = false; }); premove = null; historyIndex = null; nameForGame = null; profileTrigger.disabled = true; profilePinned = false; showProfile(false); clearInterval(nameTimer); $('opponent-name').textContent = 'Соперник'; modeControls(); renderBoard(); renderHistory(); drawClocks(); setStatus('Выбери режим.'); });
   function pause() { cancelDrag(); if (moving) reconciling = true; if (phase === 'searching') void cancelSearch(); else if (phase !== 'cancelling') { generation++; cancelTimer(); } }
   function resume() {
     if (!userId || destroyed) return;
@@ -454,6 +475,8 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   modeControls(); renderBoard(); drawClocks(); board.classList.add('ready');
   if (win.parent === win) revealPieces();
   return {
+    setRatingUnit(value) { rankUnit = value === 'elo' ? 'elo' : 'yar'; renderRatings(); },
+    setPlayerName(value) { if (typeof value === 'string' && value && $('player-name')) $('player-name').textContent = value; },
     async open(id) {
       if (userId === id || destroyed) return;
       userId = id; modeControls();

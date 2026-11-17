@@ -472,3 +472,16 @@ test('selection survives an opponent move but clears when the selected piece is 
   position = game({moves:['e4','d5','exd5','Qxd5'],turn:'w',version:4}); app.ui.hide(); app.ui.show(); await flush();
   assert.equal(square('d5').classList.contains('selected'),false);
 });
+
+test('player names and game-mode ratings switch between yar and shadow elo', async () => {
+  const dom = new JSDOM(html, { url:'https://example.com/pages/game.html', pretendToBeVisual:true });
+  dom.window.matchMedia=()=>({matches:true,addEventListener(){},removeEventListener(){}});
+  const ui=createMemberGame({document:dom.window.document, api:async body=>({game:body.action==='current'?game():null}), playerRatings:async()=>[{player:'self',username:'Alice',yar:1200,elo:1050},{player:'opponent',username:'Bob',yar:1100,elo:1150}],opponentName:async()=>({username:'Bob'})});
+  await ui.open(A); await flush();
+  assert.equal(dom.window.document.getElementById('player-name').textContent,'Alice');
+  assert.equal(dom.window.document.getElementById('opponent-rating').textContent.replace(/\s/g,''),'(1100ЯР)');
+  ui.setRatingUnit('elo');
+  assert.equal(dom.window.document.getElementById('player-rating').textContent.replace(/\s/g,''),'(1050Эло)');
+  assert.equal(dom.window.document.getElementById('opponent-rating').textContent.replace(/\s/g,''),'(1150Эло)');
+  ui.destroy(); dom.window.close();
+});

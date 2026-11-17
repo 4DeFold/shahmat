@@ -21,10 +21,17 @@ const recoveryPending = () => { try { return sessionStorage.getItem(recoveryKey)
 let profile = null;
 let selectedPalette = 'monochrome';
 let selectedTheme = null;
+let rankUnit = 'yar';
 const systemTheme = window.matchMedia('(prefers-color-scheme: dark)');
 const palettes = new Set(['monochrome', 'gray', 'forest', 'atelier', 'wood', 'earth', 'ocean', 'amber', 'lavender', 'sand']);
 const landing = document.querySelector('.landing');
 
+function applyRankUnit(value) {
+  rankUnit = value === 'elo' ? 'elo' : 'yar';
+  document.querySelectorAll('#rank-unit-options input').forEach(input => { input.checked = input.value === rankUnit; });
+  ratingView?.setUnit(rankUnit);
+  $('member-game-frame')?.contentWindow?.postMessage({ type:'shahmat-rank-unit', value:rankUnit }, window.location.origin);
+}
 function applyTheme(value) {
   selectedTheme = value === 'dark' || value === 'light' ? value : null;
   landing.dataset.paletteTheme = selectedTheme || (systemTheme.matches ? 'dark' : 'light');
@@ -67,7 +74,7 @@ function writeAppearance(id, value) {
 function recordAppearance() {
   if (!appearanceUserId) return;
   const previous = readAppearance(appearanceUserId);
-  writeAppearance(appearanceUserId, { palette: selectedPalette, theme: selectedTheme, dirty: true, version: (previous?.version || 0) + 1 });
+  writeAppearance(appearanceUserId, { palette: selectedPalette, theme: selectedTheme, rankUnit, dirty: true, version: (previous?.version || 0) + 1 });
   if (retryTimer !== null) { clearTimeout(retryTimer); retryTimer = null; }
   void syncAppearance();
 }
@@ -89,7 +96,7 @@ async function syncAppearance() {
     if (sessionError) throw sessionError;
     if (appearanceUserId !== id) return;
     if (!data.session || data.session.user.id !== id) throw new Error('Session unavailable');
-    const { error } = await supabase.auth.updateUser({ data: { palette: pending.palette, palette_theme: pending.theme } });
+    const { error } = await supabase.auth.updateUser({ data: { palette: pending.palette, palette_theme: pending.theme, rank_unit: pending.rankUnit || rankUnit } });
     if (error) throw error;
     const latest = readAppearance(id);
     if (latest?.version === pending.version) writeAppearance(id, { ...latest, dirty: false });
@@ -120,11 +127,12 @@ async function pollAppearance() {
     if (syncingAppearance || latest?.dirty || latest?.version !== before?.version) return;
     const remote = data.user.user_metadata || {};
     if (!palettes.has(remote.palette)) return;
+    const remoteRankUnit = remote.rank_unit === 'elo' ? 'elo' : 'yar';
     const theme = remote.palette_theme === 'dark' || remote.palette_theme === 'light' ? remote.palette_theme : null;
-    if (selectedPalette !== remote.palette || selectedTheme !== theme) {
+    if (selectedPalette !== remote.palette || selectedTheme !== theme || rankUnit !== remoteRankUnit) {
       applyPalette(remote.palette);
-      applyTheme(theme);
-      writeAppearance(id, { palette: selectedPalette, theme: selectedTheme, dirty: false, version: latest?.version || 0 });
+      applyTheme(theme); applyRankUnit(remoteRankUnit);
+      writeAppearance(id, { palette: selectedPalette, theme: selectedTheme, rankUnit, dirty: false, version: latest?.version || 0 });
     }
   } catch { /* Keep the current appearance while offline. */ }
   finally { if (appearancePollInFlight === epoch) appearancePollInFlight = null; }
@@ -142,10 +150,10 @@ function restoreAppearance(user) {
   const local = readAppearance(user.id);
   const remote = user.user_metadata || {};
   if (local?.dirty || (!palettes.has(remote.palette) && local)) {
-    applyPalette(local.palette); applyTheme(local.theme);
+    applyPalette(local.palette); applyTheme(local.theme); applyRankUnit(local.rankUnit || remote.rank_unit);
   } else {
-    applyPalette(remote.palette); applyTheme(remote.palette_theme);
-    writeAppearance(user.id, { palette: selectedPalette, theme: selectedTheme, dirty: false, version: local?.version || 0 });
+    applyPalette(remote.palette); applyTheme(remote.palette_theme); applyRankUnit(remote.rank_unit);
+    writeAppearance(user.id, { palette: selectedPalette, theme: selectedTheme, rankUnit, dirty: false, version: local?.version || 0 });
   }
   void syncAppearance();
   startAppearancePolling();
@@ -259,8 +267,8 @@ async function loadView(name) {
     const { default: html } = await pageLoaders[name]();
     if (!dashboardPreloadEnabled || $('dashboard-screen').hidden || $(viewId(name))) return;
     $('page-content').insertAdjacentHTML('beforeend', html);
-    if (name === 'rating') ratingView = createRatingView($('page-rating'), supabase, { showSelf:true });
-    if (name === 'settings') applyPalette(selectedPalette);
+    if (name === 'rating') { ratingView = createRatingView($('page-rating'), supabase, { showSelf:true }); ratingView.setUnit(rankUnit); }
+    if (name === 'settings') { applyPalette(selectedPalette); applyRankUnit(rankUnit); }
     if (name === 'game') {
       const frame = $('member-game-frame');
       frameReady = new Promise((resolve, reject) => {
@@ -340,7 +348,7 @@ function syncGameAppearance() {
   frame.contentWindow.postMessage({ type: 'shahmat-appearance', colors }, window.location.origin);
 }
 new MutationObserver(syncGameAppearance).observe(landing, { attributes: true, attributeFilter: ['data-palette', 'data-palette-theme', 'class'] });
-$('page-content').addEventListener('load', event => { if (event.target.id === 'member-game-frame') { syncGameAppearance(); sendOnline(); } }, true);
+$('page-content').addEventListener('load', event => { if (event.target.id === 'member-game-frame') { syncGameAppearance(); sendOnline(); applyRankUnit(rankUnit); } }, true);
 $('dashboard-screen').querySelectorAll('[data-page]').forEach(link => link.addEventListener('click', event => {
   if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
   event.preventDefault();
@@ -700,6 +708,34 @@ $('page-content').addEventListener('click', event => {
     toggleSelectedTheme(); recordAppearance();
   }
 });
+// The description opens after a deliberate hover, or on tap/keyboard.
+let rankInfoTimer = null, rankInfoPinned = false;
+function showRankInfo(show) {
+  const info = $('rank-info'), button = $('rank-info-button');
+  if (!info || !button) return;
+  info.hidden = !show; button.setAttribute('aria-expanded', String(show));
+}
+$('page-content').addEventListener('pointerover', event => {
+  const row = event.target.closest('#rank-setting');
+  if (!row || row.contains(event.relatedTarget) || event.pointerType === 'touch') return;
+  clearTimeout(rankInfoTimer); rankInfoTimer = setTimeout(() => showRankInfo(true), 1000);
+});
+$('page-content').addEventListener('pointerout', event => {
+  const row = event.target.closest('#rank-setting');
+  if (!row || row.contains(event.relatedTarget)) return;
+  clearTimeout(rankInfoTimer); if (!rankInfoPinned) showRankInfo(false);
+});
+$('page-content').addEventListener('pointerup', event => {
+  if (event.pointerType === 'touch' && event.target.closest('#rank-setting') && !event.target.closest('#rank-info-button')) { rankInfoPinned = true; showRankInfo(true); }
+});
+$('page-content').addEventListener('click', event => {
+  const row = event.target.closest('#rank-setting');
+  if (!row) { rankInfoPinned = false; showRankInfo(false); return; }
+  if (event.target.closest('#rank-info-button')) {
+    rankInfoPinned = !rankInfoPinned; showRankInfo(rankInfoPinned);
+  }
+});
+document.addEventListener('keydown', event => { if (event.key === 'Escape') { clearTimeout(rankInfoTimer); rankInfoPinned = false; showRankInfo(false); } });
 // A mouse wheel over the palette strip scrolls it horizontally; touch and
 // horizontal trackpad gestures remain native. At either edge, let the page scroll.
 $('page-content').addEventListener('wheel', event => {
@@ -712,6 +748,7 @@ $('page-content').addEventListener('wheel', event => {
   strip.scrollBy({ left: event.deltaY * unit, behavior: reducedMotion.matches ? 'instant' : 'smooth' });
 }, { passive: false });
 $('page-content').addEventListener('change', event => {
+  if (event.target.matches('#rank-unit-options input[name="rank-unit"]')) { applyRankUnit(event.target.value); recordAppearance(); }
   if (event.target.matches('#dashboard-palettes input[name="dashboard-palette"]') && event.target.value !== selectedPalette) {
     applyPalette(event.target.value); recordAppearance();
   }
@@ -731,7 +768,7 @@ document.querySelectorAll('.signout').forEach(button => button.addEventListener(
     // Discard account-specific views on logout.
     $('page-game')?.remove(); frameReady = null;
     ratingView?.destroy(); $('page-rating')?.remove(); ratingView = null;
-    profile = null; applyPalette('monochrome'); applyTheme(null); $('auth-form').reset(); setMode('login');
+    profile = null; applyPalette('monochrome'); applyTheme(null); applyRankUnit('yar'); $('auth-form').reset(); setMode('login');
     window.history.replaceState(null, '', '/');
     await show('auth-screen');
   } catch (error) { appearanceUserId = signedOutUser; startAppearancePolling(); void syncAppearance(); message('sidebar-message', 'Не удалось выйти. Попробуй ещё раз.'); }

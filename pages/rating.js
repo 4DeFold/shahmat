@@ -9,7 +9,7 @@ export function createRatingView(root, client, { showSelf = false } = {}) {
   const indicator = root.querySelector('.rating-indicator');
   const buttons = [...root.querySelectorAll('[data-rating-mode]')];
   const self = root.querySelector('.rating-self');
-  let ownName = null;
+  let ownName = null, ownPlayer = null, unit = 'yar', displayed = null;
   const win = root.ownerDocument.defaultView;
   const number = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 });
   const cache = new Map(), pending = new Map();
@@ -37,6 +37,7 @@ export function createRatingView(root, client, { showSelf = false } = {}) {
   root.ownerDocument.fonts?.ready.then(() => { if (!destroyed) scheduleIndicator(); });
 
   function render(data) {
+    displayed = data;
     const fragment = root.ownerDocument.createDocumentFragment();
     for (const [index, player] of data.slice(0,100).entries()) {
       const row = root.ownerDocument.createElement('li'); row.className = 'rating-row';
@@ -44,7 +45,7 @@ export function createRatingView(root, client, { showSelf = false } = {}) {
       if (index < 12) { row.classList.add('rating-row-reveal'); row.style.setProperty('--row', String(index)); }
       const place = root.ownerDocument.createElement('span'); place.className='rating-place'; place.textContent = player.ranked ? String(index + 1) : '—';
       const name = root.ownerDocument.createElement('span'); name.className='rating-player'; name.textContent = String(player.username ?? '');
-      const score = root.ownerDocument.createElement('span'); score.className='rating-score'; score.textContent = number.format(Number(player.yar));
+      const score = root.ownerDocument.createElement('span'); score.className='rating-score'; score.textContent = formatScore(player);
       row.append(place,name,score); fragment.append(row);
     }
     list.replaceChildren(fragment);
@@ -52,6 +53,7 @@ export function createRatingView(root, client, { showSelf = false } = {}) {
     status.textContent = data.length ? '' : 'Пока нет игроков';
   }
 
+  function formatScore(player) { return player?.[unit] == null ? '—' : number.format(Number(player[unit])); }
   function fetchMode(requestedMode) {
     if (pending.has(requestedMode)) return pending.get(requestedMode).promise;
     const controller = new AbortController();
@@ -60,7 +62,7 @@ export function createRatingView(root, client, { showSelf = false } = {}) {
       try {
         // Install the in-flight entry before a client can synchronously throw.
         await Promise.resolve();
-        const call = client.rpc('yar_leaderboard', { p_mode:requestedMode });
+        const call = client.rpc('rank_leaderboard', { p_mode:requestedMode });
         const query = typeof call?.abortSignal === 'function' ? call.abortSignal(controller.signal) : call;
         const timeout = new Promise((_, reject) => {
           timer = win.setTimeout(() => { controller.abort(); reject(new Error('timeout')); }, 10000);
@@ -80,14 +82,14 @@ export function createRatingView(root, client, { showSelf = false } = {}) {
 
   async function refreshSelf(requestedMode, request) {
     if (!showSelf || !self) return;
-    self.hidden = true; ownName = null;
+    self.hidden = true; ownName = null; ownPlayer = null;
     try {
-      const { data, error } = await client.rpc('yar_my_position', { p_mode:requestedMode });
+      const { data, error } = await client.rpc('rank_my_position', { p_mode:requestedMode });
       if (error || destroyed || request !== sequence || !Array.isArray(data) || !data[0]) return;
-      const player = data[0]; ownName = player.username;
+      const player = data[0]; ownName = player.username; ownPlayer = player;
       self.querySelector('.rating-self-place').textContent = player.ranked && player.place != null ? String(player.place) : '—';
       self.querySelector('.rating-self-name').textContent = String(player.username ?? '');
-      self.querySelector('.rating-self-score').textContent = number.format(Number(player.yar));
+      self.querySelector('.rating-self-score').textContent = formatScore(player);
       self.hidden = false;
       for (const row of list.children) row.classList.toggle('rating-row-self', row.querySelector('.rating-player')?.textContent === ownName);
     } catch { /* The leaderboard remains usable if the personal row is unavailable. */ }
@@ -103,7 +105,7 @@ export function createRatingView(root, client, { showSelf = false } = {}) {
       return;
     }
     board.setAttribute('aria-busy','true');
-    if (!cached) list.replaceChildren();
+    if (!cached) { list.replaceChildren(); displayed = null; }
     status.hidden = false; status.textContent = 'Загрузка…';
     try {
       const data = await fetchMode(requestedMode);
@@ -127,6 +129,12 @@ export function createRatingView(root, client, { showSelf = false } = {}) {
   root.addEventListener('click', onClick);
   return {
     refresh,
+    setUnit(value) {
+      unit = value === 'elo' ? 'elo' : 'yar';
+      const label = root.querySelector('.rating-unit'); if (label) label.textContent = unit === 'elo' ? 'ЭЛО · справочно' : 'ЯР';
+      if (displayed) render(displayed);
+      if (ownPlayer && self && !self.hidden) self.querySelector('.rating-self-score').textContent = formatScore(ownPlayer);
+    },
     show() {
       root.classList.remove('rating-enter'); void root.offsetWidth; root.classList.add('rating-enter');
       scheduleIndicator();

@@ -909,3 +909,14 @@ body.startup-ready #landing-screen:not([hidden]) .hero-reveal--tail { animation-
 @media (min-width:701px) { .sidebar-brand { width:calc(100% + 28px); margin-inline:-14px; text-align:center; } }
 /* overflow:hidden on the landing otherwise traps sticky positioning. */
 .landing:has(#page-rating:not([hidden])) { overflow:clip; }
+/* Rank-unit setting and an accessible description for hover, touch and keyboard. */
+.rank-setting { margin: 36px 0 44px; max-width: 680px; }
+.rank-setting-line { display:flex; flex-wrap:wrap; align-items:center; gap:12px; font-size:18px; }
+.rank-unit-options { display:flex; padding:3px; margin:0; border:1px solid var(--line); border-radius:999px; gap:2px; }
+.rank-unit-options label { cursor:pointer; }
+.rank-unit-options input { position:absolute; opacity:0; }
+.rank-unit-options span { display:block; padding:8px 16px; border-radius:999px; }
+.rank-unit-options input:checked + span { background:var(--accent); color:var(--accent-ink); }
+.rank-unit-options input:focus-visible + span, .rank-info-button:focus-visible { outline:2px solid var(--foreground); outline-offset:2px; }
+.rank-info-button { width:28px; height:28px; border:1px solid var(--line); border-radius:50%; background:transparent; color:var(--ink); font:600 14px Arial,sans-serif; cursor:pointer; }
+.rank-info { margin-top:12px; padding:15px 18px; background:var(--surface-raised); border:1px solid var(--line); line-height:1.5; font-size:15px; }
