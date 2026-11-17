@@ -782,12 +782,18 @@ body.startup-ready #landing-screen:not([hidden]) .hero-reveal--tail { animation-
   #auth-submit:hover::after { animation: none; }
 }
 
-/* Active Play highlight extends across the entire navigation rail. */
-#nav-play[aria-current="page"] { width: calc(100% + 28px); margin-inline: -14px; padding-inline: 26px; }
-.sidebar-icon svg { display: block; width: 24px; height: 24px; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-@media (min-width: 701px) and (max-width: 900px) {
-  #nav-play[aria-current="page"] { width: calc(100% + 10px); margin-inline: -5px; padding-inline: 7px; }
+/* Navigation hit areas and highlights span the rail without shifting their contents. */
+.sidebar-nav > .sidebar-item, .sidebar-account > .sidebar-item {
+  width: calc(100% + 28px); margin-inline: -14px; padding-inline: 26px;
 }
-@media (max-width: 700px), (max-height: 500px) and (pointer: coarse) {
-  #nav-play[aria-current="page"] { width: calc(100% + 28px); margin-inline: -14px; padding-inline: 26px; }
+.sidebar-icon svg { display: block; width: 24px; height: 24px; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.account-menu { left: -14px; width: calc(100% + 28px); min-width: 0; border-inline: 0; }
+.account-menu-content { padding: 8px 0; }
+.account-menu :is(button, a) { padding-inline: 26px; }
+.account-menu a[aria-current='page'],
+.sidebar-account:has(.account-menu a[aria-current='page']) > .sidebar-account-toggle {
+  background: var(--accent); color: var(--accent-ink); border-color: var(--accent);
+}
+@media (hover: hover) {
+  .account-menu a[aria-current='page']:hover { background: var(--accent); border-color: var(--accent); }
 }
