@@ -10,12 +10,13 @@ try {
     for (const reducedMotion of ['reduce','no-preference']) {
       const page=await browser.newPage({viewport,reducedMotion});
       await page.addInitScript(v=>localStorage.setItem('sb-eswyxbyddkajysogtglp-auth-token',JSON.stringify(v)),session);
+      const modes=[];
       await page.route('https://eswyxbyddkajysogtglp.supabase.co/**',route=>{
         const path=new URL(route.request().url()).pathname;
         if (path==='/auth/v1/user') return route.fulfill({json:user});
         if (path==='/rest/v1/profiles') return route.fulfill({json:{username:'Player',bio:'',palette:'monochrome'}});
         if (path==='/rest/v1/rpc/yar_leaderboard') {
-          const mode=route.request().postDataJSON().p_mode;
+          const mode=route.request().postDataJSON().p_mode; modes.push(mode);
           return route.fulfill({json:[{username:'Player_One',yar:mode==='rapid'?1250:1100,ranked:true},{username:'New_Player',yar:1000,ranked:false}]});
         }
         return route.fulfill({json:{game:null}});
@@ -28,9 +29,22 @@ try {
       await page.locator('.rating-row').first().waitFor();
       assert.equal(new URL(page.url()).pathname,'/rating');
       assert.equal(await page.locator('.rating-score').first().innerText(),'1 100');
+      await page.waitForFunction(() => document.querySelector('.rating-indicator.is-ready'));
+      const opacity = await page.locator('.rating-indicator').evaluate(el => getComputedStyle(el).opacity);
+      assert.ok(Number(opacity)>0, 'selected mode indicator is visible');
+      const motion = await page.locator('.rating-indicator').evaluate(el => getComputedStyle(el).transitionDuration);
+      assert.equal(parseFloat(motion)>0,reducedMotion !== 'reduce','indicator respects reduced motion');
+      const entered=await page.locator('.rating-heading').evaluate(el=>getComputedStyle(el).animationName);
+      assert.equal(entered!=='none',reducedMotion!=='reduce','entry respects reduced motion');
       await page.locator('[data-rating-mode=rapid]').click();
       await page.waitForFunction(()=>document.querySelector('.rating-score')?.textContent.includes('250'));
       assert.equal(await page.locator('[data-rating-mode=rapid]').getAttribute('aria-pressed'),'true');
+      await page.waitForFunction(() => { const i=document.querySelector('.rating-indicator').getBoundingClientRect(), b=document.querySelector('[data-rating-mode=rapid]').getBoundingClientRect(); return Math.abs(i.left-b.left)<1 && Math.abs(i.top-b.top)<1 && Math.abs(i.width-b.width)<1; });
+      await page.locator('[data-rating-mode=overall]').focus(); await page.keyboard.press('Enter');
+      await page.waitForFunction(()=>document.querySelector('.rating-score')?.textContent.includes('100'));
+      assert.deepEqual(modes,['overall','rapid'],'switching back to a fresh mode uses the cache');
+      await page.locator('[data-rating-mode=daily]').click();
+      await page.waitForFunction(() => { const i=document.querySelector('.rating-indicator').getBoundingClientRect(), b=document.querySelector('[data-rating-mode=daily]').getBoundingClientRect(); return Math.abs(i.left-b.left)<1 && Math.abs(i.top-b.top)<1 && Math.abs(i.width-b.width)<1; });
       assert.equal(await page.locator('.rating-place').nth(1).innerText(),'—');
       const widths=await page.evaluate(()=>({scroll:document.documentElement.scrollWidth,client:document.documentElement.clientWidth}));
       assert.ok(widths.scroll<=widths.client,`no page overflow ${viewport.width}: ${JSON.stringify(widths)}`);

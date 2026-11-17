@@ -9,7 +9,7 @@ test('completed online games update separate mode scores exactly once; average, 
   const db=await PGlite.create();
   try {
     await db.exec("create role anon; create role authenticated; create role service_role; create schema auth; create table auth.users(id uuid primary key); create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$; create table public.profiles(id uuid primary key references auth.users(id), username text not null);");
-    for (const name of ['20261116121744_online_matchplay.sql','20261116121912_online_match_clock_after_lock.sql','20261117085337_yar_ratings.sql','20261117085657_yar_order_precision.sql']) await db.exec(await readFile(`supabase/migrations/${name}`,'utf8'));
+    for (const name of ['20261116121744_online_matchplay.sql','20261116121912_online_match_clock_after_lock.sql','20261117085337_yar_ratings.sql','20261117085657_yar_order_precision.sql','20261117090956_yar_leaderboard_efficiency.sql']) await db.exec(await readFile(`supabase/migrations/${name}`,'utf8'));
     await db.query('insert into auth.users values ($1),($2),($3)',[A,B,C]);
     await db.query("insert into public.profiles values ($1,'Alice'),($2,'Bob'),($3,'Carol')",[A,B,C]);
     const finish=async (white,black,mode,result,when='2026-01-01T12:00:00Z') => {
@@ -41,7 +41,7 @@ test('calibration, top-100 cap and daily limit are enforced', async () => {
   const db=await PGlite.create();
   try {
     await db.exec("create role anon; create role authenticated; create role service_role; create schema auth; create table auth.users(id uuid primary key); create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$; create table public.profiles(id uuid primary key references auth.users(id), username text not null);");
-    for (const name of ['20261116121744_online_matchplay.sql','20261116121912_online_match_clock_after_lock.sql','20261117085337_yar_ratings.sql','20261117085657_yar_order_precision.sql']) await db.exec(await readFile(`supabase/migrations/${name}`,'utf8'));
+    for (const name of ['20261116121744_online_matchplay.sql','20261116121912_online_match_clock_after_lock.sql','20261117085337_yar_ratings.sql','20261117085657_yar_order_precision.sql','20261117090956_yar_leaderboard_efficiency.sql']) await db.exec(await readFile(`supabase/migrations/${name}`,'utf8'));
     await db.exec(`insert into auth.users select ('00000000-0000-4000-8000-' || lpad(i::text,12,'0'))::uuid from generate_series(1,105) i;
       insert into public.profiles select id, 'user' || right(id::text, 12) from auth.users;`);
     for(let i=2;i<=27;i++) {
@@ -62,7 +62,7 @@ test('leaderboard orders by full precision when displayed scores round equally',
   const db=await PGlite.create();
   try {
     await db.exec("create role anon; create role authenticated; create role service_role; create schema auth; create table auth.users(id uuid primary key); create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$; create table public.profiles(id uuid primary key references auth.users(id), username text not null);");
-    for (const name of ['20261116121744_online_matchplay.sql','20261116121912_online_match_clock_after_lock.sql','20261117085337_yar_ratings.sql','20261117085657_yar_order_precision.sql']) await db.exec(await readFile(`supabase/migrations/${name}`,'utf8'));
+    for (const name of ['20261116121744_online_matchplay.sql','20261116121912_online_match_clock_after_lock.sql','20261117085337_yar_ratings.sql','20261117085657_yar_order_precision.sql','20261117090956_yar_leaderboard_efficiency.sql']) await db.exec(await readFile(`supabase/migrations/${name}`,'utf8'));
     await db.query('insert into auth.users values ($1),($2)',[A,B]);
     await db.query("insert into public.profiles values ($1,'Zed'),($2,'Alpha')",[A,B]);
     await db.query("insert into public.yar_mode_ratings(user_id,mode,yar,games) values ($1,'blitz',1000.04,10),($2,'blitz',1000.03,10)",[A,B]);
@@ -70,5 +70,27 @@ test('leaderboard orders by full precision when displayed scores round equally',
     const list=(await db.query("select * from public.yar_leaderboard('blitz')")).rows;
     assert.deepEqual(list.map(row=>row.username),['Zed','Alpha']);
     assert.equal(Number(list[0].yar),Number(list[1].yar));
+  } finally { await db.close(); }
+});
+
+test('optimized query preserves every leaderboard across varied mode histories', async () => {
+  const db=await PGlite.create();
+  try {
+    await db.exec("create role anon; create role authenticated; create role service_role; create schema auth; create table auth.users(id uuid primary key); create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$; create table public.profiles(id uuid primary key references auth.users(id), username text not null);");
+    for (const name of ['20261116121744_online_matchplay.sql','20261116121912_online_match_clock_after_lock.sql','20261117085337_yar_ratings.sql','20261117085657_yar_order_precision.sql']) await db.exec(await readFile(`supabase/migrations/${name}`,'utf8'));
+    await db.exec(`insert into auth.users select ('00000000-0000-4000-8000-' || lpad(i::text,12,'0'))::uuid from generate_series(1,300) i;
+      insert into public.profiles select id, 'user' || right(id::text,12) from auth.users;
+      insert into public.yar_mode_ratings(user_id,mode,yar,games)
+      select u.id,m.mode,800+(i*37+j*23)%401 + ((i*j)%10)::numeric/100, (i+j)%16
+      from (select id, row_number() over(order by id)::int i from auth.users) u
+      cross join (values ('blitz',1),('rapid',2),('classical',3),('daily',4)) m(mode,j)
+      where (i+j)%3<>0;`);
+    await db.exec(`select set_config('request.jwt.claim.sub','${A}',false)`);
+    const modes=['overall','blitz','rapid','classical','daily'];
+    const before=[]; for(const mode of modes) before.push((await db.query('select * from public.yar_leaderboard($1)',[mode])).rows);
+    await db.exec(await readFile('supabase/migrations/20261117090956_yar_leaderboard_efficiency.sql','utf8'));
+    await db.exec('set role authenticated');
+    for (const [index,mode] of modes.entries()) assert.deepEqual((await db.query('select * from public.yar_leaderboard($1)',[mode])).rows,before[index]);
+    await assert.rejects(db.query('select * from public.yar_history'),/permission denied/);
   } finally { await db.close(); }
 });

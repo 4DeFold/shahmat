@@ -297,7 +297,6 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
     if (request !== pageRequest) return;
     $('page-load-error')?.remove();
     $('page-loading')?.remove();
-    if (name === 'rating') void ratingView?.refresh();
     $('member-game-frame')?.contentWindow?.postMessage({ type: name === 'game' ? 'shahmat-game-shown' : 'shahmat-game-hidden' }, window.location.origin);
     document.querySelectorAll('#dashboard-screen [data-view]').forEach(view => {
       const active = view.dataset.view === name;
@@ -308,6 +307,7 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
         view.classList.remove('page-enter'); void view.offsetWidth; view.classList.add('page-enter');
       }
     });
+    if (name === 'rating') ratingView?.show();
     document.querySelectorAll('#dashboard-screen [data-page]').forEach(link => {
       if (link.dataset.page === name) link.setAttribute('aria-current', 'page');
       else link.removeAttribute('aria-current');
@@ -718,7 +718,7 @@ document.querySelectorAll('.signout').forEach(button => button.addEventListener(
     dashboardPreloadEnabled = false; pageRequest++;
     // Discard account-specific views on logout.
     $('page-game')?.remove(); frameReady = null;
-    $('page-rating')?.remove(); ratingView = null;
+    ratingView?.destroy(); $('page-rating')?.remove(); ratingView = null;
     profile = null; applyPalette('monochrome'); applyTheme(null); $('auth-form').reset(); setMode('login');
     window.history.replaceState(null, '', '/');
     await show('auth-screen');
