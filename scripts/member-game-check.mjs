@@ -19,9 +19,11 @@ try {
     }
     if (path === '/auth/v1/user') return route.fulfill({ json:user });
     if (path === '/rest/v1/profiles') return route.fulfill({ json:{ username:'Player', bio:'', palette:'monochrome' } });
-    if (path === '/functions/v1/match-opponent-preview') return route.fulfill({ json:{ username:'Friend' } });
-    if (path === '/functions/v1/matchplay') {
+    if (path === '/functions/v1/matchplay-preview') {
       const body = JSON.parse(request.postData());
+      if (body.action === 'heartbeat') return route.fulfill({json:{ok:true}});
+      if (body.action === 'opponent') return route.fulfill({json:{username:'Friend',bio:'Bio'}});
+      if (body.action === 'resign') { snapshot = {...snapshot, status:'finished', result:'black_win',reason:'resignation',version:snapshot.version+1}; return route.fulfill({json:{game:snapshot}}); }
       if (body.action === 'current' || body.action === 'cancel') return route.fulfill({ json:{ game:snapshot } });
       if (body.action === 'search') {
         snapshot = { id:'fixture', white_id:user.id, black_id:'opponent', mode:body.mode, moves:[], turn:'w', version:0, status:'active', white_ms:180000, black_ms:180000 };
@@ -55,7 +57,7 @@ try {
   assert.equal(await game.locator('#mode-picker').getAttribute('aria-hidden'), 'true');
   assert.equal(await game.locator('#mode-picker').evaluate(el => el.getBoundingClientRect().height), 0);
   assert.equal(await game.locator('#mode-summary').innerText(), 'Блиц · 3 мин');
-  assert.equal(await game.locator('#leave-game-control').isVisible(), true);
+  assert.equal(await game.locator('#resign-control').isVisible(), true);
   await game.locator('[data-square=e2]').click(); await game.locator('[data-square=e4]').click();
   await game.locator('#status').filter({ hasText:'Ход соперника' }).waitFor();
   assert.equal(await game.locator('[data-square=e4] img').count(), 1);
@@ -89,15 +91,23 @@ try {
     assert.ok(clocks.ownCenter >= clocks.boardMiddle && clocks.opponentCenter <= clocks.boardMiddle, 'clocks are in the correct halves');
     assert.notEqual(clocks.ownBackground, clocks.opponentBackground, 'clock backgrounds must differ');
     assert.ok(clocks.numberSize >= 12, 'clock numbers are legible');
-    // The longest time control must fit without clipping at every viewport.
-    await game.locator('#player-clock').evaluate(el => { el.textContent = '24:00:00'; });
+    // The real semibold font and longest time control must fit without clipping.
+    await game.locator('#player-clock').evaluate(async () => { await document.fonts.load('600 16px Unbounded', '24:00:00'); });
+    await game.locator('#player-clock').evaluate(el => { el.textContent = '24:00:00'; el.style.setProperty('--clock-digits','8'); });
     assert.equal(await game.locator('#player-clock').evaluate(el => el.scrollWidth <= el.clientWidth + 1), true, 'clock value fits');
   }
   assert.equal(await page.locator('#app-sidebar').isVisible(), true);
-  await game.locator('.leave-game').click();
+  await page.locator('.sidebar-brand').click();
   await page.waitForURL('**/home');
   await page.locator('#nav-play').click();
   await page.frameLocator('#member-game-frame').locator('#status').filter({hasText:'Ход соперника'}).waitFor();
   assert.deepEqual(snapshot.moves, ['e4','e5','Nf3'], 'leaving must not end the game');
+  await game.locator('#resign-button').click(); assert.equal(await game.locator('#resign-dialog').evaluate(el => el.open),true);
+  await game.locator('#resign-cancel').click(); assert.equal(snapshot.status,'active');
+  await game.locator('#resign-button').click(); await game.locator('#resign-confirm').click();
+  await game.locator('#status').filter({hasText:'вы сдались'}).waitFor(); assert.equal(snapshot.status,'finished');
+  assert.equal(new URL(page.url()).pathname,'/game');
+  assert.match(await game.locator('#player-clock').evaluate(el => getComputedStyle(el).fontFamily), /Unbounded/);
+
   console.log('✓ Viewport game, four controls, mocked search and legal move');
 } finally { await browser.close(); }

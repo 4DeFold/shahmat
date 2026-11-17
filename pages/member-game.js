@@ -20,7 +20,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   const promotion = $('promotion'), options = $('promotion-options');
   let userId = null, ready = false, chess = new Chess(), latestMove = null, mode = null, phase = 'idle', selected = null, pending = null;
   let snapshot = null, receivedAt = 0, polling = null, generation = 0, moving = false, pendingSearch = null, viewVisible = true, browserVisible = true, pollFailures = 0;
-  let premove = null, historyIndex = null, nameForGame = null, nameTimer = null, drag = null, suppressClick = false;
+  let premove = null, historyIndex = null, nameForGame = null, nameTimer = null, drag = null, suppressClick = false, actionPending = false;
   const sound = createGameSound(win);
   const isVisible = () => viewVisible && browserVisible;
   const setStatus = (text, urgent = false) => { const el = $('status'); if (el.textContent !== text) el.textContent = text; el.parentElement.classList.toggle('urgent', urgent); };
@@ -36,7 +36,10 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     picker.inert = locked; picker.setAttribute('aria-hidden', String(locked));
     $('mode-summary').hidden = !locked || !mode;
     $('mode-summary').textContent = modeLabels[mode] || '';
-    $('leave-game-control').hidden = phase !== 'active' && phase !== 'finished';
+    $('resign-control').hidden = phase !== 'active';
+    $('offline-choice').hidden = phase !== 'active' || snapshot?.opponent_offline !== true;
+    for (const id of ['resign-button','resign-confirm','offline-win','offline-draw']) $(id).disabled = actionPending || moving;
+    if (phase !== 'active') closeResign();
     start.hidden = phase !== 'idle'; start.disabled = !userId || !ready || !mode;
     cancel.hidden = phase !== 'searching'; reset.hidden = phase !== 'finished';
     $('moves').hidden = phase !== 'active' && phase !== 'finished';
@@ -53,7 +56,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
       card.classList.toggle('running', snapshot?.status === 'active' && snapshot.turn === color);
       card.classList.toggle('low', remaining != null && remaining <= 30000 && snapshot?.status === 'active' && snapshot.turn === color);
       const clock = $(`${id}-clock`), text = formatClock(remaining);
-      if (clock.textContent !== text) clock.textContent = text;
+      if (clock.textContent !== text) { clock.textContent = text; clock.style.setProperty('--clock-digits', String(text.length)); }
     }
     for (const [id, text] of [['player', `Вы · ${own === 'w' ? 'Белые' : 'Чёрные'}`], ['opponent', `Соперник · ${other === 'w' ? 'Белые' : 'Чёрные'}`]]) {
       const label = $(`${id}-clock-label`), value = snapshot ? text : '';
@@ -63,9 +66,9 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   }
   function resultText() {
     if (!snapshot || snapshot.status !== 'finished') return snapshot?.turn === currentColor() ? (chess.isCheck() ? 'Шах! Защитите короля — ваш ход.' : 'Ваш ход.') : (chess.isCheck() ? 'Шах сопернику. Ожидаем ход.' : 'Ход соперника. Можно подготовить свой ход.');
-    if (snapshot.result === 'draw') return snapshot.reason === 'stalemate' ? 'Пат. Ничья.' : 'Ничья.';
+    if (snapshot.result === 'draw') return snapshot.reason === 'stalemate' ? 'Пат. Ничья.' : snapshot.reason === 'opponent_offline' ? 'Ничья: игрок отключился.' : 'Ничья.';
     const won = snapshot.result === (currentColor() === 'w' ? 'white_win' : 'black_win');
-    return `${won ? 'Вы победили' : 'Вы проиграли'}${snapshot.reason === 'timeout' ? ' по времени' : snapshot.reason === 'checkmate' ? ': мат' : ''}.`;
+    return `${won ? 'Вы победили' : 'Вы проиграли'}${snapshot.reason === 'timeout' ? ' по времени' : snapshot.reason === 'checkmate' ? ': мат' : snapshot.reason === 'resignation' ? (won ? ': соперник сдался' : ': вы сдались') : snapshot.reason === 'opponent_offline' ? (won ? ': соперник не в сети' : ': соединение прервалось') : ''}.`;
   }
   function statusGame() { setStatus(resultText(), chess.isCheck() || snapshot?.status === 'finished'); }
   function displayChess() {
@@ -162,7 +165,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   function applyGame(game) {
     if (!game || !Array.isArray(game.moves) || (snapshot && snapshot.id === game.id && game.version < snapshot.version)) return;
     if (snapshot && snapshot.id === game.id && game.version === snapshot.version && game.status === snapshot.status && !moving) {
-      snapshot = game; receivedAt = now(); drawClocks(); playQueuedPremove(); return;
+      snapshot = game; receivedAt = now(); modeControls(); drawClocks(); playQueuedPremove(); return;
     }
     const previous = snapshot, localMoves = chess.history();
     const sameGame = previous?.id === game.id;
@@ -233,7 +236,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     try { move = chess.move({ from, to, ...(piece ? { promotion:piece } : {}) }); } catch { return; }
     // Invalidate any old snapshot request before it can overwrite the optimistic move.
     cancelTimer(); const moveGeneration = ++generation;
-    moving = true; selected = null; pending = null; promotion.hidden = true; historyIndex = null; latestMove = move;
+    moving = true; modeControls(); selected = null; pending = null; promotion.hidden = true; historyIndex = null; latestMove = move;
     renderBoard(animate ? move : null); renderHistory(); playSound(move); setStatus('Отправляем ход…');
     try {
       const result = await api({ action:'move', gameId:saved.id, version:saved.version, from, to, ...(piece ? { promotion:piece } : {}) });
@@ -257,7 +260,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
         setStatus('Нет связи. Позиция восстановится после подключения.', true);
       }
     } finally {
-      moving = false;
+      moving = false; modeControls();
       if (moveGeneration === generation && isVisible() && phase === 'active') {
         if (!playQueuedPremove()) { cancelTimer(); void poll(++generation); }
       }
@@ -345,6 +348,38 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   });
   $('history-first').addEventListener('click', () => showHistory(0)); $('history-prev').addEventListener('click', () => showHistory((historyIndex ?? chess.history().length) - 1));
   $('history-next').addEventListener('click', () => showHistory((historyIndex ?? chess.history().length) + 1)); $('history-last').addEventListener('click', () => showHistory(chess.history().length));
+  const resignDialog = $('resign-dialog');
+  function closeResign() {
+    if (!resignDialog?.open) return;
+    if (typeof resignDialog.close === 'function') resignDialog.close(); else resignDialog.removeAttribute('open');
+  }
+  $('resign-button').addEventListener('click', () => {
+    if (phase !== 'active' || actionPending || moving) return;
+    if (typeof resignDialog.showModal === 'function') resignDialog.showModal(); else resignDialog.setAttribute('open','');
+    $('resign-cancel').focus();
+  });
+  $('resign-cancel').addEventListener('click', closeResign);
+  async function finishAction(action) {
+    if (phase !== 'active' || !snapshot || actionPending || moving || (action !== 'resign' && !snapshot.opponent_offline)) return;
+    const gameId = snapshot.id;
+    actionPending = true; closeResign(); modeControls(); cancelTimer(); ++generation;
+    setStatus('Подтверждаем результат…');
+    try {
+      const response = await api({ action, gameId });
+      if (!response.game) throw new Error('missing snapshot');
+      if (snapshot?.id !== gameId) return;
+      applyGame(response.game);
+      if (response.game.status === 'active') setStatus(action === 'resign' ? 'Не удалось подтвердить сдачу.' : 'Соперник вернулся или отключение ещё не подтверждено.', true);
+    } catch {
+      if (snapshot?.id === gameId) setStatus('Результат не подтверждён. Проверяем соединение…', true);
+    } finally {
+      actionPending = false; modeControls();
+      if (isVisible() && phase === 'active' && snapshot?.id === gameId) void poll(++generation);
+    }
+  }
+  $('resign-confirm').addEventListener('click', () => void finishAction('resign'));
+  $('offline-win').addEventListener('click', () => void finishAction('offline_win'));
+  $('offline-draw').addEventListener('click', () => void finishAction('offline_draw'));
   $('mode-list').addEventListener('change', event => { if (phase === 'idle' && times[event.target.value]) { mode = event.target.value; modeControls(); drawClocks(); setStatus('Всё готово к поиску.'); } });
   start.addEventListener('click', () => void search()); cancel.addEventListener('click', () => void cancelSearch());
   reset.addEventListener('click', () => { cancelTimer(); generation++; snapshot = null; chess = new Chess(); latestMove = null; phase = 'idle'; premove = null; historyIndex = null; nameForGame = null; profileTrigger.disabled = true; profilePinned = false; showProfile(false); clearInterval(nameTimer); $('opponent-name').textContent = 'Соперник'; modeControls(); renderBoard(); renderHistory(); drawClocks(); setStatus('Выбери режим.'); });

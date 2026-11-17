@@ -55,6 +55,7 @@ async function setup({ existing = false, palette = 'monochrome', failSave = fals
   window.setTimeout = (cb, delay, ...args) => delay >= 3000 ? 1 : realSetTimeout(cb, delay, ...args);
   window.createClient = () => db;
   window.startOnlinePresence = () => () => {};
+  window.startPreviewHeartbeat = () => () => {};
   window.eval(source.replace("import.meta.env.VITE_EMAIL_OTP_READY === 'true'", String(otpReady)));
   await tick();
   const $ = id => window.document.getElementById(id);
@@ -153,6 +154,7 @@ test('startup waits for session and profile before revealing dashboard', async (
   window.requestAnimationFrame = cb => cb();
   window.scrollTo = () => {};
   window.startOnlinePresence = () => () => {};
+  window.startPreviewHeartbeat = () => () => {};
   window.createClient = () => ({
     auth: { getSession: () => new Promise(resolve => { resolveSession = resolve; }) },
     from: () => ({ select: () => ({ eq: () => ({ maybeSingle: () => new Promise(resolve => { resolveProfile = resolve; }) }) }) })

@@ -1,4 +1,5 @@
 import { startOnlinePresence } from './pages/online-presence.js';
+import { startPreviewHeartbeat } from './pages/preview-heartbeat.js';
 import { createClient } from '@supabase/supabase-js';
 import './theme.js';
 
@@ -240,11 +241,12 @@ let pageRequest = 0;
 const viewId = name => name === 'home' ? 'dashboard-home' : `page-${name}`;
 const viewLoads = new Map();
 let frameReady = null;
-let onlineStop = null, onlineUser = null, onlineCount = null;
+let onlineStop = null, heartbeatStop = null, onlineUser = null, onlineCount = null;
 function sendOnline() { $('member-game-frame')?.contentWindow?.postMessage({ type: 'shahmat-online', count: onlineCount }, window.location.origin); }
 function startOnline(id) {
   if (onlineUser === id) return;
-  onlineStop?.(); onlineUser = id; onlineCount = null; sendOnline();
+  onlineStop?.(); heartbeatStop?.(); onlineUser = id; onlineCount = null; sendOnline();
+  heartbeatStop = startPreviewHeartbeat(supabase, window);
   onlineStop = startOnlinePresence(supabase, id, count => { onlineCount = count; sendOnline(); });
 }
 let dashboardPreloadEnabled = false;
@@ -708,7 +710,7 @@ document.querySelectorAll('.signout').forEach(button => button.addEventListener(
   try {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
-    onlineStop?.(); onlineStop = null; onlineUser = null; onlineCount = null;
+    onlineStop?.(); heartbeatStop?.(); onlineStop = null; heartbeatStop = null; onlineUser = null; onlineCount = null;
     dashboardPreloadEnabled = false; pageRequest++;
     $('page-game')?.remove(); frameReady = null; // Discard the prior account's game frame on logout.
     profile = null; applyPalette('monochrome'); applyTheme(null); $('auth-form').reset(); setMode('login');

@@ -21,7 +21,7 @@ try {
       const path = new URL(route.request().url()).pathname;
       if (path === '/auth/v1/user') return route.fulfill({json:user});
       if (path === '/rest/v1/profiles') return route.fulfill({json:{username:'Player',bio:'',palette:'monochrome'}});
-      if (path === '/functions/v1/matchplay') return route.fulfill({json:{game:null}});
+      if (path === '/functions/v1/matchplay-preview') return route.fulfill({json:{game:null}});
       return route.fulfill({json:{}});
     });
     await page.goto(`${base}/home`); await page.locator('#dashboard-home').waitFor({state:'visible'});

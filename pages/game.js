@@ -4,27 +4,28 @@ import { cachedUserId, startSessionMonitor } from './member-session.js';
 import { createMemberGame } from './member-game.js';
 import './game-theme.js';
 import { startOnlinePresence, createOnlineCounter } from './online-presence.js';
+import { startPreviewHeartbeat } from './preview-heartbeat.js';
 
 const supabase = createClient('https://eswyxbyddkajysogtglp.supabase.co', 'sb_publishable_w9pinHWr8XK5F9CflsSJmQ_4KFMKzHS');
 const ui = createMemberGame({ document, opponentName: async gameId => {
-  const { data, error } = await supabase.functions.invoke('match-opponent-preview', { body: { gameId }, timeout: 8000 });
+  const { data, error } = await supabase.functions.invoke('matchplay-preview', { body: { action:'opponent', gameId }, timeout: 8000 });
   return error ? null : data;
 }, api: async body => {
-  const { data, error } = await supabase.functions.invoke('matchplay', { body, timeout: 8000 });
+  const { data, error } = await supabase.functions.invoke('matchplay-preview', { body, timeout: 8000 });
   if (error || data?.error) throw new Error(data?.error || 'Сервис недоступен');
   return data;
 } });
 const updateOnline = createOnlineCounter(document);
-let stopOnline = null;
+let stopOnline = null, stopHeartbeat = null;
 // A preloaded embedded game stays paused until its parent shows the view.
 if (window.parent !== window) ui.hide();
 let cachedId = null;
 try { cachedId = cachedUserId(window.localStorage); } catch { /* Storage may be blocked. */ }
 startSessionMonitor({
   auth: supabase.auth, cachedId,
-  open: id => { if (window.parent === window && !stopOnline) stopOnline = startOnlinePresence(supabase, id, updateOnline); return ui.open(id); },
-  logout: () => { stopOnline?.(); ui.destroy(); document.getElementById('member-game').hidden = true; window.top.location.replace('/'); },
-  accountChanged: () => { stopOnline?.(); ui.destroy(); document.getElementById('member-game').hidden = true; window.location.reload(); },
+  open: id => { if (window.parent === window && !stopOnline) { stopOnline = startOnlinePresence(supabase, id, updateOnline); stopHeartbeat = startPreviewHeartbeat(supabase, window); } return ui.open(id); },
+  logout: () => { stopOnline?.(); stopHeartbeat?.(); ui.destroy(); document.getElementById('member-game').hidden = true; window.top.location.replace('/'); },
+  accountChanged: () => { stopOnline?.(); stopHeartbeat?.(); ui.destroy(); document.getElementById('member-game').hidden = true; window.location.reload(); },
 });
 document.addEventListener('visibilitychange', () => ui.browserVisibility(!document.hidden));
 ui.browserVisibility(!document.hidden);
