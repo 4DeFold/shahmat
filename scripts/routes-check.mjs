@@ -55,7 +55,7 @@ try {
     assert.equal(new URL(page.url()).pathname, `/${name}`);
     if (name === 'settings') {
       assert.equal(await page.locator('#dashboard-palettes input:checked').inputValue(), 'monochrome');
-      assert.equal(await page.locator('#dashboard-palettes label').count(), 5);
+      assert.equal(await page.locator('#dashboard-palettes label').count(), 10);
     }
     await page.reload();
     await page.locator(`#page-${name}`).waitFor({ state: 'visible' });

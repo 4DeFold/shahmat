@@ -22,7 +22,7 @@ let profile = null;
 let selectedPalette = 'monochrome';
 let selectedTheme = null;
 const systemTheme = window.matchMedia('(prefers-color-scheme: dark)');
-const palettes = new Set(['monochrome', 'gray', 'forest', 'atelier', 'wood']);
+const palettes = new Set(['monochrome', 'gray', 'forest', 'atelier', 'wood', 'earth', 'ocean', 'amber', 'lavender', 'sand']);
 const landing = document.querySelector('.landing');
 
 function applyTheme(value) {
@@ -259,8 +259,7 @@ async function loadView(name) {
     const { default: html } = await pageLoaders[name]();
     if (!dashboardPreloadEnabled || $('dashboard-screen').hidden || $(viewId(name))) return;
     $('page-content').insertAdjacentHTML('beforeend', html);
-    if (name === 'rating') ratingView = createRatingView($('page-rating'), supabase);
-    if (name === 'profile' && profile) displayProfile();
+    if (name === 'rating') ratingView = createRatingView($('page-rating'), supabase, { showSelf:true });
     if (name === 'settings') applyPalette(selectedPalette);
     if (name === 'game') {
       const frame = $('member-game-frame');
@@ -315,7 +314,7 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
     closeAccountMenu();
     if (focus) {
       window.scrollTo(0, 0);
-      const heading = name === 'profile' ? $('dashboard-title') : $('page-' + name + '-title');
+      const heading = $('page-' + name + '-title');
       if (heading) { heading.setAttribute('tabindex', '-1'); heading.focus({ preventScroll: true }); }
     }
     document.title = ({ home: 'Главная', game: 'Играть', rating: 'Рейтинг', profile: 'Профиль', settings: 'Настройки', help: 'Помощь' })[name] + ' — shahmat.xyz';
@@ -332,11 +331,11 @@ function syncGameAppearance() {
   const frame = $('member-game-frame');
   if (!frame?.contentWindow) return;
   const style = getComputedStyle(landing);
-  const names = ['--page-background', '--foreground', '--surface', '--surface-raised', '--line', '--button-background', '--button-text', '--accent', '--board-light', '--board-dark'];
+  const names = ['--page-background', '--foreground', '--surface', '--surface-raised', '--line', '--button-background', '--button-text', '--accent', '--board-light', '--board-dark', '--clock-white', '--clock-black'];
   const colors = Object.fromEntries(names.map(name => [name, style.getPropertyValue(name).trim()]));
   // Apply synchronously before revealing the frame; postMessage keeps its own
   // appearance listener in sync as the palette changes later.
-  const targets = { '--page-background': '--bg', '--foreground': '--ink', '--surface': '--surface', '--surface-raised': '--surface-alt', '--line': '--line', '--button-background': '--control', '--button-text': '--control-ink', '--accent': '--accent', '--board-light': '--board-light', '--board-dark': '--board-dark' };
+  const targets = { '--page-background': '--bg', '--foreground': '--ink', '--surface': '--surface', '--surface-raised': '--surface-alt', '--line': '--line', '--button-background': '--control', '--button-text': '--control-ink', '--accent': '--accent', '--board-light': '--board-light', '--board-dark': '--board-dark', '--clock-white':'--clock-white', '--clock-black':'--clock-black' };
   try { for (const [name, target] of Object.entries(targets)) if (colors[name]) frame.contentDocument?.documentElement.style.setProperty(target, colors[name]); } catch { /* Frame may still be navigating. */ }
   frame.contentWindow.postMessage({ type: 'shahmat-appearance', colors }, window.location.origin);
 }
@@ -472,12 +471,7 @@ function prepareProfile() {
   $('profile-submit').innerHTML = editing ? 'Сохранить <span>↗</span>' : 'Продолжить <span>→</span>';
   message('profile-message');
 }
-function displayProfile() {
-  if (!$('dashboard-title')) return;
-  $('dashboard-title').textContent = 'Привет, ' + profile.username + '.';
-  $('dashboard-profile-heading').textContent = profile.username;
-  $('dashboard-bio').textContent = profile.bio || 'Здесь можно рассказать немного о себе.';
-}
+function displayProfile() { /* The profile view is intentionally empty. */ }
 $('login').addEventListener('click', async event => {
   if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
   event.preventDefault();
@@ -681,6 +675,24 @@ $('palette-form').addEventListener('submit', async event => {
   displayProfile();
   await show('dashboard-screen');
 });
+// Reports are sent once. On a lost response we do not silently resubmit,
+// because the server may already have stored it.
+$('page-content').addEventListener('submit', async event => {
+  if (event.target.id !== 'feedback-form') return;
+  event.preventDefault();
+  const form = event.target, button = form.querySelector('button[type=submit]');
+  const status = $('feedback-status'), text = $('feedback-message');
+  const value = text.value.trim();
+  if (value.length < 5 || value.length > 2000) { status.textContent = 'Напиши от 5 до 2000 символов.'; return; }
+  button.disabled = true; status.textContent = 'Отправляем…';
+  try {
+    const { error } = await supabase.rpc('submit_feedback', { p_category:$('feedback-category').value, p_message:value });
+    if (error) throw error;
+    text.value = ''; status.textContent = 'Спасибо! Сообщение отправлено.';
+  } catch { status.textContent = 'Не удалось подтвердить отправку. Проверь соединение и попробуй позже.'; }
+  finally { button.disabled = false; }
+});
+
 // Profile and settings controls are bound on the shared container because pages are lazy-loaded.
 $('page-content').addEventListener('click', event => {
   if (event.target.closest('#edit-profile')) { editing = true; prepareProfile(); void show('profile-screen'); }

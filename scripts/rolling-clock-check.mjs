@@ -85,10 +85,10 @@ try {
     state.white_ms = 178000; age = 60000;
     await page.waitForFunction(() => document.querySelector('#player-clock').getAttribute('aria-label') === '02:58', null, {timeout:3000});
     assert.equal(await page.locator('#player-clock .clock-reel').evaluateAll(els => els.some(el => el.getAnimations().length)), reducedMotion === 'no-preference', 'clock ticks roll without replacing the timer');
-    await page.evaluate(() => { const root=document.documentElement; root.style.setProperty('--surface','#cceedd'); root.style.setProperty('--ink','#123456'); root.style.setProperty('--control','#345678'); root.style.setProperty('--control-ink','#ffffff'); });
+    await page.evaluate(() => { const root=document.documentElement; root.style.setProperty('--clock-white','#cceedd'); root.style.setProperty('--clock-black','#345678'); });
     await page.waitForTimeout(250);
     const palette = await page.evaluate(() => ({white:getComputedStyle(document.querySelector('.clock[data-color=w]')).backgroundColor, black:getComputedStyle(document.querySelector('.clock[data-color=b]')).backgroundColor, digits:getComputedStyle(document.querySelector('.clock[data-color=b] .clock-reel')).color}));
-    assert.deepEqual(palette,{white:'rgb(204, 238, 221)',black:'rgb(52, 86, 120)',digits:'rgb(255, 255, 255)'});
+    assert.deepEqual(palette,{white:'rgb(204, 238, 221)',black:'rgb(52, 86, 120)',digits:'rgb(204, 238, 221)'});
     await page.close();
   }
   // Atmosphere must disappear immediately when auth/landing is replaced by dashboard,

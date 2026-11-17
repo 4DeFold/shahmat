@@ -83,15 +83,21 @@ try {
     assert.equal(await game.locator('.game-rail').isVisible(), true);
     const clocks = await game.locator('.clock-pair').evaluate(pair => {
       const own = pair.querySelector('#player-clock-card'), opponent = pair.querySelector('#opponent-clock-card');
-      return { clockLeft: pair.getBoundingClientRect().left, boardRight: document.getElementById('board').getBoundingClientRect().right,
+      const rect = document.getElementById('board').getBoundingClientRect();
+      return { narrow:matchMedia('(max-width:700px)').matches, clockLeft: own.getBoundingClientRect().left, boardRight:rect.right, boardTop:rect.top, boardBottom:rect.bottom, ownRight:own.getBoundingClientRect().right, opponentRight:opponent.getBoundingClientRect().right,
         ownBackground: getComputedStyle(own).backgroundColor, opponentBackground: getComputedStyle(opponent).backgroundColor,
         numberSize: parseFloat(getComputedStyle(own.querySelector('strong')).fontSize), ownTop:own.getBoundingClientRect().top, ownBottom:own.getBoundingClientRect().bottom, opponentTop:opponent.getBoundingClientRect().top, opponentBottom:opponent.getBoundingClientRect().bottom, ownCenter:(own.getBoundingClientRect().top + own.getBoundingClientRect().bottom) / 2, opponentCenter:(opponent.getBoundingClientRect().top + opponent.getBoundingClientRect().bottom) / 2, boardMiddle: (document.getElementById('board').getBoundingClientRect().top + document.getElementById('board').getBoundingClientRect().bottom) / 2 };
     });
-    assert.ok(clocks.clockLeft >= clocks.boardRight, 'clocks are next to the board');
+    if (clocks.narrow) {
+      assert.ok(clocks.opponentBottom <= clocks.boardTop && clocks.ownTop >= clocks.boardBottom, 'clocks are above and below the board');
+      assert.ok(Math.abs(clocks.ownRight-clocks.boardRight) <= 6 && Math.abs(clocks.opponentRight-clocks.boardRight) <= 6, 'clocks align right');
+    } else assert.ok(clocks.clockLeft >= clocks.boardRight, 'clocks are next to the board');
     assert.ok(clocks.ownTop >= clocks.opponentBottom, 'player clock is below opponent');
     assert.ok(clocks.ownCenter >= clocks.boardMiddle && clocks.opponentCenter <= clocks.boardMiddle, 'clocks are in the correct halves');
-    assert.ok(clocks.ownTop - clocks.opponentBottom <= 13, 'clocks form a compact pair');
-    assert.ok(Math.abs((clocks.ownBottom + clocks.opponentTop) / 2 - clocks.boardMiddle) <= 1, 'clock pair is centered on the board');
+    if (!clocks.narrow) {
+      assert.ok(clocks.ownTop - clocks.opponentBottom <= 13, 'clocks form a compact pair');
+      assert.ok(Math.abs((clocks.ownBottom + clocks.opponentTop) / 2 - clocks.boardMiddle) <= 1, 'clock pair is centered on the board');
+    }
     assert.notEqual(clocks.ownBackground, clocks.opponentBackground, 'clock backgrounds must differ');
     assert.ok(clocks.numberSize >= 12, 'clock numbers are legible');
     const clock = await game.locator('#player-clock').evaluate(async el => {

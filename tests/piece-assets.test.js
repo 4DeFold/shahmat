@@ -18,7 +18,7 @@ test('the complete Cburnett set and its GPL license and attribution are present'
   assert.match(await readFile(`${folder}/COPYING.txt`, 'utf8'), /GNU GENERAL PUBLIC LICENSE/);
 });
 test('all board avatars and account icons use the same set', async () => {
-  for (const path of ['pages/play.html', 'pages/game.html', 'pages/app-shell.html', 'pages/profile.html']) {
+  for (const path of ['pages/play.html', 'pages/game.html', 'pages/app-shell.html']) {
     const html = await readFile(path, 'utf8');
     const doc = new JSDOM(html).window.document;
     const pieces = [...doc.querySelectorAll('img[src^="/pieces/"]')];

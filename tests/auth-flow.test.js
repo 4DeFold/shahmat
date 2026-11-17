@@ -10,7 +10,7 @@ const pageHtml = (await Promise.all(['home', 'game-view', 'profile', 'settings',
 const html = rootHtml.replace('    </main>', shellHtml.replace('<div id="page-content"></div>', `<div id="page-content">${pageHtml}</div>`) + '    </main>');
 const source = (await readFile('app.js', 'utf8')).replace(/import .*?;\n/g, '').replace('export const appReady = initialize();', 'initialize();');
 const tick = () => new Promise(resolve => setTimeout(resolve, 10));
-async function setup({ existing = false, palette = 'monochrome', failSave = false, systemDark = false, initialStorage = {}, saveHandler = null, getUserHandler = null, userId = 'user-1', otpReady = true, autoConfirm = false, signupError = null, signInHandler = null, url = 'https://example.com', accessToken = null } = {}) {
+async function setup({ existing = false, palette = 'monochrome', failSave = false, systemDark = false, initialStorage = {}, saveHandler = null, getUserHandler = null, userId = 'user-1', otpReady = true, autoConfirm = false, signupError = null, signInHandler = null, url = 'https://example.com', accessToken = null, feedbackHandler = null } = {}) {
   const dom = new JSDOM(html, { runScripts: 'outside-only', url });
   const { window } = dom;
   let loggedIn = existing;
@@ -36,6 +36,7 @@ async function setup({ existing = false, palette = 'monochrome', failSave = fals
       updateUser: async ({ data, password }) => { if (password) { newPassword = password; return { error: null }; } if (saveHandler) await saveHandler(data); if (failSave) return { error: new Error('save failed') }; metadata = { ...metadata, ...data }; return { data: { user: user() } }; },
       signOut: async () => { loggedIn = false; return {}; }
     },
+    rpc: async (name, args) => feedbackHandler ? feedbackHandler(name, args) : ({data:null,error:null}),
     from: () => ({
       select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: storedProfile }) }) }),
       upsert: async value => { storedProfile = value; return {}; }
@@ -77,9 +78,8 @@ test('registration requires a profile, saves chosen palette and opens dashboard'
   assert.equal(getProfile().username, 'Player_1'); assert.equal($('palette-screen').hidden, false);
   await choose('onboarding-palettes', 'atelier'); assert.equal(document.querySelector('.landing').dataset.palette, 'atelier');
   await submit('palette-form'); assert.equal(getMetadata().palette, 'atelier');
-  assert.equal($('dashboard-screen').hidden, false); assert.match($('dashboard-title').textContent, /Player_1/);
-  await click('edit-profile'); $('bio').value = 'Updated'; await submit('profile-form');
-  assert.equal(getProfile().bio, 'Updated'); assert.equal(getMetadata().palette, 'atelier');
+  assert.equal($('dashboard-screen').hidden, false);
+  assert.equal($('page-profile').children.length, 0); assert.equal(getMetadata().palette, 'atelier');
   assert.equal($('dashboard-screen').hidden, false);
   await choose('dashboard-palettes', 'wood'); assert.equal(getMetadata().palette, 'wood');
   $('dashboard-screen').querySelector('.signout').click(); await tick();
@@ -90,7 +90,7 @@ test('registration requires a profile, saves chosen palette and opens dashboard'
 
 test('existing session opens dashboard with saved palette', async () => {
   const { $, document } = await setup({ existing: true, palette: 'forest' });
-  assert.equal($('dashboard-screen').hidden, false); assert.match($('dashboard-title').textContent, /Player/);
+  assert.equal($('dashboard-screen').hidden, false); assert.equal($('page-profile').children.length, 0);
   assert.equal(document.querySelector('.landing').dataset.palette, 'forest');
 });
 
@@ -108,7 +108,7 @@ test('failed background save keeps palette locally without reporting an error', 
 test('gray palette follows monochrome and persists after signing back in', async () => {
   const { $, click, choose, submit, getMetadata, document } = await setup({ existing: true });
   for (const id of ['onboarding-palettes', 'dashboard-palettes']) {
-    assert.deepEqual(Array.from($(id).querySelectorAll('input'), input => input.value), ['monochrome', 'gray', 'forest', 'atelier', 'wood']);
+    assert.deepEqual(Array.from($(id).querySelectorAll('input'), input => input.value), ['monochrome', 'gray', 'forest', 'atelier', 'wood', 'earth', 'ocean', 'amber', 'lavender', 'sand']);
   }
   await choose('dashboard-palettes', 'gray');
   assert.equal(getMetadata().palette, 'gray');
@@ -283,14 +283,10 @@ test('background sync refuses to save with a different account session', async (
 });
 
 
-test('profile editing can be cancelled without saving changes', async () => {
-  const { $, click, getProfile } = await setup({ existing: true });
-  await click('edit-profile');
-  assert.equal($('profile-cancel').hidden, false);
-  $('bio').value = 'Unsaved changes';
-  await click('profile-cancel');
-  assert.equal($('dashboard-screen').hidden, false);
-  assert.equal(getProfile().bio, '');
+test('profile page is empty without deleting the stored profile', async () => {
+  const { $, getProfile } = await setup({ existing: true });
+  assert.equal($('page-profile').children.length, 0);
+  assert.equal(getProfile().username, 'Player');
 });
 
 test('sidebar navigates between pages, moves the dashboard to profile and returns to empty home', async () => {
@@ -316,8 +312,7 @@ test('sidebar navigates between pages, moves the dashboard to profile and return
     pageButton(name).click(); await tick();
     assert.equal($(`page-${name}`).hidden, false);
     if (name === 'profile') {
-      assert.equal(document.activeElement, $('dashboard-title'));
-      assert.equal($('dashboard-title').textContent, 'Привет, Player.');
+      assert.equal($('page-profile').children.length, 0);
     }
     assert.equal($('account-menu').hidden, true);
     assert.equal(window.location.pathname, `/${name}`);
@@ -539,7 +534,7 @@ test('settings contains palette options and keeps selection when navigating', as
   const { $, choose, document, window } = await setup({ existing: true, palette: 'forest' });
   assert.equal($('page-profile').querySelector('#dashboard-palettes'), null);
   assert.equal($('settings-palette-heading').textContent, 'Палитры.');
-  assert.equal($('dashboard-palettes').querySelectorAll('label.palette-option').length, 5);
+  assert.equal($('dashboard-palettes').querySelectorAll('label.palette-option').length, 10);
   document.querySelector('#account-menu [data-page=settings]').click(); await tick();
   assert.equal(window.location.pathname, '/settings');
   assert.equal($('dashboard-palettes').querySelector('input:checked').value, 'forest');
@@ -599,4 +594,16 @@ test('signup does not create an account when sign-in failed due to network', asy
   await app.click('login'); await app.click('tab-signup');
   app.$('email').value = 'new@example.com'; app.$('password').value = 'secret123'; await app.submit('auth-form');
   assert.equal(app.getSignUps(), 0); assert.match(app.$('auth-message').textContent, /сервер/);
+});
+
+
+test('feedback submits once and reports success or an unconfirmed response without losing text', async () => {
+  const sent=[]; let failed=false;
+  const { $, submit } = await setup({existing:true, feedbackHandler:async (name,args) => { sent.push({name,args}); return {error:failed ? Error('offline') : null}; }});
+  $('feedback-category').value='idea'; $('feedback-message').value='  Add a feature  ';
+  await submit('feedback-form');
+  assert.equal(sent.length,1); assert.equal(sent[0].name,'submit_feedback'); assert.equal(sent[0].args.p_category,'idea'); assert.equal(sent[0].args.p_message,'Add a feature');
+  assert.equal($('feedback-message').value,''); assert.match($('feedback-status').textContent,/отправлено/);
+  failed=true; $('feedback-message').value='This is a bug'; await submit('feedback-form');
+  assert.equal(sent.length,2); assert.equal($('feedback-message').value,'This is a bug'); assert.match($('feedback-status').textContent,/Не удалось/);
 });

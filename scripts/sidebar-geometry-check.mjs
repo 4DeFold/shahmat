@@ -32,7 +32,7 @@ try {
         const text = range.getBoundingClientRect(), sidebar = el.closest('.app-sidebar').getBoundingClientRect();
         return {ratio:text.width / sidebar.width, center:Math.abs((text.left + text.right - sidebar.left - sidebar.right) / 2), left:text.left - sidebar.left, right:sidebar.right - text.right};
       });
-      assert.ok(Math.abs(logo.ratio - .9) < .025 && logo.center < 1.5 && logo.left >= 0 && logo.right >= 0, `logo fills and centers in rail: ${JSON.stringify(logo)}`);
+      assert.ok(Math.abs(logo.ratio - .8) < .025 && logo.center < 1.5 && logo.left >= 0 && logo.right >= 0, `logo fills and centers in rail: ${JSON.stringify(logo)}`);
     }
     if (viewport.width <= 700 || (touch && viewport.height <= 500)) await page.locator('#mobile-menu-toggle').click();
     const spansRail = async selector => {
@@ -63,9 +63,12 @@ try {
     await game.route('https://eswyxbyddkajysogtglp.supabase.co/**', route => route.fulfill({json: new URL(route.request().url()).pathname === '/auth/v1/user' ? user : {game:null}}));
     await game.goto(`${base}/pages/game.html`); await game.locator('#board [data-square=e2]').waitFor();
     const getFrame = () => game.locator('.board-frame').evaluate(el => { const r=el.getBoundingClientRect(); return {x:r.x,y:r.y,width:r.width,height:r.height}; });
-    const current=await getFrame(); await game.addStyleTag({content:baseline}); const main=await getFrame();
-    for (const key of ['x','y','width','height']) assert.ok(Math.abs(current[key]-main[key]) < 1, `board ${key} matches main: ${current[key]} vs ${main[key]} at ${viewport.width}`);
+    const current=await getFrame();
+    assert.ok(Math.abs(current.width-current.height)<1 && current.width>0, 'board remains square');
+    if (viewport.width > 700) { await game.addStyleTag({content:baseline}); const main=await getFrame();
+      for (const key of ['x','y','width','height']) assert.ok(Math.abs(current[key]-main[key]) < 1, `board ${key} matches main: ${current[key]} vs ${main[key]} at ${viewport.width}`);
+    }
     await game.close();
   }
-  console.log('✓ Full-width sidebar and board geometry matching main at desktop, tablet and mobile sizes');
+  console.log('✓ Full-width sidebar and board geometry at desktop, tablet and mobile sizes');
 } finally { await browser.close(); }

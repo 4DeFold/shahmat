@@ -458,3 +458,17 @@ test('a match created before cancellation is restored instead of discarded', asy
   release({state:'matched',game:game()}); await flush();
   assert.equal(cancelCalls,1); assert.match(app.$('status').textContent,/Ваш ход/);
 });
+
+test('selection survives an opponent move but clears when the selected piece is captured', async t => {
+  let position = game({moves:['e4'],turn:'b'});
+  const app = setup(async () => ({game:position})); t.after(() => app.close());
+  await app.ui.open(A); await flush();
+  const square = sq => app.$('board').querySelector(`[data-square=${sq}]`);
+  square('g1').click(); assert.equal(square('g1').classList.contains('selected'),true);
+  position = game({moves:['e4','e5'],turn:'w'}); app.ui.hide(); app.ui.show(); await flush();
+  assert.equal(square('g1').classList.contains('selected'),true);
+  position = game({moves:['e4','d5','exd5'],turn:'b',version:3}); app.ui.hide(); app.ui.show(); await flush();
+  square('d5').click(); assert.equal(square('d5').classList.contains('selected'),true);
+  position = game({moves:['e4','d5','exd5','Qxd5'],turn:'w',version:4}); app.ui.hide(); app.ui.show(); await flush();
+  assert.equal(square('d5').classList.contains('selected'),false);
+});

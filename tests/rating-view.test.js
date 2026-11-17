@@ -53,3 +53,21 @@ test('synchronous errors can be retried; destroying ignores an outstanding resul
   assert.equal(count,2); view.destroy(); finish({data:[{username:'After',yar:1000,ranked:true}],error:null}); await tick();
   assert.equal(root.querySelector('.rating-player'),null); dom.window.close();
 });
+
+test('personal position stays visible outside the top 100 and stale mode replies are ignored', async () => {
+  const dom=new JSDOM(html); const root=dom.window.document.querySelector('section');
+  const requests=[]; const client={rpc:(fn,args)=>new Promise(resolve=>requests.push({fn,args,resolve}))};
+  const view=createRatingView(root,client,{showSelf:true});
+  const first=view.refresh(); await tick();
+  root.querySelector('[data-rating-mode="rapid"]').click(); await tick();
+  const find=(fn,mode)=>requests.find(r=>r.fn===fn && r.args.p_mode===mode);
+  find('yar_my_position','rapid').resolve({data:[{username:'<me>',yar:1234.5,ranked:true,place:125}]});
+  find('yar_leaderboard','rapid').resolve({data:[{username:'<me>',yar:1234.5,ranked:true}]}); await tick();
+  find('yar_my_position','overall').resolve({data:[{username:'stale',yar:0,ranked:true,place:1}]});
+  find('yar_leaderboard','overall').resolve({data:[]}); await first; await tick();
+  assert.equal(root.querySelector('.rating-self').hidden,false);
+  assert.equal(root.querySelector('.rating-self-place').textContent,'125');
+  assert.equal(root.querySelector('.rating-self-name').textContent,'<me>');
+  assert.equal(root.querySelector('.rating-row').classList.contains('rating-row-self'),true);
+  view.destroy(); dom.window.close();
+});
