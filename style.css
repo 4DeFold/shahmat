@@ -676,7 +676,7 @@ textarea { resize: vertical; min-height: 92px; }
 @media (max-height: 450px) and (pointer: coarse) {
   .landing.palette-active .dashboard .sidebar-nav,
   .landing.palette-active .dashboard .sidebar-account { flex-shrink: 0; }
-  .landing.palette-active .dashboard .account-menu { position: static; margin-bottom: 8px; }
+  .landing.palette-active .dashboard .account-menu { position: static; margin: 0 -14px; }
 }
 
 /* Secondary authentication actions follow the existing monochrome form style. */
@@ -787,7 +787,7 @@ body.startup-ready #landing-screen:not([hidden]) .hero-reveal--tail { animation-
   width: calc(100% + 28px); margin-inline: -14px; padding-inline: 26px;
 }
 .sidebar-icon svg { display: block; width: 24px; height: 24px; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-.account-menu { left: -14px; width: calc(100% + 28px); min-width: 0; border-inline: 0; }
+.account-menu { left: -14px; bottom: 100%; width: calc(100% + 28px); min-width: 0; border-inline: 0; }
 .account-menu-content { padding: 8px 0; }
 .account-menu :is(button, a) { padding-inline: 26px; }
 .account-menu a[aria-current='page'],

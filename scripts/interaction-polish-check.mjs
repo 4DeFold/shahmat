@@ -33,7 +33,7 @@ try {
   assert.ok(Math.abs(await angle()) < 1, 'pieces upright while board is sideways');
   assert.equal(await page.locator('#player-clock-label').isHidden(),true);
   const gap = await page.locator('.clock-pair').evaluate(el => {const [a,b] = el.children; return b.getBoundingClientRect().top-a.getBoundingClientRect().bottom;});
-  assert.ok(gap > 12, 'clocks are separated towards opposite sides');
+  assert.ok(gap >= 8 && gap <= 16, `clocks should be grouped: ${gap}`);
   const pickerHeight = await page.locator('#mode-picker').evaluate(el => el.getBoundingClientRect().height);
   const boardWidth = await page.locator('#board').evaluate(el => el.offsetWidth);
   await page.locator('label:has(input[value=blitz])').click(); await page.locator('#start-search').click();

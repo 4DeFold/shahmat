@@ -69,7 +69,7 @@ try {
     return { body:getComputedStyle(document.body).fontFamily, clock:getComputedStyle(document.querySelector('#player-clock')).fontFamily,
       loaded:document.fonts.check("16px 'Charis SIL'", 'Жывы') && document.fonts.check('16px Playfair', 'Играть') };
   });
-  assert.match(fonts.body, /Charis SIL/); assert.match(fonts.clock, /Unbounded/); assert.equal(fonts.loaded, true);
+  assert.match(fonts.body, /Charis SIL/); assert.match(fonts.clock, /Instrument Serif/); assert.equal(fonts.loaded, true);
   assert.equal(await page.locator('#sound-toggle, .sound-toggle, .game-rail h1, .leave-note').count(), 0);
   await page.evaluate(() => document.documentElement.style.setProperty('--accent', '#3d5a40'));
   await page.waitForTimeout(300);

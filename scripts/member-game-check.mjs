@@ -75,7 +75,7 @@ try {
   await game.locator('#toggle-moves').click(); assert.equal(await game.locator('#history-content').getAttribute('aria-hidden'), 'true');
   assert.equal(await game.locator('#history-content').evaluate(el => el.getBoundingClientRect().height), 0);
 
-  for (const size of [{ width:390,height:844 },{ width:1440,height:900 }]) {
+  for (const size of [{ width:280,height:653 }, { width:390,height:844 }, { width:768,height:1024 }, { width:1440,height:900 }, { width:2560,height:1080 }]) {
     await page.setViewportSize(size);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1 && document.documentElement.scrollHeight <= innerHeight + 1), true, 'game page must fit viewport');
     assert.equal(await game.locator('#board').isVisible(), true);
@@ -84,17 +84,34 @@ try {
       const own = pair.querySelector('#player-clock-card'), opponent = pair.querySelector('#opponent-clock-card');
       return { clockLeft: pair.getBoundingClientRect().left, boardRight: document.getElementById('board').getBoundingClientRect().right,
         ownBackground: getComputedStyle(own).backgroundColor, opponentBackground: getComputedStyle(opponent).backgroundColor,
-        numberSize: parseFloat(getComputedStyle(own.querySelector('strong')).fontSize), ownTop:own.getBoundingClientRect().top, opponentBottom:opponent.getBoundingClientRect().bottom, ownCenter:(own.getBoundingClientRect().top + own.getBoundingClientRect().bottom) / 2, opponentCenter:(opponent.getBoundingClientRect().top + opponent.getBoundingClientRect().bottom) / 2, boardMiddle: (document.getElementById('board').getBoundingClientRect().top + document.getElementById('board').getBoundingClientRect().bottom) / 2 };
+        numberSize: parseFloat(getComputedStyle(own.querySelector('strong')).fontSize), ownTop:own.getBoundingClientRect().top, ownBottom:own.getBoundingClientRect().bottom, opponentTop:opponent.getBoundingClientRect().top, opponentBottom:opponent.getBoundingClientRect().bottom, ownCenter:(own.getBoundingClientRect().top + own.getBoundingClientRect().bottom) / 2, opponentCenter:(opponent.getBoundingClientRect().top + opponent.getBoundingClientRect().bottom) / 2, boardMiddle: (document.getElementById('board').getBoundingClientRect().top + document.getElementById('board').getBoundingClientRect().bottom) / 2 };
     });
     assert.ok(clocks.clockLeft >= clocks.boardRight, 'clocks are next to the board');
     assert.ok(clocks.ownTop >= clocks.opponentBottom, 'player clock is below opponent');
     assert.ok(clocks.ownCenter >= clocks.boardMiddle && clocks.opponentCenter <= clocks.boardMiddle, 'clocks are in the correct halves');
+    assert.ok(clocks.ownTop - clocks.opponentBottom <= 13, 'clocks form a compact pair');
+    assert.ok(Math.abs((clocks.ownBottom + clocks.opponentTop) / 2 - clocks.boardMiddle) <= 1, 'clock pair is centered on the board');
     assert.notEqual(clocks.ownBackground, clocks.opponentBackground, 'clock backgrounds must differ');
     assert.ok(clocks.numberSize >= 12, 'clock numbers are legible');
-    // The real semibold font and longest time control must fit without clipping.
-    await game.locator('#player-clock').evaluate(async () => { await document.fonts.load('600 16px Unbounded', '24:00:00'); });
-    await game.locator('#player-clock').evaluate(el => { el.textContent = '24:00:00'; el.style.setProperty('--clock-digits','8'); });
-    assert.equal(await game.locator('#player-clock').evaluate(el => el.scrollWidth <= el.clientWidth + 1), true, 'clock value fits');
+    // Check actual rendered glyph widths, not just the full-width strong element.
+    const values = await game.locator('#player-clock').evaluate(async el => {
+      await document.fonts.load('400 16px "Instrument Serif"', '24:00:00');
+      return ['03:00', '24:00:00'].map(value => {
+        el.textContent = value; el.style.setProperty('--clock-digits', value.length);
+        const range = document.createRange(); range.selectNodeContents(el);
+        return { value, width: range.getBoundingClientRect().width, available: el.clientWidth };
+      });
+    });
+    for (const value of values) {
+      assert.ok(value.width <= value.available + 1, `${size.width}: clock value overflows ${JSON.stringify(value)}`);
+      assert.ok(value.width >= value.available * .7, `${size.width}: clock value should fill most of the width ${JSON.stringify(value)}`);
+    }
+    const online = await game.locator('#online-counter').evaluate(el => {
+      const number = el.querySelector('#online-value'), label = el.querySelector('.online-label');
+      return { numberLeft: number.getBoundingClientRect().left, labelLeft: label.getBoundingClientRect().left,
+        numberSize: parseFloat(getComputedStyle(number).fontSize), labelSize: parseFloat(getComputedStyle(label).fontSize) };
+    });
+    assert.ok(online.numberLeft < online.labelLeft && online.labelSize < online.numberSize, 'online number precedes a smaller label');
   }
   assert.equal(await page.locator('#app-sidebar').isVisible(), true);
   await page.locator('.sidebar-brand').click();
@@ -107,7 +124,7 @@ try {
   await game.locator('#resign-button').click(); await game.locator('#resign-confirm').click();
   await game.locator('#status').filter({hasText:'вы сдались'}).waitFor(); assert.equal(snapshot.status,'finished');
   assert.equal(new URL(page.url()).pathname,'/game');
-  assert.match(await game.locator('#player-clock').evaluate(el => getComputedStyle(el).fontFamily), /Unbounded/);
+  assert.match(await game.locator('#player-clock').evaluate(el => getComputedStyle(el).fontFamily), /Instrument Serif/);
 
   console.log('✓ Viewport game, four controls, mocked search and legal move');
 } finally { await browser.close(); }

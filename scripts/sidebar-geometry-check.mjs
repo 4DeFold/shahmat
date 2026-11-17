@@ -14,8 +14,8 @@ const baseline = `.board-wrap { width: min(100%, 816px, calc(100dvh - 124px + 13
  .board-with-clocks { grid-template-columns: minmax(0, 1fr) 86px; gap: 8px; }
 }`;
 try {
-  for (const viewport of [{width:1440,height:900},{width:800,height:900},{width:390,height:844}]) {
-    const page = await browser.newPage({ viewport, reducedMotion:'reduce' });
+  for (const {viewport, touch} of [{viewport:{width:1440,height:900}}, {viewport:{width:800,height:900}}, {viewport:{width:390,height:844},touch:true}, {viewport:{width:844,height:390},touch:true}]) {
+    const page = await browser.newPage({ viewport, hasTouch:!!touch, isMobile:!!touch, reducedMotion:'reduce' });
     await page.addInitScript(v => localStorage.setItem('sb-eswyxbyddkajysogtglp-auth-token',JSON.stringify(v)),session);
     await page.route('https://eswyxbyddkajysogtglp.supabase.co/**', route => {
       const path = new URL(route.request().url()).pathname;
@@ -25,7 +25,7 @@ try {
       return route.fulfill({json:{}});
     });
     await page.goto(`${base}/home`); await page.locator('#dashboard-home').waitFor({state:'visible'});
-    if (viewport.width <= 700) await page.locator('#mobile-menu-toggle').click();
+    if (viewport.width <= 700 || (touch && viewport.height <= 500)) await page.locator('#mobile-menu-toggle').click();
     const spansRail = async selector => {
       const rects = await page.evaluate(selector => {
         const side = document.querySelector('#app-sidebar').getBoundingClientRect(), item = document.querySelector(selector).getBoundingClientRect();
@@ -36,9 +36,13 @@ try {
     await spansRail('#nav-play'); await spansRail('#account-toggle');
     await page.locator('#nav-play').hover(); await spansRail('#nav-play');
     await page.locator('#account-toggle').click();
+    const gap = await page.evaluate(() => document.querySelector('#account-toggle').getBoundingClientRect().top - document.querySelector('#account-menu').getBoundingClientRect().bottom);
+    assert.ok(Math.abs(gap) <= 1, `menu meets profile button at ${viewport.width}x${viewport.height}: ${gap}px`);
+    const separation = await page.evaluate(() => document.querySelector('#account-menu').getBoundingClientRect().top - document.querySelector('#nav-play').getBoundingClientRect().bottom);
+    assert.ok(separation >= -1, `menu must not cover play at ${viewport.width}x${viewport.height}: ${separation}px`);
     for (const selector of ['#account-menu [data-page=profile]','#account-menu [data-page=settings]','#account-menu [data-page=help]','#account-menu .signout']) await spansRail(selector);
     await page.locator('#account-menu [data-page=profile]').click();
-    if (viewport.width <= 700) await page.locator('#mobile-menu-toggle').click();
+    if (viewport.width <= 700 || (touch && viewport.height <= 500)) await page.locator('#mobile-menu-toggle').click();
     const toggleActive = await page.locator('#account-toggle').evaluate(el => getComputedStyle(el).backgroundColor);
     assert.notEqual(toggleActive, 'rgba(0, 0, 0, 0)', 'profile route highlights the account tab');
     await page.locator('#account-toggle').click();
