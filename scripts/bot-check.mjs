@@ -7,7 +7,7 @@ const uid='12345678-1234-1234-1234-123456789012', user={id:uid,aud:'authenticate
 const token=['e30',Buffer.from(JSON.stringify({sub:uid,exp:Math.floor(Date.now()/1000)+3600,role:'authenticated'})).toString('base64url'),'x'].join('.');
 const session={access_token:token,token_type:'bearer',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,refresh_token:'mock',user};
 try {
- for(const [viewport,reducedMotion] of [[{width:1440,height:900},'no-preference'],[{width:390,height:844},'reduce']]) {
+ for(const [viewport,reducedMotion] of [[{width:1440,height:900},'no-preference'],[{width:390,height:844},'no-preference'],[{width:390,height:844},'reduce']]) {
   const page=await browser.newPage({viewport,reducedMotion}); const errors=[],writes=[];
   page.on('pageerror',error=>errors.push(error.message));
   await page.addInitScript(value=>localStorage.setItem('sb-eswyxbyddkajysogtglp-auth-token',JSON.stringify(value)),session);
@@ -23,20 +23,40 @@ try {
   const frame=page.frameLocator('#bot-game-frame'); await frame.locator('#bot-play:not([disabled])').waitFor({timeout:20000});
   assert.equal(await frame.locator('.orbit-board').count(),8);
   assert.equal(await frame.locator('.orbit-board .mini-square').count(),512);
-  assert.equal(await frame.locator('#bot-name').textContent(),'Пешка');
+  assert.equal(await frame.locator('.bot-clocks').count(),0);
+  assert.equal(await frame.locator('.bot-selector button').count(),2);
+  const slot=await frame.locator('.orbit-slot').boundingBox(), selector=await frame.locator('.bot-selector').boundingBox(), playButton=await frame.locator('#bot-play').boundingBox();
+  assert.ok(slot.y+slot.height<=selector.y+1 && selector.y+selector.height<=playButton.y+1,'orbit, selector and play button are arranged vertically');
+  assert.equal(await frame.locator('#bot-name').textContent(),'1 уровень');
   if(reducedMotion==='no-preference') {
+   await frame.locator('#orbit-boards').evaluate(el=>{
+    window.demoEvents=[];
+    new MutationObserver(records=>{for(const record of records) { if(record.attributeName==='class' && record.target.classList.contains('last')) window.demoEvents.push({index:record.target.closest('.orbit-board').dataset.index,time:performance.now()}); }}).observe(el,{subtree:true,attributes:true,attributeFilter:['class']});
+   });
    const before=await frame.locator('.orbit-board').first().getAttribute('style'); await page.waitForTimeout(250);
    assert.notEqual(await frame.locator('.orbit-board').first().getAttribute('style'),before,'boards orbit');
-   await frame.locator('#bot-next').click(); await frame.locator('#bot-name').getByText('Конь').waitFor(); await page.waitForTimeout(650);
+   assert.match(before,/rotate\(/,'boards turn along the orbit');
+   await page.waitForTimeout(3000);
+   const events=await frame.locator('#orbit-boards').evaluate(()=>window.demoEvents);
+   assert.ok(new Set(events.map(event=>event.index)).size>=3,'demonstration boards tick independently');
+   assert.ok(Math.max(...events.map(event=>event.time))-Math.min(...events.map(event=>event.time))>300,'ticks do not happen in lockstep');
+   // Rapid input must register every click while old constellations depart.
+   await frame.locator('#bot-next').evaluate(button=>{ for(let i=0;i<5;i++) button.click(); });
+   assert.equal(await frame.locator('#bot-name').textContent(),'Stockfish');
+   assert.ok(await frame.locator('.orbit-departure').count()>0,'whole constellation departs');
+   await frame.locator('#bot-next').click(); assert.equal(await frame.locator('#bot-name').textContent(),'1 уровень');
+   await page.waitForTimeout(750);
    const opacity=await frame.locator('#hero-piece').evaluate(el=>getComputedStyle(el).opacity); assert.equal(opacity,'1','piece remains visible after animation');
-   await frame.locator('#bot-prev').click(); await frame.locator('#bot-name').getByText('Пешка').waitFor(); await page.waitForTimeout(650);
+   assert.equal(await frame.locator('.orbit-departure').count(),0,'departures cleaned up');
   } else {
-   await frame.locator('#bot-prev').click(); assert.equal(await frame.locator('#bot-name').textContent(),'Король');
-   await frame.locator('#bot-next').click(); assert.equal(await frame.locator('#bot-name').textContent(),'Пешка');
+   await frame.locator('#bot-prev').click(); assert.equal(await frame.locator('#bot-name').textContent(),'Stockfish');
+   await frame.locator('#bot-next').click(); assert.equal(await frame.locator('#bot-name').textContent(),'1 уровень');
   }
   await frame.locator('#bot-play').click();
-  if(reducedMotion==='no-preference') { await frame.locator('#bot-app[data-phase=launching]').waitFor(); await frame.locator('.fly-board').waitFor({timeout:3000}); }
+  let destination;
+  if(reducedMotion==='no-preference') { await frame.locator('#bot-app[data-phase=launching]').waitFor(); await frame.locator('.fly-board .board').waitFor({timeout:3000}); destination=await frame.locator('#target-board').boundingBox(); }
   await frame.locator('#bot-app[data-phase=playing]').waitFor({timeout:6000});
+  if(destination) { const live=await frame.locator('#target-board').boundingBox(); for(const key of ['x','y','width','height']) assert.ok(Math.abs(destination[key]-live[key])<2,`board arrival has stable ${key}`); }
   assert.equal(await frame.locator('#board .square').count(),64); assert.equal(await frame.locator('#resign-wrap').getAttribute('aria-hidden'),'true');
   await frame.locator('[data-square=e2]').click(); await frame.locator('[data-square=e4]').click();
   await frame.locator('#status').getByText(/Ваш ход/).waitFor({timeout:30000});

@@ -2,12 +2,12 @@
 // A worker is created only when a game actually needs the engine. King uses
 // the full network, while lower levels use the lighter network and UCI limits.
 export const BOT_LEVELS = [
-  { piece:'P', name:'Пешка', skill:0, elo:1320, ms:250, description:'Первый шаг: знакомство с игрой.' },
-  { piece:'N', name:'Конь', skill:4, elo:1550, ms:350, description:'Неожиданные ходы и первые комбинации.' },
-  { piece:'B', name:'Слон', skill:8, elo:1800, ms:500, description:'Диагонали, тактика и позиционная игра.' },
-  { piece:'R', name:'Ладья', skill:12, elo:2100, ms:700, description:'Сильнее в открытых позициях и эндшпиле.' },
-  { piece:'Q', name:'Ферзь', skill:16, elo:2450, ms:1000, description:'Серьёзный соперник для опытного игрока.' },
-  { piece:'K', name:'Король', skill:20, elo:null, ms:2500, description:'Полная сеть Stockfish, без ограничения силы.' },
+  { piece:'P', name:'1 уровень', skill:0, elo:1320, ms:250 },
+  { piece:'N', name:'2 уровень', skill:4, elo:1550, ms:350 },
+  { piece:'B', name:'3 уровень', skill:8, elo:1800, ms:500 },
+  { piece:'R', name:'4 уровень', skill:12, elo:2100, ms:700 },
+  { piece:'Q', name:'5 уровень', skill:16, elo:2450, ms:1000 },
+  { piece:'K', name:'Stockfish', skill:20, elo:null, ms:2500 },
 ];
 export function createStockfish(level, { WorkerClass = globalThis.Worker, timeoutMs = 90000 } = {}) {
   const config = BOT_LEVELS[level];

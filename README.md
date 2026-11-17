@@ -133,8 +133,8 @@ are always unrated and their client-reported results are not authoritative.
 
 ## Bot games (preview)
 
-Signed-in players can visit `/bot` and choose Pawn, Knight, Bishop, Rook, Queen
-or King. All levels use Stockfish.js 17.1 with progressively higher UCI limits;
+Signed-in players can visit `/bot` and choose levels 1–5 or Stockfish.
+Their figures progress from Pawn to King. All levels use Stockfish.js 17.1 with progressively higher UCI limits;
 the 1/6–6/6 scale is a UI convention, not a measured percentage of chess ability.
 The King uses the full single-threaded NNUE network with no skill limit and a
 2.5-second move budget. The other five use the lite engine and strength limits.
