@@ -1,10 +1,10 @@
 // Counts signed-in users running this version of the site, not tabs. Presence is
 // ephemeral; no profile data is sent over the Realtime channel.
 export function startOnlinePresence(client, userId, onCount) {
-  let channel, stopped = false, connected = false, last = null;
+  let channel, stopped = false, connected = false, synced = false, last = null;
   const report = value => { if (value !== last) { last = value; onCount(value); } };
   const timer = setInterval(() => {
-    if (!connected || !channel) { report(null); return; }
+    if (!connected || !synced || !channel) { report(null); return; }
     report(Object.keys(channel.presenceState()).length);
   }, 500);
   (async () => {
@@ -12,13 +12,14 @@ export function startOnlinePresence(client, userId, onCount) {
       const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`shahmat-online:${userId}`));
       if (stopped) return;
       const key = Array.from(new Uint8Array(bytes), byte => byte.toString(16).padStart(2, '0')).join('');
-      channel = client.channel('site-online-v1', { config: { presence: { key } } });
+      channel = client.channel('site-online-v1', { config: { presence: { key, enabled: true } } });
+      channel.on('presence', { event: 'sync' }, () => { synced = true; });
       channel.subscribe(async status => {
         if (stopped) return;
         if (status === 'SUBSCRIBED') {
           const result = await channel.track({});
           if (!stopped && result === 'ok') connected = true;
-        } else if (['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED'].includes(status)) { connected = false; report(null); }
+        } else if (['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED'].includes(status)) { connected = false; synced = false; report(null); }
       });
     } catch { report(null); }
   })();
