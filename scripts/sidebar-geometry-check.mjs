@@ -43,6 +43,10 @@ try {
       assert.ok(Math.abs(rects.left) < 1.1 && Math.abs(rects.right) < 1.1, `${selector} spans sidebar: ${JSON.stringify(rects)} at ${viewport.width}`);
     };
     await spansRail('#nav-play'); await spansRail('#account-toggle');
+    if (!(touch && viewport.height <= 500)) {
+      const bottomGap = await page.evaluate(() => document.querySelector('#app-sidebar').getBoundingClientRect().bottom - document.querySelector('#account-toggle').getBoundingClientRect().bottom);
+      assert.ok(Math.abs(bottomGap) < 1, `profile touches bottom of sidebar: ${bottomGap}px`);
+    }
     await page.locator('#nav-play').hover(); await spansRail('#nav-play');
     await page.locator('#account-toggle').click();
     const gap = await page.evaluate(() => document.querySelector('#account-toggle').getBoundingClientRect().top - document.querySelector('#account-menu').getBoundingClientRect().bottom);

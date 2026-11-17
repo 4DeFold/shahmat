@@ -150,7 +150,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     // Establish initial rotation before the board changes sides.
     if (board.classList.contains('waiting') && snapshot) void board.offsetWidth;
     board.classList.toggle('waiting', !snapshot); board.classList.toggle('black', !!snapshot && color === 'b');
-    const playerColor = snapshot ? (color === 'w' ? 'Белые' : 'Чёрные') : 'Цвет определится после поиска';
+    const playerColor = snapshot ? (color === 'w' ? 'Белые' : 'Чёрные') : '';
     const opponentColor = snapshot ? (color === 'w' ? 'Чёрные' : 'Белые') : '';
     if ($('player-color').textContent !== playerColor) $('player-color').textContent = playerColor;
     if ($('opponent-color').textContent !== opponentColor) $('opponent-color').textContent = opponentColor;

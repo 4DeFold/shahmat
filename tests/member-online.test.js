@@ -38,6 +38,7 @@ test('board opens at starting position, modes are explicit and a real request st
   assert.deepEqual([...app.$('mode-list').querySelectorAll('input')].map(input => input.value), ['blitz','rapid','classical','daily']);
   assert.equal(app.$('start-search').disabled, true); assert.equal(app.$('start-search').hidden, true);
   await app.ui.open(A);
+  assert.equal(app.$('player-color').textContent, '');
   const rapid = app.$('mode-list').querySelector('[value=rapid]'); rapid.checked = true; rapid.dispatchEvent(new app.dom.window.Event('change', { bubbles:true }));
   assert.equal(app.$('player-clock').getAttribute('aria-label'), '10:00'); assert.equal(app.$('start-search').disabled, false); assert.equal(app.$('start-search').hidden, false);
   app.$('start-search').click(); await flush();

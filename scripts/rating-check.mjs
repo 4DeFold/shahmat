@@ -29,7 +29,7 @@ try {
       await page.locator('.rating-row').first().waitFor();
       assert.equal(new URL(page.url()).pathname,'/rating');
       assert.equal(await page.locator('.rating-score').first().innerText(),'1 100');
-      await page.waitForFunction(() => document.querySelector('.rating-indicator.is-ready'));
+      await page.waitForFunction(() => { const el=document.querySelector('.rating-indicator.is-ready'); return el && Number(getComputedStyle(el).opacity)>0; });
       const opacity = await page.locator('.rating-indicator').evaluate(el => getComputedStyle(el).opacity);
       assert.ok(Number(opacity)>0, 'selected mode indicator is visible');
       const motion = await page.locator('.rating-indicator').evaluate(el => getComputedStyle(el).transitionDuration);
@@ -45,7 +45,7 @@ try {
       assert.deepEqual(modes,['overall','rapid'],'switching back to a fresh mode uses the cache');
       await page.locator('[data-rating-mode=daily]').click();
       await page.waitForFunction(() => { const i=document.querySelector('.rating-indicator').getBoundingClientRect(), b=document.querySelector('[data-rating-mode=daily]').getBoundingClientRect(); return Math.abs(i.left-b.left)<1 && Math.abs(i.top-b.top)<1 && Math.abs(i.width-b.width)<1; });
-      assert.equal(await page.locator('.rating-place').nth(1).innerText(),'—');
+      assert.equal(await page.locator('.rating-place').nth(1).innerText(),'2');
       const widths=await page.evaluate(()=>({scroll:document.documentElement.scrollWidth,client:document.documentElement.clientWidth}));
       assert.ok(widths.scroll<=widths.client,`no page overflow ${viewport.width}: ${JSON.stringify(widths)}`);
       await page.reload(); await page.locator('#page-rating').waitFor({state:'visible'}); await page.locator('.rating-row').first().waitFor();

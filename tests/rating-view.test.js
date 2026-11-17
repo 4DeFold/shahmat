@@ -17,7 +17,7 @@ test('rating switches modes, escapes names, and ignores stale requests', async (
   assert.equal(root.querySelector('[data-rating-mode="rapid"]').getAttribute('aria-pressed'),'true');
   assert.equal(root.querySelector('.rating-player').textContent,'<b>Player</b>');
   assert.equal(root.querySelector('.rating-player b'),null);
-  assert.equal(root.querySelectorAll('.rating-row')[1].querySelector('.rating-place').textContent,'—');
+  assert.equal(root.querySelectorAll('.rating-row')[1].querySelector('.rating-place').textContent,'2');
   assert.equal(root.querySelector('.rating-board').getAttribute('aria-busy'),'false');
   root.querySelector('[data-rating-mode="blitz"]').click(); await Promise.resolve(); requests[2].resolve({error:'unavailable'}); await tick();
   assert.equal(root.querySelector('.rating-retry').hidden,false);
@@ -81,5 +81,19 @@ test('switching display units changes scores without changing ЯР ordering or r
   assert.deepEqual([...root.querySelectorAll('.rating-score')].map(el=>Number(el.textContent.replace(/\D/g,''))),[980,1300]);
   assert.equal(root.querySelector('.rating-self-score').textContent,'980'); assert.equal(root.querySelector('.rating-unit').textContent,'ЭЛО');
   assert.equal(calls,2); view.setUnit('yar'); assert.equal(root.querySelector('.rating-self-score').textContent.replace(/\D/g,''),'1200');
+  view.destroy(); dom.window.close();
+});
+
+
+test('calibrating players are numbered and identical forced refresh preserves rows', async () => {
+  const dom=new JSDOM(html), root=dom.window.document.querySelector('section');
+  const data=[{username:'First',yar:1005,ranked:false},{username:'Second',yar:1000,ranked:true}];
+  const view=createRatingView(root,{rpc:async fn=>({data:fn==='rank_my_position' ? [{...data[0],place:1}] : data})},{showSelf:true});
+  await view.refresh(); await tick();
+  assert.deepEqual([...root.querySelectorAll('.rating-place')].map(el=>el.textContent),['1','2']);
+  assert.equal(root.querySelector('.rating-self-place').textContent,'1');
+  const row=root.querySelector('.rating-row');
+  await view.refresh({force:true});
+  assert.equal(root.querySelector('.rating-row'),row);
   view.destroy(); dom.window.close();
 });

@@ -16,7 +16,7 @@ try {
    if(path==='/auth/v1/user') { if(route.request().method()==='PUT') metadata={...metadata,...route.request().postDataJSON().data}; return route.fulfill({json:{...user,user_metadata:metadata}}); }
    if(path==='/rest/v1/profiles') return route.fulfill({json:{username:'Alice',bio:'',palette:'monochrome'}});
    if(path==='/rest/v1/rpc/rank_my_position') return route.fulfill({json:[{username:'Alice',yar:1200,elo:1000,ranked:true,place:1}]});
-   if(path==='/rest/v1/rpc/rank_leaderboard') { const mode=route.request().postDataJSON().p_mode; return route.fulfill({json:[{username:'Alice',yar:mode==='rapid'?1450:1200,elo:1000,ranked:true},{username:'Bob',yar:1100,elo:990,ranked:true}]}); }
+   if(path==='/rest/v1/rpc/rank_leaderboard') { const mode=route.request().postDataJSON().p_mode; return route.fulfill({json:[{username:'Alice',yar:mode==='rapid'?1450:1200,elo:1000,ranked:true},{username:'Игрок',yar:1100,elo:990,ranked:false}]}); }
    return route.fulfill({json:{game:null}});
   });
   await page.goto(`${base}/settings`); await page.locator('#rank-setting').waitFor({state:'visible'});
@@ -59,10 +59,26 @@ try {
   assert.equal(await page.locator('.rating-unit').innerText(),'ЭЛО');
   // Text is always readable to assistive tech even while pseudo-elements animate.
   assert.equal(await page.locator('.rating-player').first().textContent(),'Alice');
+  assert.equal(await page.locator('.rating-place').nth(1).textContent(),'2');
+  assert.equal(await page.locator('.rating-top').count(),0);
   if(reducedMotion==='no-preference') {
     await page.locator('.rating-player.rating-animating').first().waitFor();
     const count=await page.locator('.rating-score').first().getAttribute('data-animated'); assert.notEqual(count,null);
-    await page.locator('.rating-player.rating-animating').first().waitFor({state:'hidden',timeout:1200});
+    const frames=await page.evaluate(async ()=>{
+      const score=document.querySelector('.rating-score'), name=document.querySelectorAll('.rating-player')[1];
+      const scores=[],names=[],colors=[],heights=[];
+      const start=performance.now(); while(performance.now()-start<1000) {
+        await new Promise(requestAnimationFrame);
+        scores.push(score.dataset.animated); names.push(name.dataset.animated);
+        colors.push({active:score.classList.contains('rating-animating'), color:getComputedStyle(score).color});
+        heights.push(score.closest('.rating-row').getBoundingClientRect().height);
+      } return {scores,names,colors,heights};
+    });
+    assert.ok(new Set(frames.scores.filter(Boolean)).size>15, 'ticker updates at frame rate');
+    assert.ok(new Set(frames.names.filter(Boolean)).size>10, 'Cyrillic name scrambles at frame rate');
+    assert.ok(frames.colors.some(x=>!x.active), 'animation completes');
+    assert.ok(frames.colors.filter(x=>!x.active).every(x=>!x.color.includes('rgba') || !x.color.endsWith(', 0)')), 'no invisible/fading final score');
+    assert.ok(Math.max(...frames.heights)-Math.min(...frames.heights)<1, 'row height stays stable throughout animation');
   } else assert.equal(await page.locator('.rating-animating').count(),0);
   await page.locator('[data-rating-mode=rapid]').click();
   await page.waitForFunction(()=>document.querySelector('.rating-score')?.textContent.includes('1 000'));
