@@ -95,7 +95,7 @@ try {
     assert.notEqual(clocks.ownBackground, clocks.opponentBackground, 'clock backgrounds must differ');
     assert.ok(clocks.numberSize >= 12, 'clock numbers are legible');
     const clock = await game.locator('#player-clock').evaluate(async el => {
-      await document.fonts.load('400 16px "Instrument Serif"');
+      await document.fonts.load('600 16px Geist');
       const slots = [...el.querySelectorAll('.clock-digit')];
       const canvas = document.createElement('canvas'), context = canvas.getContext('2d');
       context.font = getComputedStyle(el).font;
@@ -121,7 +121,7 @@ try {
   await game.locator('#resign-button').click(); await game.locator('#resign-confirm').click();
   await game.locator('#status').filter({hasText:'вы сдались'}).waitFor(); assert.equal(snapshot.status,'finished');
   assert.equal(new URL(page.url()).pathname,'/game');
-  assert.match(await game.locator('#player-clock').evaluate(el => getComputedStyle(el).fontFamily), /Instrument Serif/);
+  assert.match(await game.locator('#player-clock').evaluate(el => getComputedStyle(el).fontFamily), /Geist/);
 
   console.log('✓ Viewport game, four controls, mocked search and legal move');
 } finally { await browser.close(); }

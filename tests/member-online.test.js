@@ -20,7 +20,7 @@ function game({ moves = [], turn = 'w', version = moves.length, status = 'active
 test('clock formatting covers all requested controls', () => {
   assert.equal(formatClock(180000), '03:00'); assert.equal(formatClock(600000), '10:00');
   assert.equal(formatClock(3600000), '1:00:00'); assert.equal(formatClock(86400000), '24:00:00');
-  assert.equal(formatClock(0), '00:00');
+  assert.equal(formatClock(0), '00:00'); assert.equal(formatClock(null), '00:00');
 });
 
 test('board opens at starting position, modes are explicit and a real request starts search', async () => {
@@ -32,6 +32,8 @@ test('board opens at starting position, modes are explicit and a real request st
   assert.equal(app.$('opponent-clock-card').nextElementSibling, app.$('player-clock-card'));
   assert.equal(app.$('player-clock-label').hidden, true);
   assert.equal(app.$('opponent-clock-label').hidden, true);
+  assert.equal(app.$('player-clock').getAttribute('aria-label'), '00:00');
+  assert.equal(app.$('opponent-clock').getAttribute('aria-label'), '00:00');
   assert.equal(app.$('board').querySelector('[data-square=e2] img').getAttribute('src'), '/pieces/cburnett/wP.svg');
   assert.deepEqual([...app.$('mode-list').querySelectorAll('input')].map(input => input.value), ['blitz','rapid','classical','daily']);
   assert.equal(app.$('start-search').disabled, true); assert.equal(app.$('start-search').hidden, true);

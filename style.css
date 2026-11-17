@@ -782,6 +782,9 @@ body.startup-ready #landing-screen:not([hidden]) .hero-reveal--tail { animation-
   #auth-submit:hover::after { animation: none; }
 }
 
+/* The wordmark fills roughly 90% of the full 208px desktop rail. */
+.sidebar-brand { width: calc(100% + 28px); margin-inline: -14px; padding-inline: 0; font-size: 36px; }
+
 /* Navigation hit areas and highlights span the rail without shifting their contents. */
 .sidebar-nav > .sidebar-item, .sidebar-account > .sidebar-item {
   width: calc(100% + 28px); margin-inline: -14px; padding-inline: 26px;

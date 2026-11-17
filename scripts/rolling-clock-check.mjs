@@ -26,6 +26,11 @@ try {
     await page.goto(`${base}/pages/game.html`);
     await page.locator('#board [data-square=e2]').waitFor();
     assert.equal(await page.locator('#start-search').isHidden(),true);
+    assert.equal(await page.locator('#player-clock').getAttribute('aria-label'),'00:00');
+    assert.equal(await page.locator('#opponent-clock').getAttribute('aria-label'),'00:00');
+    assert.equal(await page.locator('#player-clock .clock-digit').count(),4);
+    const tileStyle = await page.locator('#player-clock .clock-digit').first().evaluate(el => ({ background:getComputedStyle(el).backgroundImage, radius:parseFloat(getComputedStyle(el).borderRadius) }));
+    assert.match(tileStyle.background, /gradient/); assert.ok(tileStyle.radius > 0, 'digits have separate rounded tiles');
     await page.locator('label:has(input[value=blitz])').click();
     assert.equal(await page.locator('#start-search').isVisible(),true);
     assert.equal(await page.locator('#start-search').evaluate(el => el.getAnimations().some(animation => animation.animationName === 'rail-appear')), reducedMotion === 'no-preference');
@@ -36,13 +41,24 @@ try {
     assert.equal(await page.locator('#player-clock .clock-digit').first().evaluate(el => el === window.clockSlot),true, 'existing digit stays in place during a mode change');
     const animated = await page.locator('#player-clock .clock-reel').evaluateAll(els => els.some(el => el.getAnimations().length));
     assert.equal(animated,reducedMotion === 'no-preference');
+    await page.waitForTimeout(700);
+    const before = await page.locator('#player-clock-card').boundingBox();
+    await page.locator('label:has(input[value=daily])').click();
+    await page.waitForTimeout(60);
+    const middle = await page.locator('#player-clock-card').boundingBox();
+    const sizing = await page.locator('#player-clock-card').evaluate(el => el.getAnimations().some(a => a.effect.getTiming().duration === 350));
+    assert.equal(sizing, reducedMotion === 'no-preference', 'card resize is animated unless reduced motion is requested');
+    await page.waitForTimeout(400);
+    const after = await page.locator('#player-clock-card').boundingBox();
+    assert.ok(before.height > after.height + 3, 'longer clock has a smaller card');
+    if (reducedMotion === 'no-preference') assert.ok(middle.height < before.height && middle.height > after.height, `card height changes gradually: ${before.height} ${middle.height} ${after.height}`);
     for (const viewport of [{width:280,height:653},{width:390,height:844},{width:768,height:1024},{width:1440,height:900},{width:2560,height:1080}]) {
       await page.setViewportSize(viewport);
       for (const [mode, time] of [['daily','24:00:00'],['blitz','03:00']]) {
         await page.locator(`label:has(input[value=${mode}])`).click();
         assert.equal(await page.locator('#player-clock').getAttribute('aria-label'),time);
         const fit = await page.locator('#player-clock').evaluate(async el => {
-          await document.fonts.load('400 16px "Instrument Serif"');
+          await document.fonts.load('600 16px Geist');
           const context = document.createElement('canvas').getContext('2d'); context.font = getComputedStyle(el).font;
           const slots = [...el.querySelectorAll('.clock-digit')];
           return {slot:Math.min(...slots.map(slot => slot.clientWidth)), glyph:Math.max(...'0123456789'.split('').map(c => context.measureText(c).width)),
@@ -51,6 +67,17 @@ try {
         assert.ok(fit.strip <= fit.width + 1 && fit.glyph <= fit.slot + 1, `${viewport.width} ${time}: ${JSON.stringify(fit)}`);
       }
     }
+    await page.waitForTimeout(500);
+    const wide = await page.locator('#player-clock-card').boundingBox();
+    await page.setViewportSize({width:390,height:844});
+    await page.waitForTimeout(60);
+    const narrowing = await page.locator('#player-clock-card').boundingBox();
+    const widthAnimated = await page.locator('#player-clock-card').evaluate(el => el.getAnimations().some(a => a.effect.getTiming().duration === 350));
+    assert.equal(widthAnimated, reducedMotion === 'no-preference', 'responsive width changes animate');
+    await page.waitForTimeout(400);
+    const narrow = await page.locator('#player-clock-card').boundingBox();
+    assert.ok(wide.width > narrow.width + 10);
+    if (reducedMotion === 'no-preference') assert.ok(narrowing.width < wide.width && narrowing.width > narrow.width);
     await page.locator('#start-search').click();
     assert.equal(await page.locator('#resign-control').isHidden(),true);
     await page.waitForTimeout(400);

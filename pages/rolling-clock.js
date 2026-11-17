@@ -6,6 +6,38 @@ export function createRollingClock(element, reducedMotion = () => false) {
   const display = doc.createElement('span'); display.className = 'clock-digits'; display.setAttribute('aria-hidden', 'true');
   element.replaceChildren(accessible, display);
   let previous = null, columns = new Map();
+  // FLIP the card's visual box when its content or responsive width changes.
+  // ResizeObserver runs before paint, so the new layout need not jump first.
+  const card = element.closest('.clock');
+  let cardRect = null, sizeAnimation = null;
+  const observer = card && win.ResizeObserver ? new win.ResizeObserver(() => {
+    let from = cardRect;
+    if (sizeAnimation && cardRect && win.DOMMatrixReadOnly) {
+      const transform = win.getComputedStyle(card).transform;
+      if (transform && transform !== 'none') {
+        const matrix = new win.DOMMatrixReadOnly(transform);
+        const width = cardRect.width * matrix.a, height = cardRect.height * matrix.d;
+        from = { width, height, left:cardRect.left + cardRect.width / 2 + matrix.e - width / 2,
+          top:cardRect.top + cardRect.height / 2 + matrix.f - height / 2 };
+      }
+    }
+    sizeAnimation?.cancel(); sizeAnimation = null;
+    const next = card.getBoundingClientRect();
+    if (from?.width && from.height && next.width && next.height &&
+        (Math.abs(from.width - next.width) > .5 || Math.abs(from.height - next.height) > .5) &&
+        !reducedMotion() && card.animate) {
+      const dx = Math.max(-80, Math.min(80, (from.left + from.width / 2) - (next.left + next.width / 2)));
+      const dy = Math.max(-80, Math.min(80, (from.top + from.height / 2) - (next.top + next.height / 2)));
+      const animation = card.animate([
+        { transform:`translate(${dx}px, ${dy}px) scale(${from.width / next.width}, ${from.height / next.height})` },
+        { transform:'translate(0, 0) scale(1, 1)' },
+      ], { duration:350, easing:'cubic-bezier(.22, 1, .36, 1)' });
+      sizeAnimation = animation;
+      animation.finished?.catch(() => {}).finally(() => { if (sizeAnimation === animation) sizeAnimation = null; });
+    }
+    cardRect = next;
+  }) : null;
+  observer?.observe(card);
 
   function update(value) {
     if (value === previous) return;
@@ -20,9 +52,10 @@ export function createRollingClock(element, reducedMotion = () => false) {
       if (!column || column.isDigit !== isDigit) {
         const slot = doc.createElement('span'); slot.className = isDigit ? 'clock-digit' : 'clock-separator';
         if (isDigit) {
+          const window = doc.createElement('span'); window.className = 'clock-window';
           const reel = doc.createElement('span'); reel.className = 'clock-reel';
           for (let i = 0; i < 30; i++) { const digit = doc.createElement('span'); digit.textContent = String(i % 10); reel.append(digit); }
-          slot.append(reel); column = { slot, reel, isDigit, value: null, animation: null };
+          window.append(reel); slot.append(window); column = { slot, reel, isDigit, value: null, animation: null };
         } else column = { slot, isDigit, value: null };
       }
       columns.set(key, column); display.append(column.slot);
@@ -56,5 +89,5 @@ export function createRollingClock(element, reducedMotion = () => false) {
     element.style.setProperty('--clock-digits', String(value.length));
     previous = value;
   }
-  return { update, destroy() { for (const column of columns.values()) column.animation?.cancel(); } };
+  return { update, destroy() { observer?.disconnect(); sizeAnimation?.cancel(); for (const column of columns.values()) column.animation?.cancel(); } };
 }

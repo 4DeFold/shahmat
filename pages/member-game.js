@@ -9,7 +9,7 @@ const names = { k:'король', q:'ферзь', r:'ладья', b:'слон', 
 const files = 'abcdefgh';
 const pieceSrc = (color, type) => `/pieces/cburnett/${color}${type.toUpperCase()}.svg`;
 export function formatClock(ms) {
-  if (ms == null) return '—:—';
+  if (ms == null) return '00:00';
   const seconds = Math.max(0, Math.ceil(ms / 1000));
   const h = Math.floor(seconds / 3600), m = Math.floor(seconds % 3600 / 60), s = seconds % 60;
   return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
