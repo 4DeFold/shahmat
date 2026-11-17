@@ -1,10 +1,10 @@
-// The whole signed-in preview, not just the chess iframe, reports presence.
-export function startPreviewHeartbeat(client, win) {
+// The whole signed-in app, not just the chess iframe, reports presence.
+export function startMatchHeartbeat(client, win) {
   let stopped = false, pending = false;
   const beat = async () => {
     if (stopped || pending) return;
     pending = true;
-    try { await client.functions.invoke('matchplay-preview', { body:{ action:'heartbeat' }, timeout:8000 }); }
+    try { await client.functions.invoke('matchplay', { body:{ action:'heartbeat' }, timeout:8000 }); }
     catch { /* A missed beat is never invented locally. */ }
     finally { pending = false; }
   };

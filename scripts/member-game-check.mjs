@@ -19,7 +19,7 @@ try {
     }
     if (path === '/auth/v1/user') return route.fulfill({ json:user });
     if (path === '/rest/v1/profiles') return route.fulfill({ json:{ username:'Player', bio:'', palette:'monochrome' } });
-    if (path === '/functions/v1/matchplay-preview') {
+    if (path === '/functions/v1/matchplay') {
       const body = JSON.parse(request.postData());
       if (body.action === 'heartbeat') return route.fulfill({json:{ok:true}});
       if (body.action === 'opponent') return route.fulfill({json:{username:'Friend',bio:'Bio'}});

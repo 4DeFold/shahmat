@@ -14,7 +14,7 @@ try {
     await page.route('https://eswyxbyddkajysogtglp.supabase.co/**', route => {
       const path = new URL(route.request().url()).pathname;
       if (path === '/auth/v1/user') return route.fulfill({json:user});
-      if (path === '/functions/v1/matchplay-preview') {
+      if (path === '/functions/v1/matchplay') {
         const body = JSON.parse(route.request().postData());
         if (body.action === 'opponent') return route.fulfill({json:{username:'Friend'}});
         if (body.action === 'search') state = {id:'fixture',white_id:user.id,black_id:'other',mode:body.mode,moves:[],turn:'w',version:0,status:'active',white_ms:180000,black_ms:180000,game_age_ms:age};

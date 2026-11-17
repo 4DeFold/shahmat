@@ -1,5 +1,5 @@
 import { startOnlinePresence } from './pages/online-presence.js';
-import { startPreviewHeartbeat } from './pages/preview-heartbeat.js';
+import { startMatchHeartbeat } from './pages/match-heartbeat.js';
 import { createClient } from '@supabase/supabase-js';
 import './theme.js';
 
@@ -246,7 +246,7 @@ function sendOnline() { $('member-game-frame')?.contentWindow?.postMessage({ typ
 function startOnline(id) {
   if (onlineUser === id) return;
   onlineStop?.(); heartbeatStop?.(); onlineUser = id; onlineCount = null; sendOnline();
-  heartbeatStop = startPreviewHeartbeat(supabase, window);
+  heartbeatStop = startMatchHeartbeat(supabase, window);
   onlineStop = startOnlinePresence(supabase, id, count => { onlineCount = count; sendOnline(); });
 }
 let dashboardPreloadEnabled = false;
