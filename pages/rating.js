@@ -12,9 +12,11 @@ export function createRatingView(root, client, { showSelf = false } = {}) {
   let ownName = null, ownPlayer = null, unit = 'yar', displayed = null;
   const win = root.ownerDocument.defaultView;
   const number = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 });
+  const motionPreference = win.matchMedia?.('(prefers-reduced-motion: reduce)');
   const cache = new Map(), pending = new Map();
   const freshness = 15000;
   let mode = 'overall', sequence = 0, destroyed = false, indicatorFrame = null;
+  let motionFrame = null, motionDeadline = 0, motionItems = [], lastPaint = 0;
 
   function positionIndicator() {
     if (!indicator) return;
@@ -36,9 +38,56 @@ export function createRatingView(root, client, { showSelf = false } = {}) {
   // Fonts can change button sizes after the first paint.
   root.ownerDocument.fonts?.ready.then(() => { if (!destroyed) scheduleIndicator(); });
 
-  function render(data) {
+  // Magic UI Number Ticker / Hyper Text adapted to one shared frame loop. The
+  // real text never changes: a visual-only pseudo-element preserves accessible
+  // names, selection/highlighting and column widths while the effect runs.
+  const clock = () => win.performance.now();
+  function clearMotion() {
+    if (motionFrame !== null) win.cancelAnimationFrame(motionFrame);
+    motionFrame = null;
+    for (const item of motionItems) { item.el.classList.remove('rating-animating'); delete item.el.dataset.animated; }
+    motionItems = []; lastPaint = 0;
+  }
+  function animateItems(items) {
+    if (!win.requestAnimationFrame || !motionPreference || motionPreference.matches) return;
+    const start = clock(), duration = Math.min(750, motionDeadline - start);
+    if (duration < 100) return;
+    for (const item of items) {
+      if (!item.el || item.value == null) continue;
+      item.el.classList.add('rating-animating');
+      motionItems.push({ ...item, start, duration });
+      item.el.dataset.animated = item.type === 'score' ? number.format(0) : String(item.value).replace(/[A-Za-z0-9]/g, 'X');
+    }
+    if (!motionItems.length || motionFrame !== null) return;
+    const tick = timestamp => {
+      motionFrame = null;
+      if (destroyed) { clearMotion(); return; }
+      if (timestamp - lastPaint < 45 && motionItems.every(item => timestamp < item.start + item.duration)) { motionFrame = win.requestAnimationFrame(tick); return; }
+      lastPaint = timestamp;
+      const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+      motionItems = motionItems.filter(item => {
+        if (!item.el.isConnected || timestamp >= item.start + item.duration) {
+          item.el.classList.remove('rating-animating'); delete item.el.dataset.animated; return false;
+        }
+        const progress = Math.max(0, Math.min(1, (timestamp - item.start) / item.duration));
+        if (item.type === 'score') item.el.dataset.animated = number.format(Number(item.value) * (1 - Math.pow(1-progress, 3)));
+        else {
+          const text = String(item.value), unlocked = Math.floor(progress * text.length);
+          item.el.dataset.animated = [...text].map((char, i) => i < unlocked || !/[A-Za-z0-9]/.test(char) ? char : alphabet[Math.floor(Math.random()*alphabet.length)]).join('');
+        }
+        return true;
+      });
+      if (motionItems.length) motionFrame = win.requestAnimationFrame(tick);
+    };
+    motionFrame = win.requestAnimationFrame(tick);
+  }
+  function beginMotion() { clearMotion(); motionDeadline = clock() + 950; }
+  const onMotionPreferenceChange = () => { if (motionPreference?.matches) { clearMotion(); motionDeadline = 0; } };
+  motionPreference?.addEventListener?.('change', onMotionPreferenceChange);
+
+  function render(data, animate = false) {
     displayed = data;
-    const fragment = root.ownerDocument.createDocumentFragment();
+    const fragment = root.ownerDocument.createDocumentFragment(), animated = [];
     for (const [index, player] of data.slice(0,100).entries()) {
       const row = root.ownerDocument.createElement('li'); row.className = 'rating-row';
       if (ownName && player.username === ownName) row.classList.add('rating-row-self');
@@ -47,8 +96,10 @@ export function createRatingView(root, client, { showSelf = false } = {}) {
       const name = root.ownerDocument.createElement('span'); name.className='rating-player'; name.textContent = String(player.username ?? '');
       const score = root.ownerDocument.createElement('span'); score.className='rating-score'; score.textContent = formatScore(player);
       row.append(place,name,score); fragment.append(row);
+      if (animate) { animated.push({el:name,type:'name',value:player.username ?? ''}, {el:score,type:'score',value:player[unit]}); }
     }
     list.replaceChildren(fragment);
+    if (animate) animateItems(animated);
     status.hidden = data.length > 0;
     status.textContent = data.length ? '' : 'Пока нет игроков';
   }
@@ -91,15 +142,17 @@ export function createRatingView(root, client, { showSelf = false } = {}) {
       self.querySelector('.rating-self-name').textContent = String(player.username ?? '');
       self.querySelector('.rating-self-score').textContent = formatScore(player);
       self.hidden = false;
+      animateItems([{el:self.querySelector('.rating-self-name'),type:'name',value:player.username ?? ''}, {el:self.querySelector('.rating-self-score'),type:'score',value:player[unit]}]);
       for (const row of list.children) row.classList.toggle('rating-row-self', row.querySelector('.rating-player')?.textContent === ownName);
     } catch { /* The leaderboard remains usable if the personal row is unavailable. */ }
   }
   async function refresh({ force = false } = {}) {
+    beginMotion();
     const request = ++sequence, requestedMode = mode;
     const cached = cache.get(requestedMode);
     void refreshSelf(requestedMode, request);
     retry.hidden = true;
-    if (cached) render(cached.data);
+    if (cached) render(cached.data, true);
     if (!force && cached && Date.now() - cached.at < freshness) {
       board.setAttribute('aria-busy','false');
       return;
@@ -110,7 +163,7 @@ export function createRatingView(root, client, { showSelf = false } = {}) {
     try {
       const data = await fetchMode(requestedMode);
       if (destroyed || request !== sequence) return;
-      render(data);
+      render(data, !cached);
     } catch {
       if (destroyed || request !== sequence) return;
       status.hidden = false; status.textContent = 'Не удалось загрузить рейтинг'; retry.hidden = false;
@@ -130,8 +183,10 @@ export function createRatingView(root, client, { showSelf = false } = {}) {
   return {
     refresh,
     setUnit(value) {
-      unit = value === 'elo' ? 'elo' : 'yar';
-      const label = root.querySelector('.rating-unit'); if (label) label.textContent = unit === 'elo' ? 'ЭЛО · справочно' : 'ЯР';
+      const next = value === 'elo' ? 'elo' : 'yar';
+      if (unit === next) return;
+      clearMotion(); motionDeadline = 0; unit = next;
+      const label = root.querySelector('.rating-unit'); if (label) label.textContent = unit === 'elo' ? 'ЭЛО' : 'ЯР';
       if (displayed) render(displayed);
       if (ownPlayer && self && !self.hidden) self.querySelector('.rating-self-score').textContent = formatScore(ownPlayer);
     },
@@ -140,10 +195,12 @@ export function createRatingView(root, client, { showSelf = false } = {}) {
       scheduleIndicator();
       void refresh();
     },
+    hide() { clearMotion(); motionDeadline = 0; },
     destroy() {
-      destroyed = true; sequence++;
+      destroyed = true; clearMotion(); sequence++;
       root.removeEventListener('click', onClick);
       win.removeEventListener('resize', scheduleIndicator);
+      motionPreference?.removeEventListener?.('change', onMotionPreferenceChange);
       if (indicatorFrame !== null) win.cancelAnimationFrame(indicatorFrame);
       for (const { controller } of pending.values()) controller.abort();
       cache.clear();

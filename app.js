@@ -314,7 +314,8 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
         view.classList.remove('page-enter'); void view.offsetWidth; view.classList.add('page-enter');
       }
     });
-    if (name === 'rating') ratingView?.show();
+    if (name === 'rating') ratingView?.show(); else ratingView?.hide();
+    if (name !== 'settings') { clearTimeout(rankInfoTimer); rankInfoPinned = false; showRankInfo(false); }
     document.querySelectorAll('#dashboard-screen [data-page]').forEach(link => {
       if (link.dataset.page === name) link.setAttribute('aria-current', 'page');
       else link.removeAttribute('aria-current');
@@ -713,7 +714,7 @@ let rankInfoTimer = null, rankInfoPinned = false;
 function showRankInfo(show) {
   const info = $('rank-info'), button = $('rank-info-button');
   if (!info || !button) return;
-  info.hidden = !show; button.setAttribute('aria-expanded', String(show));
+  info.classList.toggle('is-open', show); info.setAttribute('aria-hidden', String(!show)); button.setAttribute('aria-expanded', String(show));
 }
 $('page-content').addEventListener('pointerover', event => {
   const row = event.target.closest('#rank-setting');
@@ -736,17 +737,48 @@ $('page-content').addEventListener('click', event => {
   }
 });
 document.addEventListener('keydown', event => { if (event.key === 'Escape') { clearTimeout(rankInfoTimer); rankInfoPinned = false; showRankInfo(false); } });
-// A mouse wheel over the palette strip scrolls it horizontally; touch and
-// horizontal trackpad gestures remain native. At either edge, let the page scroll.
+// Match the site's Lenis lerp for wheel scrolling while preserving native touch.
+// Accumulate the target rather than restarting a browser smooth scroll on every tick.
+let paletteScroll = null;
+function stopPaletteScroll() {
+  if (paletteScroll?.frame != null) window.cancelAnimationFrame(paletteScroll.frame);
+  paletteScroll = null;
+}
 $('page-content').addEventListener('wheel', event => {
   const strip = event.target.closest('#palette-scroll');
-  if (!strip || event.ctrlKey || event.shiftKey || Math.abs(event.deltaX) >= Math.abs(event.deltaY)) return;
-  const max = strip.scrollWidth - strip.clientWidth;
-  if (max <= 0 || (event.deltaY < 0 && strip.scrollLeft <= 0) || (event.deltaY > 0 && strip.scrollLeft >= max - 1)) return;
+  if (!strip || event.ctrlKey || event.metaKey || event.shiftKey) return;
+  const delta = Math.abs(event.deltaX) >= Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+  const vertical = Math.abs(event.deltaX) < Math.abs(event.deltaY);
+  const max = Math.max(0, strip.scrollWidth - strip.clientWidth);
+  const currentTarget = paletteScroll?.strip === strip ? paletteScroll.target : strip.scrollLeft;
+  if (!max || !delta || (delta < 0 && currentTarget <= 0) || (delta > 0 && currentTarget >= max)) return;
+  // For reduced motion, keep horizontal touchpads native; map vertical wheels instantly.
+  if (reducedMotion.matches || !window.requestAnimationFrame) {
+    if (!vertical) return;
+    event.preventDefault();
+    const multiplier = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? strip.clientWidth : 1;
+    strip.scrollBy({ left:delta * multiplier, behavior:'instant' });
+    return;
+  }
   event.preventDefault();
-  const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? strip.clientWidth : 1;
-  strip.scrollBy({ left: event.deltaY * unit, behavior: reducedMotion.matches ? 'instant' : 'smooth' });
-}, { passive: false });
+  if (paletteScroll?.strip !== strip) { stopPaletteScroll(); paletteScroll = {strip, target:strip.scrollLeft, frame:null, last:null}; }
+  const state = paletteScroll, multiplier = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? strip.clientWidth : 1;
+  state.target = Math.max(0, Math.min(max, state.target + delta * multiplier * 1.1));
+  if (state.frame != null) return;
+  const tick = time => {
+    if (paletteScroll !== state || !strip.isConnected) { stopPaletteScroll(); return; }
+    const dt = state.last == null ? 16.67 : Math.min(50, Math.max(0, time - state.last)); state.last = time;
+    const distance = state.target - strip.scrollLeft;
+    if (Math.abs(distance) < .5) { strip.scrollLeft = state.target; state.frame = null; paletteScroll = null; return; }
+    const before = strip.scrollLeft;
+    strip.scrollLeft = before + distance * (1 - Math.pow(1 - .14, dt / (1000/60)));
+    // scrollLeft may be integer-rounded; do not leave an immortal RAF on the last pixel.
+    if (strip.scrollLeft === before) { strip.scrollLeft = state.target; state.frame = null; paletteScroll = null; return; }
+    state.frame = window.requestAnimationFrame(tick);
+  };
+  state.frame = window.requestAnimationFrame(tick);
+}, { passive:false });
+$('page-content').addEventListener('pointerdown', event => { if (event.target.closest('#palette-scroll')) stopPaletteScroll(); });
 $('page-content').addEventListener('change', event => {
   if (event.target.matches('#rank-unit-options input[name="rank-unit"]')) { applyRankUnit(event.target.value); recordAppearance(); }
   if (event.target.matches('#dashboard-palettes input[name="dashboard-palette"]') && event.target.value !== selectedPalette) {

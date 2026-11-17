@@ -79,7 +79,7 @@ test('switching display units changes scores without changing ЯР ordering or r
   view.setUnit('elo');
   assert.deepEqual([...root.querySelectorAll('.rating-player')].map(el=>el.textContent),['Alice','Bob']);
   assert.deepEqual([...root.querySelectorAll('.rating-score')].map(el=>Number(el.textContent.replace(/\D/g,''))),[980,1300]);
-  assert.equal(root.querySelector('.rating-self-score').textContent,'980'); assert.match(root.querySelector('.rating-unit').textContent,/справочно/);
+  assert.equal(root.querySelector('.rating-self-score').textContent,'980'); assert.equal(root.querySelector('.rating-unit').textContent,'ЭЛО');
   assert.equal(calls,2); view.setUnit('yar'); assert.equal(root.querySelector('.rating-self-score').textContent.replace(/\D/g,''),'1200');
   view.destroy(); dom.window.close();
 });
