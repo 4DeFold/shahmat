@@ -1,89 +1,49 @@
+import {applyProfileTheme,clearProfileTheme,paletteNames} from './profile-theme.js';
 const DEFAULT_AVATAR='/pieces/cburnett/wN.svg';
 const number=new Intl.NumberFormat('ru-RU',{maximumFractionDigits:1});
+const labels={overall:'Общий',total:'Всего',blitz:'Блиц',rapid:'Рапид',classical:'Классика',daily:'Дневная',bot:'Игра с ботом'};
 
-// Crop avatars centrally; preserve the banner's aspect ratio while fitting its
-// width and a generous height bound. Never send the original full-size file.
-export async function prepareProfileImage(file,kind,doc=document) {
-  if (!file || !['image/png','image/jpeg','image/webp'].includes(file.type)) throw new Error('Выбери изображение PNG, JPEG или WebP.');
-  if (file.size>10_000_000) throw new Error('Файл слишком большой: максимум 10 МБ.');
-  const url=URL.createObjectURL(file), img=new Image();
-  try {
-    img.src=url; try { await img.decode(); } catch { throw new Error('Не удалось прочитать изображение.'); }
-    const w=img.naturalWidth,h=img.naturalHeight;
-    if (!w || !h || w*h>40_000_000) throw new Error('Изображение слишком большое.');
-    const canvas=doc.createElement('canvas'), ctx=canvas.getContext('2d');
-    if (!ctx) throw new Error('Не удалось обработать изображение.');
-    if(kind==='avatar') { const side=Math.min(w,h); canvas.width=100; canvas.height=100; ctx.drawImage(img,(w-side)/2,(h-side)/2,side,side,0,0,100,100); }
-    else { const scale=Math.min(1,600/w,1200/h); canvas.width=Math.max(1,Math.round(w*scale)); canvas.height=Math.max(1,Math.round(h*scale)); ctx.drawImage(img,0,0,canvas.width,canvas.height); }
-    const result=canvas.toDataURL('image/png');
-    if(result.length>(kind==='avatar'?160022:2666690)) throw new Error('Изображение слишком большое после обработки.');
-    return result;
-  } finally { URL.revokeObjectURL(url); }
-}
-
-export function createProfileView(root,client,{onSaved=()=>{},onLoaded=()=>{}}={}) {
-  const $=id=>root.querySelector(`#${id}`), controls=['profile-save','profile-discard','profile-edit-button'];
-  let user=null, userId=null, media={avatar:null,banner:null}, draft=null, busy=false, destroyed=false, epoch=0, imageJobs=0, pendingSave=null; const imageSequence={avatar:0,banner:0};
-  const say=text=>{ $('profile-edit-status').textContent=text||''; };
-  function paint(current) {
-    const avatar=$('profile-avatar-image'), banner=$('profile-banner-image');
-    avatar.src=current.avatar||DEFAULT_AVATAR; avatar.classList.toggle('profile-custom-avatar',!!current.avatar);
-    if(current.banner) { banner.src=current.banner; banner.hidden=false; } else { banner.hidden=true; banner.removeAttribute('src'); }
-  }
-  function setEditing(value) {
-    root.classList.toggle('is-editing',value);
-    for(const id of ['profile-edit-name','profile-edit-bio','profile-edit-actions']) $(id).hidden=!value;
-    for(const el of root.querySelectorAll('.profile-upload-overlay')) el.hidden=!value;
-    for(const id of ['profile-display-name','profile-display-bio','profile-edit-button']) $(id).hidden=value;
-    for(const id of ['profile-avatar-file','profile-banner-file']) $(id).disabled=!value;
-  }
-  function display(p) { $('profile-display-name').textContent=p?.username||'—'; $('profile-display-bio').textContent=p?.bio?.trim()||'Био пока нет.'; }
-  function setBusy(value) { busy=value; for(const id of controls) $(id).disabled=value; }
-  const edit=()=>{ if(!user||busy)return; draft={...media}; $('profile-edit-name').value=user.username||''; $('profile-edit-bio').value=user.bio||''; setEditing(true); say(''); $('profile-edit-name').focus(); };
-  const discard=()=>{ if(busy)return; epoch++; imageJobs=0; draft=null; paint(media); setEditing(false); say(''); };
-  async function imageChange(event) {
-    const file=event.currentTarget.files?.[0], kind=event.currentTarget.id==='profile-avatar-file'?'avatar':'banner'; event.currentTarget.value='';
-    if(!file||!draft)return;
-    const request=epoch, imageRequest=++imageSequence[kind]; imageJobs++; setBusy(true); say('Обрабатываем изображение…');
-    try { const image=await prepareProfileImage(file,kind,root.ownerDocument); if(!destroyed&&request===epoch&&draft&&imageRequest===imageSequence[kind]){draft[kind]=image;paint(draft);say('');} }
-    catch(error) { if(request===epoch) say(error.message||'Не удалось прочитать изображение.'); }
-    finally { if(request===epoch) { imageJobs--; if(imageJobs===0) setBusy(false); } }
-  }
-  async function save() {
-    if(busy||!draft||!user)return;
-    const username=$('profile-edit-name').value.trim(),bio=$('profile-edit-bio').value.trim();
-    if(!/^[A-Za-z0-9_]{3,24}$/.test(username)) { say('Ник: от 3 до 24 латинских букв, цифр или подчёркиваний.'); return; }
-    if(bio.length>280) { say('Био: максимум 280 символов.'); return; }
-    const request=epoch; setBusy(true); say('Сохраняем…');
-    try {
-      const {error}=await client.rpc('profile_save',{p_username:username,p_bio:bio,p_avatar:draft.avatar,p_banner:draft.banner});
-      if(error)throw error;
-      if(destroyed||request!==epoch)return;
-      user={...user,username,bio}; media={...draft}; draft=null; display(user); paint(media); setEditing(false); say('Профиль сохранён.'); onSaved(user,media);
-    } catch(error) { if(!destroyed&&request===epoch) say(/username_change_cooldown/.test(error?.message||'')?'Ник можно менять только раз в 7 дней.':error?.code==='23505'?'Этот ник уже занят.':'Не удалось сохранить профиль. Попробуй ещё раз.'); }
-    finally { if(request===epoch&&!destroyed)setBusy(false); }
-  }
-  $('profile-edit-button').addEventListener('click',edit); $('profile-discard').addEventListener('click',discard); $('profile-save').addEventListener('click',()=>{ if(!pendingSave) { pendingSave=save().finally(()=>{pendingSave=null;}); } });
-  $('profile-avatar-file').addEventListener('change',imageChange); $('profile-banner-file').addEventListener('change',imageChange); setEditing(false);
-  const view = {
-    async show(profile,id) {
-      if(!profile||!id||destroyed)return; userId=id; $('profile-retry').hidden=true; const request=++epoch; user=profile; media={avatar:null,banner:null}; draft=null; imageJobs=0; setBusy(true); setEditing(false); display(profile); paint(media); say('');
-      $('profile-yar').textContent='—'; $('profile-games').textContent='—';
-      try {
-        if(pendingSave) await pendingSave;
-        if(destroyed||request!==epoch)return;
-        const [fresh,m,rank,stats]=await Promise.all([client.from('profiles').select('username,bio,palette').eq('id',id).maybeSingle(),client.from('profile_media').select('avatar,banner').eq('user_id',id).maybeSingle(),client.rpc('rank_my_position',{p_mode:'overall'}),client.rpc('profile_my_stats')]);
-        if(destroyed||request!==epoch)return;
-        if(m.error || fresh.error || !fresh.data) throw m.error || fresh.error || new Error('profile missing');
-        user=fresh.data; display(user); onLoaded(user); media={avatar:m.data?.avatar||null,banner:m.data?.banner||null}; paint(media);
-        if(!rank.error&&rank.data?.[0]?.yar!=null) $('profile-yar').textContent=number.format(rank.data[0].yar);
-        if(!stats.error&&stats.data?.[0]?.games!=null) $('profile-games').textContent=number.format(stats.data[0].games);
-        setBusy(false);
-      } catch { if(!destroyed&&request===epoch) { say('Не удалось загрузить данные профиля.'); $('profile-retry').hidden=false; } }
-    },
-    hide() { if(draft&&!busy) discard(); },
-    destroy() { destroyed=true; epoch++; },
-  };
-  $('profile-retry').addEventListener('click',()=>{ if(user) void view.show(user, userId); });
-  return view;
+export function createProfileView(root,client,{onSaved=()=>{},onLoaded=()=>{},onBack=()=>{}}={}) {
+ const $=id=>root.querySelector(`#${id}`), win=root.ownerDocument.defaultView;
+ let user=null,userId=null,media={avatar:null,banner:null},draft=null,busy=false,destroyed=false,epoch=0,pendingSave=null,rewards=null,publicData=null,other=false,cropKind=null,cropImage=null,cropURL=null,cropSeq=0,frames=[],shownRewards=null;
+ const say=text=>{ $('profile-edit-status').textContent=text||''; };
+ const setBusy=value=>{busy=value;for(const id of ['profile-save','profile-discard','profile-edit-button']) $(id).disabled=value;};
+ function paint(current){const avatar=$('profile-avatar-image'),banner=$('profile-banner-image');avatar.src=current.avatar||DEFAULT_AVATAR;avatar.classList.toggle('profile-custom-avatar',!!current.avatar);if(current.banner){banner.src=current.banner;banner.hidden=false;}else{banner.hidden=true;banner.removeAttribute('src');}}
+ function setEditing(value){root.classList.toggle('is-editing',value);for(const id of ['profile-edit-name','profile-edit-bio','profile-edit-actions']) $(id).hidden=!value;for(const id of ['profile-avatar-open','profile-banner-open']) $(id).hidden=!value;for(const id of ['profile-display-name','profile-display-bio']) $(id).hidden=value;$('profile-edit-button').hidden=value||other;$('profile-lock-hint').textContent=value?`${rewards?.avatar_unlocked?'':'Аватар — 1100 ЯР. '}${rewards?.banner_unlocked?'':'Баннер — 1200 ЯР.'}`:'';for(const kind of ['avatar','banner']){const btn=$(`profile-${kind}-open`),unlocked=!!rewards?.[`${kind}_unlocked`];btn.disabled=!unlocked;btn.title=unlocked?'':`${kind==='avatar'?'1100':'1200'} общего ЯР`;btn.setAttribute('aria-label',unlocked?`Изменить ${kind==='avatar'?'аватар':'баннер'}`:`${kind==='avatar'?'Аватар':'Баннер'} открывается при ${kind==='avatar'?'1100':'1200'} общего ЯР`);}}
+ function display(p){$('profile-display-name').textContent=p?.username||'—';$('profile-display-bio').textContent=p?.bio?.trim()||'Био пока нет.';}
+ function stopTicks(){for(const f of frames)win.cancelAnimationFrame(f);frames=[];}
+ function ticker(el,value){if(value==null||!Number.isFinite(Number(value))){el.textContent='—';return;}const target=Number(value);el.textContent=number.format(target);el.setAttribute('aria-label',number.format(target));if(!win.requestAnimationFrame||win.matchMedia?.('(prefers-reduced-motion: reduce)').matches)return;el.textContent=number.format(0);let start=null;const tick=t=>{if(!el.isConnected||destroyed)return;if(start===null)start=t;let p=Math.min(1,(t-start)/850),n=target*(1-Math.exp(-5*p))/(1-Math.exp(-5));el.textContent=number.format(p===1?target:n);if(p<1)frames.push(win.requestAnimationFrame(tick));};frames.push(win.requestAnimationFrame(tick));}
+ function fillStats(data){stopTicks();const ratings=data?.ratings||{},games=data?.games||{},total=['blitz','rapid','classical','daily','bot'].reduce((s,k)=>s+(Number(games[k])||0),0);if(data?.games)games.total=total;ticker($('profile-yar'),ratings.overall);ticker($('profile-games'),data?.games?total:null);
+  for(const [id,values,keys] of [['profile-yar-details',ratings,['overall','blitz','rapid','classical','daily']],['profile-games-details',games,['total','blitz','rapid','classical','daily','bot']]]) {const box=$(id);box.replaceChildren();for(const key of keys){const row=root.ownerDocument.createElement('div'),label=root.ownerDocument.createElement('span'),value=root.ownerDocument.createElement('strong');row.className='profile-detail-row';label.textContent=id.includes('games')?({blitz:'Рейтинговый блиц',rapid:'Рейтинговый рапид',classical:'Рейтинговая классика',daily:'Рейтинговая дневная'}[key]||labels[key]):labels[key];value.dataset.value=values[key]??'';value.textContent=values[key]==null?'—':number.format(values[key]);row.append(label,value);box.append(row);}}
+ }
+ for(const type of ['yar','games'])$(`profile-${type}-open`).addEventListener('click',()=>{const box=$(`profile-${type}-details`),btn=$(`profile-${type}-open`);box.hidden=!box.hidden;btn.setAttribute('aria-expanded',String(!box.hidden));if(!box.hidden)for(const el of box.querySelectorAll('strong'))ticker(el,el.dataset.value===''?null:el.dataset.value);});
+ const edit=()=>{if(!user||busy||other)return;draft={...media};$('profile-edit-name').value=user.username||'';$('profile-edit-bio').value=user.bio||'';setEditing(true);say('');$('profile-edit-name').focus();};
+ const discard=()=>{if(busy)return;epoch++;draft=null;paint({avatar:rewards?.avatar_unlocked?media.avatar:null,banner:rewards?.banner_unlocked?media.banner:null});setEditing(false);say('');};
+ function closeCrop(){cropSeq++;if(cropURL)URL.revokeObjectURL(cropURL);cropURL=null;cropImage=null;$('profile-image-file').value='';if($('profile-crop').open)$('profile-crop').close();}
+ function cropGeometry(img,kind){const ratio=kind==='avatar'?1:3, zoom=Number($('profile-crop-zoom').value),iw=img.naturalWidth,ih=img.naturalHeight;let w=Math.min(iw,ih*ratio)/zoom,h=w/ratio;return {w,h,x:(iw-w)*Number($('profile-crop-x').value)/100,y:(ih-h)*Number($('profile-crop-y').value)/100};}
+ function drawCrop(){if(!cropImage)return;const canvas=$('profile-crop-preview'),g=cropGeometry(cropImage,cropKind);canvas.width=cropKind==='avatar'?384:720;canvas.height=cropKind==='avatar'?384:240;canvas.getContext('2d').drawImage(cropImage,g.x,g.y,g.w,g.h,0,0,canvas.width,canvas.height);}
+ function openCrop(kind){if(!draft||busy||!rewards?.[`${kind}_unlocked`])return;cropKind=kind;cropImage=null;for(const [key,value] of [['zoom',1],['x',50],['y',50]])$(`profile-crop-${key}`).value=value;$('profile-crop-title').textContent=kind==='avatar'?'Аватар':'Баннер';$('profile-crop-hint').textContent=kind==='avatar'?'PNG, JPEG, WebP · до 384 × 384 px':'PNG, JPEG, WebP · до 1440 × 480 px';$('profile-crop-controls').hidden=true;$('profile-crop-apply').disabled=true;$('profile-crop-status').textContent='';const canvas=$('profile-crop-preview');canvas.width=kind==='avatar'?384:720;canvas.height=kind==='avatar'?384:240;$('profile-crop').showModal();}
+ for(const kind of ['avatar','banner'])$(`profile-${kind}-open`).addEventListener('click',()=>openCrop(kind));
+ $('profile-crop-close').addEventListener('click',closeCrop);$('profile-crop').addEventListener('cancel',event=>{event.preventDefault();closeCrop();});
+ for(const key of ['zoom','x','y'])$(`profile-crop-${key}`).addEventListener('input',drawCrop);
+ $('profile-image-file').addEventListener('change',async e=>{const file=e.target.files?.[0];if(!file)return;const seq=++cropSeq;$('profile-crop-status').textContent='';$('profile-crop-apply').disabled=true;$('profile-crop-controls').hidden=true;cropImage=null;if(cropURL)URL.revokeObjectURL(cropURL);cropURL=null;
+  if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>10000000){$('profile-crop-status').textContent='PNG, JPEG или WebP до 10 МБ.';return;}
+  const url=URL.createObjectURL(file);cropURL=url;const img=new Image();img.src=url;try{await img.decode();if(seq!==cropSeq)return;if(!img.naturalWidth||!img.naturalHeight||img.naturalWidth*img.naturalHeight>40000000)throw Error();cropImage=img;drawCrop();$('profile-crop-controls').hidden=false;$('profile-crop-apply').disabled=false;}catch{if(seq===cropSeq)$('profile-crop-status').textContent='Не удалось прочитать изображение.';}
+ });
+ $('profile-crop-apply').addEventListener('click',()=>{if(!cropImage||!draft)return;const g=cropGeometry(cropImage,cropKind),maxWidth=cropKind==='avatar'?384:1440,maxBytes=cropKind==='avatar'?200000:450000,canvas=root.ownerDocument.createElement('canvas');canvas.width=Math.max(1,Math.floor(Math.min(maxWidth,g.w)));canvas.height=Math.max(1,Math.floor(canvas.width/(cropKind==='avatar'?1:3)));const ctx=canvas.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(cropImage,g.x,g.y,g.w,g.h,0,0,canvas.width,canvas.height);let result;for(let quality=.87;quality>=.4;quality-=.08){result=canvas.toDataURL('image/jpeg',quality);if(result.length<=Math.floor(maxBytes/3)*4+23)break;}if(result.length>Math.floor(maxBytes/3)*4+23){$('profile-crop-status').textContent='Фото слишком большое.';return;}draft[cropKind]=result;paint({avatar:rewards?.avatar_unlocked?draft.avatar:null,banner:rewards?.banner_unlocked?draft.banner:null});closeCrop();});
+ async function save(){if(busy||!draft||!user)return;const username=$('profile-edit-name').value.trim(),bio=$('profile-edit-bio').value.trim();if(!/^[A-Za-z0-9_]{3,24}$/.test(username)){say('Ник: от 3 до 24 латинских букв, цифр или подчёркиваний.');return;}if(bio.length>280){say('Био: максимум 280 символов.');return;}const request=epoch;setBusy(true);say('Сохраняем…');try{const {error}=await client.rpc('profile_save',{p_username:username,p_bio:bio,p_avatar:draft.avatar,p_banner:draft.banner});if(error)throw error;if(destroyed||request!==epoch)return;user={...user,username,bio};media={...draft};draft=null;display(user);paint({avatar:rewards?.avatar_unlocked?media.avatar:null,banner:rewards?.banner_unlocked?media.banner:null});setEditing(false);say('Профиль сохранён.');onSaved(user,{avatar:rewards?.avatar_unlocked?media.avatar:null,banner:rewards?.banner_unlocked?media.banner:null});}catch(error){if(!destroyed&&request===epoch)say(/username_change_cooldown/.test(error?.message||'')?'Ник можно менять только раз в 7 дней.':error?.code==='23505'?'Этот ник уже занят.':/avatar_locked|banner_locked/.test(error?.message||'')?'Для этого оформления пока недостаточно ЯР.':'Не удалось сохранить профиль. Попробуй ещё раз.');}finally{if(request===epoch&&!destroyed)setBusy(false);}}
+ $('profile-edit-button').addEventListener('click',edit);$('profile-discard').addEventListener('click',discard);$('profile-save').addEventListener('click',()=>{if(!pendingSave)pendingSave=save().finally(()=>{pendingSave=null;});});$('profile-back').addEventListener('click',onBack);
+ async function ackUnlock(){if(!$('profile-unlock').open)return;$('profile-unlock').close();try{await client.rpc('profile_ack_rewards',{p_avatar:!!shownRewards?.avatar,p_banner:!!shownRewards?.banner});}catch{ /* retry on next visit */ }}
+ $('profile-unlock-close').addEventListener('click',()=>void ackUnlock());$('profile-unlock').addEventListener('cancel',event=>{event.preventDefault();void ackUnlock();});$('profile-unlock-action').addEventListener('click',()=>{void ackUnlock();edit();});
+ function reset(){stopTicks();closeCrop();if($('profile-unlock').open)$('profile-unlock').close();for(const type of ['yar','games']){$(`profile-${type}-details`).hidden=true;$(`profile-${type}-open`).setAttribute('aria-expanded','false');}say('');$('profile-retry').hidden=true;}
+ setEditing(false);
+ const view={
+  async show(profile,id){if(!profile||!id||destroyed)return;reset();other=false;delete root.dataset.profileOther;userId=id;clearProfileTheme(root);$('profile-back').hidden=true;$('profile-theme-heading').textContent='ТВОЯ ТЕМАТИКА';const request=++epoch;user=profile;media={avatar:null,banner:null};draft=null;rewards=null;setBusy(true);setEditing(false);display(profile);paint(media);fillStats(null);
+   try{if(pendingSave)await pendingSave;if(destroyed||request!==epoch)return;const [fresh,m,reward]=await Promise.all([client.from('profiles').select('username,bio,palette').eq('id',id).maybeSingle(),client.from('profile_media').select('avatar,banner').eq('user_id',id).maybeSingle(),client.from('profile_rewards').select('avatar_unlocked,banner_unlocked,avatar_seen,banner_seen').eq('user_id',id).maybeSingle()]);if(destroyed||request!==epoch)return;if(m.error||fresh.error||reward.error||!fresh.data)throw m.error||fresh.error||reward.error||Error();const pub=await client.rpc('profile_public',{p_name:fresh.data.username});if(destroyed||request!==epoch)return;if(pub.error||!pub.data)throw pub.error||Error();user=fresh.data;display(user);onLoaded(user);media={avatar:m.data?.avatar||null,banner:m.data?.banner||null};rewards=reward.data||{};publicData=pub.data;paint({avatar:rewards.avatar_unlocked?media.avatar:null,banner:rewards.banner_unlocked?media.banner:null});fillStats(publicData);setBusy(false);if((rewards.avatar_unlocked&&!rewards.avatar_seen)||(rewards.banner_unlocked&&!rewards.banner_seen)){shownRewards={avatar:rewards.avatar_unlocked&&!rewards.avatar_seen,banner:rewards.banner_unlocked&&!rewards.banner_seen};$('profile-unlock-text').textContent=rewards.banner_unlocked&&!rewards.banner_seen?'Ты достиг 1200 общего ЯР! Теперь можно установить баннер и аватар.':'Ты достиг 1100 общего ЯР! Теперь можно установить аватар.';$('profile-unlock').showModal();}}
+   catch{if(!destroyed&&request===epoch){say('Не удалось загрузить данные профиля.');$('profile-retry').hidden=false;}}
+  },
+  async showOther(name){reset();other=true;root.dataset.profileOther='true';clearProfileTheme(root);draft=null;rewards=null;const request=++epoch;setBusy(true);setEditing(false);$('profile-back').hidden=false;$('profile-theme-heading').textContent='ТЕМАТИКА ИГРОКА';display({username:name});paint({});fillStats(null);try{const {data,error}=await client.rpc('profile_public',{p_name:name});if(error||!data)throw error||Error();if(destroyed||request!==epoch)return;publicData=data;display(data);applyProfileTheme(root,data.palette,data.theme);$('profile-palette-name').textContent=paletteNames[data.palette]||paletteNames.monochrome;$('profile-palette-swatch').className=`palette-swatch ${paletteNames[data.palette]?data.palette:'monochrome'}`;paint(data);fillStats(data);setBusy(false);}catch{if(!destroyed&&request===epoch)say('Не удалось загрузить профиль.');}},
+  hide(){stopTicks();closeCrop();if($('profile-unlock').open)$('profile-unlock').close();if(draft&&!busy)discard();},destroy(){destroyed=true;epoch++;stopTicks();closeCrop();},
+ };
+ $('profile-retry').addEventListener('click',()=>{if(user&&!other)void view.show(user,userId);});return view;
 }

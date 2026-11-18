@@ -6,29 +6,37 @@
       <div class="profile-banner-orbit orbit-one" aria-hidden="true"></div><div class="profile-banner-orbit orbit-two" aria-hidden="true"></div>
       <span class="profile-banner-mark" aria-hidden="true">✳</span>
       <img class="profile-banner-image" id="profile-banner-image" alt="" hidden>
-      <label class="profile-upload-overlay profile-banner-upload" for="profile-banner-file" hidden><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h4l2-2h4l2 2h4v12H4z"/><circle cx="12" cy="13" r="3"/></svg><span>Изменить баннер</span></label>
-      <input class="profile-file" id="profile-banner-file" type="file" accept="image/png,image/jpeg,image/webp" aria-label="Загрузить баннер">
+      <button type="button" class="profile-upload-overlay profile-banner-upload" id="profile-banner-open" hidden><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h4l2-2h4l2 2h4v12H4z"/><circle cx="12" cy="13" r="3"/></svg><span>Изменить баннер</span></button>
+
     </div>
     <div class="profile-content">
       <div class="profile-identity profile-reveal" style="--reveal:1">
-        <div class="profile-portrait"><div class="profile-portrait-inner"><img id="profile-avatar-image" src="/pieces/cburnett/wN.svg" alt="Аватар"></div><label class="profile-upload-overlay profile-avatar-upload" for="profile-avatar-file" hidden><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h4l2-2h4l2 2h4v12H4z"/><circle cx="12" cy="13" r="3"/></svg><span class="visually-hidden">Изменить аватар</span></label><input class="profile-file" id="profile-avatar-file" type="file" accept="image/png,image/jpeg,image/webp" aria-label="Загрузить аватар"></div>
+        <div class="profile-portrait"><div class="profile-portrait-inner"><img id="profile-avatar-image" src="/pieces/cburnett/wN.svg" alt="Аватар"></div><button type="button" class="profile-upload-overlay profile-avatar-upload" id="profile-avatar-open" aria-label="Изменить аватар" hidden><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h4l2-2h4l2 2h4v12H4z"/><circle cx="12" cy="13" r="3"/></svg><span class="visually-hidden">Изменить аватар</span></button></div>
         <div class="profile-identity-copy"><h3 id="profile-display-name">—</h3><p id="profile-display-bio"></p><label class="visually-hidden" for="profile-edit-name">Ник</label><textarea id="profile-edit-name" rows="1" maxlength="24" hidden></textarea><label class="visually-hidden" for="profile-edit-bio">Био</label><textarea id="profile-edit-bio" rows="3" maxlength="280" placeholder="Расскажи о себе" hidden></textarea></div>
       </div>
       <div class="profile-section-line profile-reveal" style="--reveal:2"></div>
       <div class="profile-bento">
-        <article class="profile-stat-card profile-reveal" style="--reveal:3"><div class="profile-card-label"><span>ОЧКИ РАНГА</span><span aria-hidden="true">↗</span></div><div class="profile-stat-value"><span id="profile-yar" class="profile-stat-number">—</span><span> ЯР</span></div><div class="profile-stat-art" aria-hidden="true">✳</div></article>
-        <article class="profile-stat-card profile-reveal" style="--reveal:4"><div class="profile-card-label"><span>СЫГРАНО ПАРТИЙ</span><span aria-hidden="true">↗</span></div><div class="profile-stat-value"><span id="profile-games" class="profile-stat-number">—</span></div><div class="profile-mini-board" aria-hidden="true"></div></article>
+        <button type="button" class="profile-stat-card profile-reveal" id="profile-yar-open" aria-expanded="false" aria-controls="profile-yar-details" style="--reveal:3"><div class="profile-card-label"><span>ОЧКИ РАНГА</span><span aria-hidden="true">↗</span></div><div class="profile-stat-value"><span id="profile-yar" class="profile-stat-number">—</span><span> ЯР</span></div><div class="profile-stat-art" aria-hidden="true">✳</div></button><div class="profile-stat-details" id="profile-yar-details" hidden></div>
+        <button type="button" class="profile-stat-card profile-reveal" id="profile-games-open" aria-expanded="false" aria-controls="profile-games-details" style="--reveal:4"><div class="profile-card-label"><span>СЫГРАНО ПАРТИЙ</span><span aria-hidden="true">↗</span></div><div class="profile-stat-value"><span id="profile-games" class="profile-stat-number">—</span></div><div class="profile-mini-board" aria-hidden="true"></div></button><div class="profile-stat-details" id="profile-games-details" hidden></div>
       </div>
     </div>
   </div>
   <aside class="profile-rail" aria-labelledby="profile-theme-heading">
     <div class="profile-rail-content profile-reveal" style="--reveal:5">
-      <div class="profile-rail-top"><button id="profile-edit-button" class="profile-edit-button" type="button" aria-label="Редактировать профиль" title="Редактировать профиль"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 20l4-.8L19 8.2 15.8 5 4.8 16zM14.8 6l3.2 3.2"/></svg></button></div>
+      <div class="profile-rail-top"><button id="profile-back" class="profile-retry" type="button" hidden>← Назад</button><button id="profile-edit-button" class="profile-edit-button" type="button" aria-label="Редактировать профиль" title="Редактировать профиль"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 20l4-.8L19 8.2 15.8 5 4.8 16zM14.8 6l3.2 3.2"/></svg></button></div>
       <h3 class="profile-rail-label" id="profile-theme-heading">ТВОЯ ТЕМАТИКА</h3>
       <div class="profile-palette-card"><span id="profile-palette-swatch" class="palette-swatch monochrome" aria-hidden="true"></span><span id="profile-palette-name" class="profile-palette-name">Монохром</span></div>
-      <div class="profile-edit-actions" id="profile-edit-actions" hidden><p class="profile-edit-help">Аватар до 100 × 100 px, баннер до 600 px по ширине. Ник можно менять раз в неделю.</p><button type="button" id="profile-save">Сохранить</button><button type="button" id="profile-discard">Отмена</button></div>
+      <div class="profile-edit-actions" id="profile-edit-actions" hidden><p class="profile-edit-help">Ник можно менять раз в неделю.</p><p id="profile-lock-hint" class="profile-edit-help"></p><button type="button" id="profile-save">Сохранить</button><button type="button" id="profile-discard">Отмена</button></div>
       <p id="profile-edit-status" class="profile-edit-status" role="status" aria-live="polite"></p>
       <button id="profile-retry" class="profile-retry" type="button" hidden>Повторить загрузку</button>
     </div>
   </aside>
+  <dialog id="profile-crop" class="profile-dialog" aria-labelledby="profile-crop-title">
+    <div class="profile-dialog-head"><h3 id="profile-crop-title">Аватар</h3><button id="profile-crop-close" type="button" aria-label="Закрыть">×</button></div>
+    <p id="profile-crop-hint"></p><label class="profile-import">Выбрать фото<input id="profile-image-file" type="file" accept="image/png,image/jpeg,image/webp"></label>
+    <canvas id="profile-crop-preview" width="384" height="384" aria-label="Предпросмотр кадрирования"></canvas>
+    <div id="profile-crop-controls" hidden><label>Масштаб <input type="range" id="profile-crop-zoom" min="1" max="3" step="0.01" value="1"></label><label>Горизонтально <input type="range" id="profile-crop-x" min="0" max="100" value="50"></label><label>Вертикально <input type="range" id="profile-crop-y" min="0" max="100" value="50"></label></div>
+    <p id="profile-crop-status" role="status"></p><button type="button" id="profile-crop-apply" disabled>Применить</button>
+  </dialog>
+  <dialog id="profile-unlock" class="profile-dialog profile-unlock" aria-labelledby="profile-unlock-title"><button id="profile-unlock-close" type="button" aria-label="Закрыть">×</button><span aria-hidden="true">✳</span><h3 id="profile-unlock-title">Новая возможность!</h3><p id="profile-unlock-text"></p><button type="button" id="profile-unlock-action">Настроить профиль</button></dialog>
 </section>

@@ -962,3 +962,6 @@ body.startup-ready #landing-screen:not([hidden]) .hero-reveal--tail { animation-
 .rating-avatar { flex:0 0 36px; width:36px; height:36px; object-fit:contain; border:1px solid var(--line); border-radius:50%; background:var(--surface-raised); }
 .rating-avatar.has-custom-avatar { object-fit:cover; }
 @media (max-width:700px) { .rating-person { gap:8px; } .rating-avatar { width:30px; height:30px; flex-basis:30px; } }
+
+.rating-profile-trigger { border:0; background:transparent; color:inherit; padding:0; text-align:left; cursor:pointer; }
+.rating-profile-trigger:focus-visible { outline:2px solid var(--foreground); outline-offset:4px; }

@@ -21,6 +21,7 @@ try {
     if (path === '/auth/v1/user') return route.fulfill({ json:user });
     if (path === '/rest/v1/profiles') return route.fulfill({ json:{ username:'Player', bio:'', palette:'monochrome' } });
     if (path === '/rest/v1/rpc/rank_game_players') return route.fulfill({json:[{player:'self',username:'Player',yar:1000},{player:'opponent',username:'Friend',yar:1000}]});
+    if (path === '/rest/v1/rpc/profile_public') return route.fulfill({json:{username:'Friend',bio:'Bio',palette:'forest',theme:'dark',avatar,banner:avatar,ratings:{overall:1000},games:{}}});
     if (path === '/rest/v1/rpc/profile_avatars') return route.fulfill({json:[{username:'Player',avatar},{username:'Friend',avatar}]});
     if (path === '/functions/v1/matchplay') {
       const body = JSON.parse(request.postData());
@@ -59,6 +60,7 @@ try {
   await game.locator('#start-search').click();
   await game.locator('#status').filter({ hasText:'Ваш ход' }).waitFor();
   await game.locator('#player-avatar-image.custom-profile-avatar').waitFor(); await game.locator('#opponent-avatar-image.custom-profile-avatar').waitFor();
+  await game.locator('#opponent-profile-trigger').click(); await game.locator('#opponent-profile-card').waitFor({state:'visible'}); assert.equal(await game.locator('#opponent-profile-card').getAttribute('data-profile-theme'),'dark'); assert.equal(await game.locator('#opponent-profile-banner').getAttribute('src'),avatar); await game.locator('#opponent-profile-trigger').click();
   assert.equal(await game.locator('#player-avatar-image').getAttribute('src'),avatar); assert.equal(await game.locator('#opponent-avatar-image').getAttribute('src'),avatar);
   assert.equal(await game.locator('#mode-picker').getAttribute('aria-hidden'), 'true');
   assert.equal(await game.locator('#mode-picker').evaluate(el => el.getBoundingClientRect().height), 0);

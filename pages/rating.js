@@ -1,6 +1,8 @@
+import {createProfileCard} from './profile-card.js';
 // Animata's Fluid Tabs, adapted to native buttons without React or animation dependencies.
 // Only nicknames and scores are returned; player text is never interpolated as HTML.
-export function createRatingView(root, client, { showSelf = false } = {}) {
+export function createRatingView(root, client, { showSelf = false, onOpenProfile = () => {} } = {}) {
+  const profileCard = createProfileCard(root,client,onOpenProfile);
   const list = root.querySelector('.rating-list');
   const board = root.querySelector('.rating-board');
   const status = root.querySelector('.rating-status');
@@ -96,7 +98,7 @@ export function createRatingView(root, client, { showSelf = false } = {}) {
       const row = root.ownerDocument.createElement('li'); row.className = 'rating-row';
       if (ownName && player.username === ownName) row.classList.add('rating-row-self');
       const place = root.ownerDocument.createElement('span'); place.className='rating-place'; place.textContent = String(index + 1);
-      const person = root.ownerDocument.createElement('span'); person.className='rating-person';
+      const person = root.ownerDocument.createElement('button'); person.type='button'; person.className='rating-person rating-profile-trigger'; person.dataset.profileName=String(player.username ?? '');
       const avatar = root.ownerDocument.createElement('img'); avatar.className='rating-avatar'; avatar.alt=''; avatar.src='/pieces/cburnett/wP.svg';
       const name = root.ownerDocument.createElement('span'); name.className='rating-player'; name.textContent = String(player.username ?? ''); person.append(avatar,name);
       const score = root.ownerDocument.createElement('span'); score.className='rating-score'; score.textContent = formatScore(player);
@@ -117,7 +119,7 @@ export function createRatingView(root, client, { showSelf = false } = {}) {
     try {
       const {data:avatars,error}=await client.rpc('profile_avatars',{p_names:names});
       if(error||!Array.isArray(avatars)||destroyed||request!==avatarRequest) return;
-      const images=new Map(avatars.filter(a=>typeof a.avatar==='string'&&a.avatar.startsWith('data:image/png;base64,')).map(a=>[a.username,a.avatar]));
+      const images=new Map(avatars.filter(a=>typeof a.avatar==='string'&&/^data:image\/(?:png|jpeg);base64,/.test(a.avatar)).map(a=>[a.username,a.avatar]));
       for(const row of list.children) { const name=row.querySelector('.rating-player')?.textContent, img=row.querySelector('.rating-avatar'); if(img&&images.has(name)) {img.src=images.get(name);img.classList.add('has-custom-avatar');} }
       const own=self?.querySelector('.rating-avatar'); if(own&&images.has(ownName)) {own.src=images.get(ownName);own.classList.add('has-custom-avatar');}
     } catch { /* Ranking remains available if images cannot load. */ }
@@ -162,7 +164,7 @@ export function createRatingView(root, client, { showSelf = false } = {}) {
       self.querySelector('.rating-self-score').textContent = formatScore(player);
       self.hidden = false;
       {
-        void client.rpc('profile_avatars',{p_names:[ownName]}).then(({data})=>{if(!destroyed&&request===sequence&&data?.[0]?.avatar?.startsWith('data:image/png;base64,')){const image=self.querySelector('.rating-avatar'); if(image){image.src=data[0].avatar;image.classList.add('has-custom-avatar');}}}).catch(()=>{});
+        void client.rpc('profile_avatars',{p_names:[ownName]}).then(({data})=>{if(!destroyed&&request===sequence&&/^data:image\/(?:png|jpeg);base64,/.test(data?.[0]?.avatar||'')){const image=self.querySelector('.rating-avatar'); if(image){image.src=data[0].avatar;image.classList.add('has-custom-avatar');}}}).catch(()=>{});
       }
       animateItems([{el:self.querySelector('.rating-self-name'),type:'name',value:player.username ?? ''}, {el:self.querySelector('.rating-self-score'),type:'score',value:player[unit]}]);
       for (const row of list.children) row.classList.toggle('rating-row-self', row.querySelector('.rating-player')?.textContent === ownName);
@@ -228,9 +230,9 @@ export function createRatingView(root, client, { showSelf = false } = {}) {
       scheduleIndicator();
       void refresh();
     },
-    hide() { clearMotion(); },
+    hide() { clearMotion(); profileCard.hide(); },
     destroy() {
-      destroyed = true; clearMotion(); sequence++;
+      destroyed = true; clearMotion(); sequence++; profileCard.destroy();
       root.removeEventListener('click', onClick);
       win.removeEventListener('resize', scheduleIndicator);
       motionPreference?.removeEventListener?.('change', onMotionPreferenceChange);

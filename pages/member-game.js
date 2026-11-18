@@ -1,3 +1,4 @@
+import {applyProfileTheme,isProfileImage} from './profile-theme.js';
 import { Chess } from 'chess.js';
 import { createMemberBoard } from './member-board.js';
 import { createGameSound } from './game-sound.js';
@@ -27,7 +28,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   let premove = null, historyIndex = null, nameForGame = null, nameTimer = null, drag = null, suppressClick = false, actionPending = false;
   let rankUnit = 'yar', scores = null, ratingsKey = null, ratingsRequest = 0, ratingsRetryAt = 0;
   const format = value => value == null || !Number.isFinite(Number(value)) ? '' : `(${new Intl.NumberFormat('ru-RU', { maximumFractionDigits:1 }).format(Number(value))} ${rankUnit === 'elo' ? 'Эло' : 'ЯР'})`;
-  function setAvatar(who, value) { const img = $(`${who}-avatar-image`); if(!img)return; const custom=typeof value==='string' && value.startsWith('data:image/png;base64,'); img.src=custom?value:`/pieces/cburnett/${who==='player'?'wP':'bN'}.svg`; img.classList.toggle('custom-profile-avatar',custom); }
+  function setAvatar(who, value) { const img = $(`${who}-avatar-image`); if(!img)return; const custom=typeof value==='string' && /^data:image\/(?:png|jpeg);base64,/.test(value); img.src=custom?value:`/pieces/cburnett/${who==='player'?'wP':'bN'}.svg`; img.classList.toggle('custom-profile-avatar',custom); }
   function renderRatings() {
     for (const who of ['player','opponent']) {
       const rating = $(who + '-rating'); if (rating) rating.textContent = format(scores?.[who === 'player' ? 'self' : who]?.[rankUnit]);
@@ -164,24 +165,28 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     nameTimer = setInterval(() => { step++; el.textContent = [...text].map((c, i) => c === ' ' || step > 5 + i ? c : letters[Math.floor(Math.random() * letters.length)]).join(''); if (step > text.length + 5) { clearInterval(nameTimer); el.textContent = text; } }, 24);
   }
   const profileTrigger = $('opponent-profile-trigger'), profileCard = $('opponent-profile-card');
-  let profilePinned = false;
+  let profilePinned = false, opponentProfileName = null;
+  $('opponent-profile-open')?.addEventListener('click',()=>{ if(!opponentProfileName)return; if(win.parent!==win) win.parent.postMessage({type:'shahmat-open-profile',username:opponentProfileName},win.location.origin); else win.location.href=`/profile?player=${encodeURIComponent(opponentProfileName)}`; });
   function showProfile(show) { profileCard.hidden = !show; profileTrigger.setAttribute('aria-expanded', String(show)); }
   profileTrigger.addEventListener('pointerenter', event => { if (event.pointerType !== 'touch' && !profileTrigger.disabled) showProfile(true); });
-  $('opponent-profile-trigger').parentElement.addEventListener('pointerleave', () => { if (!profilePinned && document.activeElement !== profileTrigger) showProfile(false); });
+  $('opponent-profile-trigger').parentElement.addEventListener('pointerleave', () => { if (!profilePinned && document.activeElement !== profileTrigger && !profileCard.contains(document.activeElement)) showProfile(false); });
   profileTrigger.addEventListener('focus', () => { if (!profileTrigger.disabled) showProfile(true); });
-  profileTrigger.addEventListener('blur', () => { if (!profilePinned) showProfile(false); });
+  profileTrigger.addEventListener('blur', event => { if (!profilePinned && !profileCard.contains(event.relatedTarget)) showProfile(false); });
+  profileCard.addEventListener('focusout', event => { if(!profilePinned && !profileCard.contains(event.relatedTarget) && event.relatedTarget!==profileTrigger) showProfile(false); });
   profileTrigger.addEventListener('click', () => { profilePinned = !profilePinned; showProfile(profilePinned); });
   document.addEventListener('keydown', event => { if (event.key === 'Escape') { profilePinned = false; showProfile(false); } });
   document.addEventListener('pointerdown', event => { if (!profileTrigger.parentElement.contains(event.target)) { profilePinned = false; showProfile(false); } });
   function loadName(game) {
     if (nameForGame === game.id) return;
-    nameForGame = game.id; profilePinned = false; showProfile(false); profileTrigger.disabled = false;
-    $('opponent-profile-name').textContent = 'Соперник'; $('opponent-profile-bio').textContent = 'Информация пока недоступна.';
+    nameForGame = game.id; opponentProfileName=null; profilePinned = false; showProfile(false); profileTrigger.disabled = false;
+    $('opponent-profile-name').textContent = 'Соперник'; $('opponent-profile-bio').textContent = 'Информация пока недоступна.'; applyProfileTheme(profileCard,'monochrome','light'); if($('opponent-profile-banner')) $('opponent-profile-banner').hidden=true; if($('opponent-profile-avatar')) { $('opponent-profile-avatar').src='/pieces/cburnett/bN.svg'; $('opponent-profile-avatar').classList.remove('custom'); }
     Promise.resolve(opponentName(game.id)).then(profile => {
       if (nameForGame !== game.id || !profile) return;
       const name = typeof profile === 'string' ? profile : profile.username;
-      if (typeof name === 'string' && name) { revealName(name); $('opponent-profile-name').textContent = name; }
+      if (typeof name === 'string' && name) { opponentProfileName=name; revealName(name); $('opponent-profile-name').textContent = name; }
       if (typeof profile === 'object' && 'bio' in profile) $('opponent-profile-bio').textContent = profile.bio?.trim() || 'Био пока нет.';
+      if(typeof profile === 'object') { applyProfileTheme(profileCard,profile.palette,profile.theme); const avatar=$('opponent-profile-avatar'),banner=$('opponent-profile-banner'); if(avatar){avatar.src=isProfileImage(profile.avatar)?profile.avatar:'/pieces/cburnett/bN.svg';avatar.classList.toggle('custom',isProfileImage(profile.avatar));} if(banner){banner.hidden=!isProfileImage(profile.banner);if(!banner.hidden)banner.src=profile.banner;} }
+
     }).catch(() => {});
   }
   function playQueuedPremove() {

@@ -15,7 +15,7 @@ async function setup({ existing = false, palette = 'monochrome', failSave = fals
   const { window } = dom;
   let loggedIn = existing;
   let sessionUserId = userId;
-  let metadata = { palette };
+  let metadata = { palette, palette_effective_theme:systemDark?'dark':'light' };
   for (const [key, value] of Object.entries(initialStorage)) window.localStorage.setItem(key, value);
   const user = () => ({ id: userId, user_metadata: { ...metadata } });
   let storedProfile = existing ? { username: 'Player', bio: '', palette: 'monochrome' } : null;

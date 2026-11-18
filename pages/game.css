@@ -198,3 +198,9 @@ html, body { width: 100%; height: 100%; overflow: hidden; }
 }
 .player-rating { font-size: .85em; opacity: .8; }
 #player-name, #opponent-name { display:inline; }
+
+.opponent-profile-card { background:var(--page-background,var(--surface-alt)); color:var(--foreground,var(--ink)); }
+.opponent-card-banner { height:72px; margin:-14px -14px 0; background:linear-gradient(120deg,var(--page-background),var(--board-dark)); }
+.opponent-card-banner img { width:100%; height:100%; object-fit:cover; }
+.opponent-card-avatar { display:block; width:52px; height:52px; object-fit:contain; border:3px solid var(--page-background); background:var(--board-light); border-radius:50%; margin-top:-26px; position:relative; }
+.opponent-card-avatar.custom { object-fit:cover; }.opponent-profile-card .bio-label { color:inherit; opacity:.65; }.opponent-profile-card button { color:inherit; background:transparent; border:1px solid var(--line); padding:7px 10px; margin-top:12px; }

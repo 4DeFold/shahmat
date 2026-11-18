@@ -297,7 +297,8 @@ test('opponent card is accessible, treats bio as text, and clears between games'
   trigger.focus(); assert.equal(card.hidden, false); assert.equal(trigger.getAttribute('aria-expanded'), 'true');
   assert.equal(doc.getElementById('opponent-profile-name').textContent, 'Friend');
   assert.equal(doc.getElementById('opponent-profile-bio').textContent, '<img src=x onerror=alert(1)>');
-  assert.equal(card.querySelector('img'), null);
+  assert.equal(doc.getElementById('opponent-profile-bio').querySelector('img'), null);
+  assert.ok(doc.getElementById('opponent-profile-avatar'));
   doc.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key:'Escape' })); assert.equal(card.hidden, true);
   trigger.click(); assert.equal(card.hidden, false); trigger.click(); assert.equal(card.hidden, true);
   ui.destroy(); dom.window.close();

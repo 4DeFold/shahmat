@@ -16,6 +16,7 @@ try {
         const path=new URL(route.request().url()).pathname;
         if (path==='/auth/v1/user') return route.fulfill({json:user});
         if (path==='/rest/v1/profiles') return route.fulfill({json:{username:'Player',bio:'',palette:'monochrome'}});
+        if (path==='/rest/v1/rpc/profile_public') return route.fulfill({json:{username:'Player_One',bio:'Привет',palette:'forest',theme:'dark',avatar,banner:avatar,ratings:{overall:1100,blitz:1100,rapid:1000,classical:1000,daily:1000},games:{blitz:2,rapid:0,classical:0,daily:0,bot:1}}});
         if (path==='/rest/v1/rpc/profile_avatars') return route.fulfill({json:[{username:'Player_One',avatar}]});
         if (path==='/rest/v1/rpc/rank_leaderboard') {
           const mode=route.request().postDataJSON().p_mode; modes.push(mode);
@@ -52,7 +53,13 @@ try {
       assert.equal(await page.locator('.rating-place').nth(1).innerText(),'2');
       const widths=await page.evaluate(()=>({scroll:document.documentElement.scrollWidth,client:document.documentElement.clientWidth}));
       assert.ok(widths.scroll<=widths.client,`no page overflow ${viewport.width}: ${JSON.stringify(widths)}`);
-      await page.reload(); await page.locator('#page-rating').waitFor({state:'visible'}); await page.locator('.rating-row').first().waitFor();
+      if(viewport.width===1440&&reducedMotion==='reduce'){
+        await page.locator('.rating-profile-trigger').first().focus(); await page.locator('.player-mini-card').waitFor({state:'visible'}); await page.getByText('Привет').waitFor();
+        assert.equal(await page.locator('.player-mini-card').getAttribute('data-profile-palette'),'forest'); assert.equal(await page.locator('.player-mini-card').getAttribute('data-profile-theme'),'dark'); assert.equal(await page.locator('.player-mini-banner img').getAttribute('src'),avatar);
+        await page.locator('.player-mini-card button').click(); await page.locator('#page-profile').waitFor({state:'visible'}); await page.locator('#profile-display-name').getByText('Player_One').waitFor();
+        assert.equal(await page.locator('#page-profile').getAttribute('data-profile-theme'),'dark'); assert.equal(await page.locator('#profile-palette-name').textContent(),'Лес'); assert.equal(await page.locator('.landing').getAttribute('data-palette'),'monochrome'); await page.locator('#profile-back').click();
+      }
+      await page.goto(`${base}/rating`); await page.locator('#page-rating').waitFor({state:'visible'}); await page.locator('.rating-row').first().waitFor();
       await page.close();
     }
   }

@@ -342,7 +342,7 @@ async function restore(id) {
   } catch { game=null; status('Не удалось восстановить партию. Можно начать новую.'); }
 }
 showLevel(); draw(); startOrbit(); if(pageVisible) animateEntry(); $('bot-play').disabled=true;
-function setPlayerAvatar(value) { const img=$('bot-player-avatar-image'), custom=typeof value==='string'&&value.startsWith('data:image/png;base64,'); img.src=custom?value:'/pieces/cburnett/wP.svg'; img.classList.toggle('custom-profile-avatar',custom); }
+function setPlayerAvatar(value) { const img=$('bot-player-avatar-image'), custom=typeof value==='string'&&/^data:image\/(?:png|jpeg);base64,/.test(value); img.src=custom?value:'/pieces/cburnett/wP.svg'; img.classList.toggle('custom-profile-avatar',custom); }
 startSessionMonitor({auth:supabase.auth,cachedId:cachedUserId(localStorage),open:async id=>{ void supabase.from('profile_media').select('avatar').eq('user_id',id).maybeSingle().then(({data})=>{if(!destroyed&&userId===id)setPlayerAvatar(data?.avatar);}).catch(()=>{}); await restore(id); if(!destroyed) $('bot-play').disabled=false; },logout:()=>{ destroyed=true; ++generation; stopOrbit(); engine?.destroy(); store?.destroy(); clearInterval(timer); sound.destroy(); if(window.parent===window) location.replace('/'); },accountChanged:()=>location.reload()});
 window.addEventListener('online',()=>store?.flush());
 // If Play is pressed during the entrance, continue from the current opacity

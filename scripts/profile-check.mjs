@@ -8,13 +8,16 @@ const token=['e30',Buffer.from(JSON.stringify({sub:uid,exp:Math.floor(Date.now()
 const session={access_token:token,token_type:'bearer',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,refresh_token:'mock',user};
 try {
  for(const [viewport,reducedMotion] of [[{width:1440,height:900},'no-preference'],[{width:390,height:844},'no-preference'],[{width:280,height:800},'no-preference'],[{width:844,height:390},'reduce']]) {
-  const page=await browser.newPage({viewport,reducedMotion}); const errors=[],saves=[]; let currentProfile={username:'Alice',bio:'Играю в шахматы',palette:'forest'}, savedMedia=null, nameChanged=false, failLoad=viewport.width===1440, failSave=false;
+  const page=await browser.newPage({viewport,reducedMotion}); const errors=[],saves=[]; let currentProfile={username:'Alice',bio:'Играю в шахматы',palette:'forest'}, savedMedia=null, nameChanged=false, failLoad=viewport.width===1440, failSave=false, reward=viewport.width===390?{avatar_unlocked:true,banner_unlocked:false,avatar_seen:false,banner_seen:false}:{avatar_unlocked:true,banner_unlocked:true,avatar_seen:true,banner_seen:true},acks=0;
   page.on('pageerror',e=>errors.push(e.message));
   await page.addInitScript(value=>localStorage.setItem('sb-eswyxbyddkajysogtglp-auth-token',JSON.stringify(value)),session);
   await page.route('https://eswyxbyddkajysogtglp.supabase.co/**',async route=>{
    const path=new URL(route.request().url()).pathname;
    if(path==='/auth/v1/user') return route.fulfill({json:user});
    if(path==='/rest/v1/profiles') return route.fulfill({json:currentProfile});
+   if(path==='/rest/v1/profile_rewards') return route.fulfill({json:reward});
+   if(path==='/rest/v1/rpc/profile_ack_rewards'){acks++;reward={...reward,avatar_seen:true};return route.fulfill({json:null});}
+   if(path==='/rest/v1/rpc/profile_public') return route.fulfill({json:{...currentProfile,palette:'forest',theme:'dark',ratings:{overall:1123,blitz:1100,rapid:1200,classical:1000,daily:1192},games:{blitz:2,rapid:3,classical:1,daily:2,bot:4},avatar:savedMedia?.avatar||null,banner:savedMedia?.banner||null}});
    if(path==='/rest/v1/profile_media') {if(failLoad){return route.fulfill({status:503,json:{message:'unavailable'}});} return route.fulfill({json:savedMedia});}
    if(path==='/rest/v1/rpc/rank_my_position') return route.fulfill({json:[{username:'Alice',yar:1123,place:1}]});
    if(path==='/rest/v1/rpc/profile_my_stats') return route.fulfill({json:[{games:12}]});
@@ -25,10 +28,11 @@ try {
   await page.goto(`${base}/profile`); await page.locator('#page-profile').waitFor({state:'visible'});
   if(viewport.width===1440){await page.getByText('Не удалось загрузить данные профиля.').waitFor(); assert.equal(await page.locator('#profile-edit-button').isDisabled(),true); failLoad=false; await page.locator('#profile-retry').click();}
   await page.locator('#profile-edit-button:not([disabled])').waitFor();
+  if(viewport.width===390){await page.locator('#profile-unlock[open]').waitFor();assert.match(await page.locator('#profile-unlock-text').textContent(),/1100/);await page.locator('#profile-unlock-action').click();await page.locator('#profile-edit-name').waitFor();assert.equal(await page.locator('#profile-banner-open').isDisabled(),true);assert.equal(await page.locator('#profile-avatar-open').isDisabled(),false);assert.match(await page.locator('#profile-lock-hint').textContent(),/1200/);await page.locator('#profile-discard').click();assert.equal(acks,1);await page.evaluate(()=>window.scrollTo(0,0));}
   assert.equal(await page.locator('#profile-palette-name').textContent(),'Лес');
   assert.equal(await page.locator('#profile-palette-swatch').evaluate(el=>el.classList.contains('forest')),true);
   assert.equal(await page.locator('#profile-display-name').innerText(),'Alice');
-  assert.equal(await page.locator('#profile-yar').textContent(),'1 123');
+  await page.waitForTimeout(1000); assert.equal(await page.locator('#profile-yar').textContent(),'1 123');
   assert.equal(await page.locator('#profile-games').textContent(),'12');
   assert.doesNotMatch(await page.locator('#page-profile').innerText(),/ДЕМО|Каждый ход|ЛИЧНАЯ КАРТОЧКА|Рейтинг игрока|Каждая партия|ШАХМАТНЫЙ ПРОФИЛЬ/);
   assert.equal(await page.locator('.profile-portrait-star,.profile-banner-index,.profile-player-tag,.profile-identity-aside').count(),0);
@@ -43,15 +47,17 @@ try {
    await page.locator('#profile-edit-button').click();
    assert.equal(await page.locator('#profile-edit-name').inputValue(),'Alice');
    await page.locator('#profile-edit-name').fill('Alice_2'); await page.locator('#profile-edit-bio').fill('Новое био');
-   const bytes=await page.evaluate(()=>{const c=document.createElement('canvas');c.width=1000;c.height=400;const x=c.getContext('2d');x.fillStyle='orange';x.fillRect(0,0,c.width,c.height);return c.toDataURL('image/png').split(',')[1]});
+   const bytes=await page.evaluate(()=>{const c=document.createElement('canvas');c.width=1200;c.height=400;const x=c.getContext('2d');x.fillStyle='red';x.fillRect(0,0,600,400);x.fillStyle='blue';x.fillRect(600,0,600,400);return c.toDataURL('image/png').split(',')[1]});
    const image={name:'test.png',mimeType:'image/png',buffer:Buffer.from(bytes,'base64')};
-   await page.locator('#profile-avatar-file').setInputFiles(image); await page.locator('#profile-save:not([disabled])').waitFor();
-   await page.locator('#profile-banner-file').setInputFiles(image); await page.locator('#profile-save:not([disabled])').waitFor();
+   await page.locator('#profile-avatar-open').click(); assert.equal(await page.locator('#profile-crop').evaluate(el=>el.open),true); await page.locator('#profile-image-file').setInputFiles(image); await page.locator('#profile-crop-apply:not([disabled])').waitFor(); await page.locator('#profile-crop-x').fill('0'); await page.locator('#profile-crop-apply').click();
+   await page.locator('#profile-banner-open').click(); await page.locator('#profile-image-file').setInputFiles(image); await page.locator('#profile-crop-apply:not([disabled])').waitFor(); await page.locator('#profile-crop-apply').click();
    await page.locator('#profile-save').click(); await page.getByText('Профиль сохранён.').waitFor();
    assert.equal(saves.length,1);assert.equal(saves[0].p_username,'Alice_2');assert.equal(saves[0].p_bio,'Новое био');
-   const dims=data=>{const b=Buffer.from(data.split(',')[1],'base64');return [b.readUInt32BE(16),b.readUInt32BE(20)];};
-   assert.deepEqual(dims(saves[0].p_avatar),[100,100]);assert.deepEqual(dims(saves[0].p_banner),[600,240]);
+   const dims=async data=>page.evaluate(async src=>{const image=new Image();image.src=src;await image.decode();return [image.naturalWidth,image.naturalHeight]},data);
+   assert.deepEqual(await dims(saves[0].p_avatar),[384,384]);assert.deepEqual(await dims(saves[0].p_banner),[1200,400]);assert.ok(saves[0].p_avatar.startsWith('data:image/jpeg;base64,'));
+   const pixel=await page.evaluate(async src=>{const img=new Image();img.src=src;await img.decode();const c=document.createElement('canvas');c.width=1;c.height=1;const ctx=c.getContext('2d');ctx.drawImage(img,0,0,1,1);return [...ctx.getImageData(0,0,1,1).data]},saves[0].p_avatar); assert.ok(pixel[0]>pixel[2]*3,'horizontal crop chooses left side');
    assert.equal(await page.locator('#profile-display-name').innerText(),'Alice_2');
+   await page.locator('#profile-yar-open').click(); assert.equal(await page.locator('#profile-yar-details .profile-detail-row').count(),5); await page.locator('#profile-games-open').click(); assert.equal(await page.locator('#profile-games-details .profile-detail-row').count(),6);
    await page.locator('#profile-edit-button').click(); await page.locator('#profile-edit-name').fill('discarded'); await page.locator('#profile-discard').click(); assert.equal(await page.locator('#profile-display-name').innerText(),'Alice_2');
    await page.reload(); await page.locator('#profile-edit-button:not([disabled])').waitFor();
    assert.equal(await page.locator('#profile-display-name').textContent(),'Alice_2'); assert.equal(await page.locator('#profile-avatar-image').getAttribute('src'),saves[0].p_avatar); assert.equal(await page.locator('#profile-banner-image').getAttribute('src'),saves[0].p_banner);
