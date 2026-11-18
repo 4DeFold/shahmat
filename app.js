@@ -174,7 +174,7 @@ let navigating = false;
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const accountMenu = $('account-menu');
 const accountToggle = $('account-toggle');
-const pages = new Set(['home', 'game', 'rating', 'profile', 'settings', 'help']);
+const pages = new Set(['home', 'game', 'bot', 'rating', 'profile', 'settings', 'help']);
 const sidebar = $('app-sidebar');
 const mobileMenuToggle = $('mobile-menu-toggle');
 let sidebarOpen = false;
@@ -242,6 +242,7 @@ function openAccountMenu() {
 const pageLoaders = {
   home: () => import('./pages/home.html?raw'),
   game: () => import('./pages/game-view.html?raw'),
+  bot: () => import('./pages/bot-view.html?raw'),
   rating: () => import('./pages/rating.html?raw'),
   profile: () => import('./pages/profile.html?raw'),
   settings: () => import('./pages/settings.html?raw'),
@@ -250,7 +251,7 @@ const pageLoaders = {
 let pageRequest = 0;
 const viewId = name => name === 'home' ? 'dashboard-home' : `page-${name}`;
 const viewLoads = new Map();
-let frameReady = null, ratingView = null;
+let frameReady = null, botFrameReady = null, ratingView = null;
 let onlineStop = null, heartbeatStop = null, onlineUser = null, onlineCount = null;
 function sendOnline() { $('member-game-frame')?.contentWindow?.postMessage({ type: 'shahmat-online', count: onlineCount }, window.location.origin); }
 function startOnline(id) {
@@ -269,15 +270,16 @@ async function loadView(name) {
     $('page-content').insertAdjacentHTML('beforeend', html);
     if (name === 'rating') { ratingView = createRatingView($('page-rating'), supabase, { showSelf:true }); ratingView.setUnit(rankUnit); }
     if (name === 'settings') { applyPalette(selectedPalette); applyRankUnit(rankUnit); }
-    if (name === 'game') {
-      const frame = $('member-game-frame');
-      frameReady = new Promise((resolve, reject) => {
+    if (name === 'game' || name === 'bot') {
+      const frame = $(name === 'game' ? 'member-game-frame' : 'bot-game-frame');
+      const ready = new Promise((resolve, reject) => {
         const timeout = setTimeout(() => reject(new Error('Game load timed out')), 15000);
         frame.addEventListener('load', () => { clearTimeout(timeout); resolve(); }, { once: true });
         frame.addEventListener('error', () => { clearTimeout(timeout); reject(new Error('Game load failed')); }, { once: true });
       });
       // Prevent an unhandled rejection if a background load fails before navigation.
-      frameReady.catch(() => {});
+      ready.catch(() => {});
+      if (name === 'game') frameReady = ready; else botFrameReady = ready;
     }
   })();
   viewLoads.set(name, pending);
@@ -301,10 +303,12 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
     }
     await loadView(name);
     if (name === 'game' && frameReady) await frameReady;
+    if (name === 'bot' && botFrameReady) await botFrameReady;
     if (request !== pageRequest) return;
     $('page-load-error')?.remove();
     $('page-loading')?.remove();
     $('member-game-frame')?.contentWindow?.postMessage({ type: name === 'game' ? 'shahmat-game-shown' : 'shahmat-game-hidden' }, window.location.origin);
+    $('bot-game-frame')?.contentWindow?.postMessage({ type: name === 'bot' ? 'shahmat-bot-shown' : 'shahmat-bot-hidden' }, window.location.origin);
     document.querySelectorAll('#dashboard-screen [data-view]').forEach(view => {
       const active = view.dataset.view === name;
       const changed = active && view.hidden;
@@ -326,30 +330,33 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
       const heading = $('page-' + name + '-title');
       if (heading) { heading.setAttribute('tabindex', '-1'); heading.focus({ preventScroll: true }); }
     }
-    document.title = ({ home: 'Главная', game: 'Играть', rating: 'Рейтинг', profile: 'Профиль', settings: 'Настройки', help: 'Помощь' })[name] + ' — shahmat.xyz';
+    document.title = ({ home: 'Главная', game: 'Играть', bot: 'Бот', rating: 'Рейтинг', profile: 'Профиль', settings: 'Настройки', help: 'Помощь' })[name] + ' — shahmat.xyz';
   } catch {
     if (request !== pageRequest) return;
     document.querySelectorAll('#dashboard-screen [data-view]').forEach(view => { view.hidden = true; });
     $('page-load-error')?.remove(); $('page-loading')?.remove();
     if (name === 'game') { $('page-game')?.remove(); frameReady = null; }
+    if (name === 'bot') { $('page-bot')?.remove(); botFrameReady = null; }
     $('page-content').insertAdjacentHTML('beforeend', '<section class="empty-page" id="page-load-error" role="alert"><h2>Страница не загрузилась.</h2><p>Проверь соединение и обнови страницу.</p></section>');
   }
 }
 // The game remains a separate page; send appearance only to our own frame.
 function syncGameAppearance() {
-  const frame = $('member-game-frame');
-  if (!frame?.contentWindow) return;
+  const frames = [$('member-game-frame'), $('bot-game-frame')].filter(frame => frame?.contentWindow);
+  if (!frames.length) return;
   const style = getComputedStyle(landing);
   const names = ['--page-background', '--foreground', '--surface', '--surface-raised', '--line', '--button-background', '--button-text', '--accent', '--board-light', '--board-dark', '--clock-white', '--clock-black'];
   const colors = Object.fromEntries(names.map(name => [name, style.getPropertyValue(name).trim()]));
   // Apply synchronously before revealing the frame; postMessage keeps its own
   // appearance listener in sync as the palette changes later.
   const targets = { '--page-background': '--bg', '--foreground': '--ink', '--surface': '--surface', '--surface-raised': '--surface-alt', '--line': '--line', '--button-background': '--control', '--button-text': '--control-ink', '--accent': '--accent', '--board-light': '--board-light', '--board-dark': '--board-dark', '--clock-white':'--clock-white', '--clock-black':'--clock-black' };
-  try { for (const [name, target] of Object.entries(targets)) if (colors[name]) frame.contentDocument?.documentElement.style.setProperty(target, colors[name]); } catch { /* Frame may still be navigating. */ }
-  frame.contentWindow.postMessage({ type: 'shahmat-appearance', colors }, window.location.origin);
+  for (const frame of frames) {
+    try { for (const [name, target] of Object.entries(targets)) if (colors[name]) frame.contentDocument?.documentElement.style.setProperty(target, colors[name]); } catch { /* Frame may still be navigating. */ }
+    frame.contentWindow.postMessage({ type: 'shahmat-appearance', colors }, window.location.origin);
+  }
 }
 new MutationObserver(syncGameAppearance).observe(landing, { attributes: true, attributeFilter: ['data-palette', 'data-palette-theme', 'class'] });
-$('page-content').addEventListener('load', event => { if (event.target.id === 'member-game-frame') { syncGameAppearance(); sendOnline(); applyRankUnit(rankUnit); } }, true);
+$('page-content').addEventListener('load', event => { if (event.target.id === 'member-game-frame' || event.target.id === 'bot-game-frame') { syncGameAppearance(); sendOnline(); applyRankUnit(rankUnit); } }, true);
 $('dashboard-screen').querySelectorAll('[data-page]').forEach(link => link.addEventListener('click', event => {
   if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
   event.preventDefault();
@@ -378,7 +385,7 @@ async function show(id, immediate = false) {
   const next = $(id);
   screen.classList.add('leaving');
   if (!immediate && !reducedMotion.matches) await new Promise(resolve => setTimeout(resolve, 300));
-  if (screen.id === 'dashboard-screen') $('member-game-frame')?.contentWindow?.postMessage({ type: 'shahmat-game-hidden' }, window.location.origin);
+  if (screen.id === 'dashboard-screen') { $('member-game-frame')?.contentWindow?.postMessage({ type: 'shahmat-game-hidden' }, window.location.origin); $('bot-game-frame')?.contentWindow?.postMessage({ type: 'shahmat-bot-hidden' }, window.location.origin); }
   screen.hidden = true;
   screen.classList.remove('leaving');
   landing.classList.toggle('palette-active', ['profile-screen', 'palette-screen', 'dashboard-screen'].includes(id));
@@ -798,7 +805,7 @@ document.querySelectorAll('.signout').forEach(button => button.addEventListener(
     onlineStop?.(); heartbeatStop?.(); onlineStop = null; heartbeatStop = null; onlineUser = null; onlineCount = null;
     dashboardPreloadEnabled = false; pageRequest++;
     // Discard account-specific views on logout.
-    $('page-game')?.remove(); frameReady = null;
+    $('page-game')?.remove(); frameReady = null; $('page-bot')?.remove(); botFrameReady = null;
     ratingView?.destroy(); $('page-rating')?.remove(); ratingView = null;
     profile = null; applyPalette('monochrome'); applyTheme(null); applyRankUnit('yar'); $('auth-form').reset(); setMode('login');
     window.history.replaceState(null, '', '/');

@@ -124,24 +124,36 @@ For local mocked browser tests only, start the server with
 `VITE_EMAIL_OTP_READY=true npm run dev`, then run `npm run test:responsive`.
 Do not use this flag against a real auto-confirm-enabled project for signup.
 
-## Rating foundation (not deployed)
+## Rating foundation
 
-`rating/rank.js` contains pure calculation helpers based on
-`RANKING_STRUCTURE.md`; it does not authorize or record results. The rating
-SQL in `supabase/proposals/` is a storage-only proposal, not an automatic
-migration and not applied to the shared database. It
-keeps rank in separate tables rather than extending client-writable profiles.
-There are deliberately no client privileges. The example files referenced in
-the ranking document were not present in this repository; this implementation
-was derived from the formulas in the document.
+The active ЯР and shadow Elo implementation, calibration and leaderboard are
+described in `RANKING_STRUCTURE.md` and `rating/YAR_IMPLEMENTATION.md`. Online
+games are rated by database-side logic; the separate bot games described below
+are always unrated and their client-reported results are not authoritative.
 
-Online matchmaking, authoritative chess and clocks, game completion, rating
-transactions, daily and opponent limits, calibration/leaderboard, division
-persistence, normalization, and database-backed mode statistics are **not yet
-implemented**. Bot games remain local, untimed and unrated. Before enabling
-rating, implement and test these mechanisms on an isolated test database,
-including concurrent games, duplicate completion, timeouts and UTC day
-boundaries. Zero-delta rated games must still count toward both limits. The
-normalization floor in the specification (200) conflicts with its stated 0–2600
-scale and should be resolved before scheduling normalization. Never accept game
-results or rating changes from the browser.
+## Bot games (preview)
+
+Signed-in players can visit `/bot` and choose levels 1–5 or Stockfish.
+Their figures progress from Pawn to King. All levels use Stockfish.js 17.1 with progressively higher UCI limits;
+the 1/6–6/6 scale is a UI convention, not a measured percentage of chess ability.
+The King uses the full single-threaded NNUE network with no skill limit and a
+2.5-second move budget. The other five use the lite engine and strength limits.
+The full network is approximately 75 MB and is downloaded lazily on its first
+move; WASM and Web Workers must be supported. Engine failures are shown with a
+retry action, never replaced silently with another algorithm.
+
+Stockfish.js is GPLv3; its exact source revision is
+https://github.com/nmrugg/stockfish.js/tree/602fd7e1a571a2be71f242942db90483731f2a1f
+and the license is served at `/stockfish/COPYING.txt`. `npm ci` installs the
+engine and the Vite plugin copies only the relevant worker and network files
+into the build; these generated binaries are not committed.
+
+`bot_games` stores client-generated, unrated snapshots. RLS permits each
+authenticated user to read and write only their own rows. The moves, outcomes,
+level and minute-before-resignation rule are client-side and must not be trusted
+for leaderboards, prizes or anti-cheat. Bot games do not enter `online_games`
+or trigger rating calculations. Pending writes and the current game are cached
+per account locally and retried after network failures. Preview currently shares
+the production Supabase database, where the additive bot table has been applied.
+For browser checks, run `npm run build`, `npm run preview`, then `npm run test:bot`;
+Supabase is mocked, while the Stockfish worker actually runs in the browser.
