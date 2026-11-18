@@ -3,6 +3,7 @@ import { startOnlinePresence } from './pages/online-presence.js';
 import { startMatchHeartbeat } from './pages/match-heartbeat.js';
 import { createClient } from '@supabase/supabase-js';
 import './theme.js';
+import './pages/profile.css';
 
 // Preserve the callback type before Supabase consumes and clears the URL fragment.
 const callbackParams = new URLSearchParams(window.location.hash.slice(1));
@@ -32,14 +33,21 @@ function applyRankUnit(value) {
   ratingView?.setUnit(rankUnit);
   $('member-game-frame')?.contentWindow?.postMessage({ type:'shahmat-rank-unit', value:rankUnit }, window.location.origin);
 }
+const paletteNames = { monochrome:'Монохром', gray:'Графит', forest:'Лес', atelier:'Шахматный кабинет', wood:'Тёплое дерево', earth:'Сосновый бор', ocean:'Морская глубина', amber:'Янтарь', lavender:'Лаванда', sand:'Песчаный' };
+function updateProfileAppearance() {
+  if ($('profile-palette-name')) $('profile-palette-name').textContent = paletteNames[selectedPalette];
+  if ($('profile-theme-name')) $('profile-theme-name').textContent = landing.dataset.paletteTheme === 'dark' ? 'Тёмная тема' : 'Светлая тема';
+}
 function applyTheme(value) {
   selectedTheme = value === 'dark' || value === 'light' ? value : null;
   landing.dataset.paletteTheme = selectedTheme || (systemTheme.matches ? 'dark' : 'light');
+  updateProfileAppearance();
 }
 systemTheme.addEventListener('change', () => { if (!selectedTheme) applyTheme(null); });
 function applyPalette(value) {
   selectedPalette = palettes.has(value) ? value : 'monochrome';
   landing.dataset.palette = selectedPalette;
+  updateProfileAppearance();
   document.querySelectorAll('.palette-list input').forEach(input => {
     input.checked = input.value === selectedPalette;
   });
@@ -270,6 +278,7 @@ async function loadView(name) {
     $('page-content').insertAdjacentHTML('beforeend', html);
     if (name === 'rating') { ratingView = createRatingView($('page-rating'), supabase, { showSelf:true }); ratingView.setUnit(rankUnit); }
     if (name === 'settings') { applyPalette(selectedPalette); applyRankUnit(rankUnit); }
+    if (name === 'profile') updateProfileAppearance();
     if (name === 'game' || name === 'bot') {
       const frame = $(name === 'game' ? 'member-game-frame' : 'bot-game-frame');
       const ready = new Promise((resolve, reject) => {
@@ -314,6 +323,10 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
       const changed = active && view.hidden;
       view.hidden = !active;
       view.inert = sidebarOpen;
+      if (changed && view.dataset.view === 'profile') {
+        view.classList.remove('profile-enter'); void view.offsetWidth;
+        if (!reducedMotion.matches) view.classList.add('profile-enter');
+      }
       if (changed && focus && !reducedMotion.matches) {
         view.classList.remove('page-enter'); void view.offsetWidth; view.classList.add('page-enter');
       }
