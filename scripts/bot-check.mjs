@@ -17,6 +17,7 @@ try {
    if(path==='/auth/v1/user') return route.fulfill({json:user});
    if(path==='/rest/v1/profiles') return route.fulfill({json:{username:'Alice',bio:'',palette:'forest'}});
    if(path==='/rest/v1/profile_media') return route.fulfill({json:{avatar}});
+   if(path==='/rest/v1/profile_rewards') return route.fulfill({json:{avatar_unlocked:true}});
    if(path==='/rest/v1/bot_games') { if(route.request().method()!=='GET') writes.push(route.request().postDataJSON()); return route.fulfill({json:route.request().method()==='GET'?[]:{}}); }
    return route.fulfill({json:{game:null}});
   });
