@@ -20,14 +20,31 @@ try {
   });
   await page.goto(`${base}/profile`); await page.locator('#page-profile').waitFor({state:'visible'});
   assert.equal(await page.locator('#profile-palette-name').textContent(),'Лес');
-  assert.equal(await page.locator('#profile-theme-name').textContent(),'Тёмная тема');
-  assert.match(await page.locator('#page-profile').innerText(),/ДЕМО/);
+  assert.equal(await page.locator('#profile-palette-swatch').evaluate(el=>el.classList.contains('forest')),true);
+  assert.match(await page.locator('#page-profile').innerText(),/Тихий игрок/);
+  assert.doesNotMatch(await page.locator('#page-profile').innerText(),/ДЕМО|Каждый ход|ЛИЧНАЯ КАРТОЧКА|Рейтинг игрока|Каждая партия/);
   assert.match(await page.locator('#page-profile').innerText(),/1 284/);
   assert.match(await page.locator('#page-profile').innerText(),/86/);
   assert.equal(await page.locator('#page-profile button, #page-profile a, #page-profile input').count(),0);
   assert.equal(await page.locator('.profile-reveal').first().evaluate(el=>getComputedStyle(el).animationName),reducedMotion==='reduce'?'none':'profile-reveal');
   await page.waitForTimeout(1200);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,`no horizontal overflow at ${viewport.width}`);
+  const geometry=await page.evaluate(()=>{const rect=selector=>{const r=document.querySelector(selector).getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,width:r.width,height:r.height};};return {banner:rect('.profile-banner'),rail:rect('.profile-rail'),sidebar:rect('.app-sidebar')};});
+  if(viewport.width>700) {
+   assert.ok(Math.abs(geometry.banner.top)<1,'banner reaches top of page');
+   assert.ok(Math.abs(geometry.banner.left-geometry.sidebar.right)<1,'banner touches left rail');
+   assert.ok(Math.abs(geometry.banner.right-geometry.rail.left)<1,'banner touches right rail');
+  } else {
+   assert.ok(Math.abs(geometry.banner.top-68)<1,'banner starts directly under mobile navigation');
+   assert.ok(Math.abs(geometry.banner.left)<1 && Math.abs(geometry.banner.width-viewport.width)<1,'mobile banner fills the width');
+   assert.ok(geometry.banner.height>=220,'mobile banner retains its height');
+   assert.ok(geometry.rail.top>geometry.banner.top+geometry.banner.height,'mobile palette rail follows content');
+  }
+  await page.locator('#dashboard-palettes').waitFor({state:'attached'});
+  const swatches=await page.evaluate(()=>[getComputedStyle(document.querySelector('#profile-palette-swatch')).backgroundImage,getComputedStyle(document.querySelector('#dashboard-palettes .palette-swatch.forest')).backgroundImage]);
+  assert.equal(swatches[0],swatches[1],'palette swatch matches settings');
+  for(const selector of ['.profile-card-label','.profile-stat-value','.profile-palette-name','.profile-banner-index']) assert.match(await page.locator(selector).first().evaluate(el=>getComputedStyle(el).fontFamily),/Charis SIL|Playfair Display/);
+
   assert.equal(await page.locator('.profile-portrait img').evaluate(img=>img.complete&&img.naturalWidth>0),true);
   if(process.env.PROFILE_SCREENSHOTS) await page.screenshot({path:`/tmp/profile-${viewport.width}.png`,fullPage:true});
   if(viewport.width===1440) {

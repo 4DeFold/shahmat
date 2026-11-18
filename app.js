@@ -36,7 +36,7 @@ function applyRankUnit(value) {
 const paletteNames = { monochrome:'Монохром', gray:'Графит', forest:'Лес', atelier:'Шахматный кабинет', wood:'Тёплое дерево', earth:'Сосновый бор', ocean:'Морская глубина', amber:'Янтарь', lavender:'Лаванда', sand:'Песчаный' };
 function updateProfileAppearance() {
   if ($('profile-palette-name')) $('profile-palette-name').textContent = paletteNames[selectedPalette];
-  if ($('profile-theme-name')) $('profile-theme-name').textContent = landing.dataset.paletteTheme === 'dark' ? 'Тёмная тема' : 'Светлая тема';
+  if ($('profile-palette-swatch')) $('profile-palette-swatch').className = `palette-swatch ${selectedPalette}`;
 }
 function applyTheme(value) {
   selectedTheme = value === 'dark' || value === 'light' ? value : null;
