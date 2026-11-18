@@ -1,0 +1,42 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {PGlite} from '@electric-sql/pglite';
+const A='00000000-0000-4000-8000-000000000001',B='00000000-0000-4000-8000-000000000002';
+const png=(w,h)=>'data:image/png;base64,'+Buffer.from('89504e470d0a1a0a0000000d49484452'+w.toString(16).padStart(8,'0')+h.toString(16).padStart(8,'0')+'080600000000000000','hex').toString('base64');
+test('profile media owner isolation, atomic saves, dimensions and seven-day nickname rule',async()=>{
+ const db=await PGlite.create(); try {
+  await db.exec("create role anon; create role authenticated; create schema auth; grant usage on schema auth to authenticated; create table auth.users(id uuid primary key); create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;");
+  await db.exec(await readFile('supabase/migrations/20261113140000_create_profiles.sql','utf8'));
+  await db.exec("create table public.online_games(id uuid,white_id uuid,black_id uuid,status text); create table public.bot_games(user_id uuid,status text);");
+  await db.exec(await readFile('supabase/migrations/20261118072419_profile_media.sql','utf8'));
+  await db.query('insert into auth.users values ($1),($2)',[A,B]);
+  await db.exec(`select set_config('request.jwt.claim.sub','${A}',false); set role authenticated;`);
+  await db.query("insert into public.profiles(id,username) values ($1,'Alice')",[A]);
+  await db.query("select public.profile_save('Alice','bio',$1,$2)",[png(100,100),png(600,400)]);
+  await db.exec('reset role');
+  await db.query("insert into public.online_games(white_id,black_id,status) values ($1,$2,'finished'),($1,$2,'active')",[A,B]);
+  await db.query("insert into public.bot_games(user_id,status) values ($1,'draw'),($1,'abandoned'),($2,'draw')",[A,B]);
+  await db.exec(`set role authenticated; select set_config('request.jwt.claim.sub','${A}',false);`);
+  assert.equal(Number((await db.query('select * from public.profile_my_stats()')).rows[0].games),2);
+  await db.exec(`select set_config('request.jwt.claim.sub','${B}',false)`);
+  assert.equal((await db.query('select * from public.profile_media')).rows.length,0);
+  assert.equal((await db.query("select * from public.profile_avatars(array['Alice'])")).rows[0].avatar,png(100,100));
+  await db.exec(`select set_config('request.jwt.claim.sub','${A}',false)`);
+  await assert.rejects(db.query("select public.profile_save('Bob','changed',$1,null)",[png(101,100)]),/check constraint/);
+  assert.equal((await db.query('select username,bio from public.profiles')).rows[0].username,'Alice');
+  await db.query("select public.profile_save('Alice_2','bio',null,null)");
+  await assert.rejects(db.query("update public.profiles set username='Alice_3',username_changed_at=null"),/username_change_cooldown/);
+  await db.query("update public.profiles set username_changed_at=null");
+  await assert.rejects(db.query("update public.profiles set username='Alice_3'"),/username_change_cooldown/);
+  await assert.rejects(db.query("select public.profile_save('Alice_2','bad',null,$1)",[png(601,100)]),/check constraint/);
+  await assert.rejects(db.query("select public.profile_save('Alice_2','bad',$1,null)",['data:image/png;base64,PHN2Zz48L3N2Zz4=']),/check constraint/);
+  await assert.rejects(db.query("select * from public.profile_avatars(array_fill('Alice'::text,array[101]))"),/invalid names/);
+  await assert.rejects(db.query("insert into public.profile_media(user_id) values ($1)",[B]),/row-level security/);
+  await db.exec(`select set_config('request.jwt.claim.sub','${B}',false)`);
+  assert.equal((await db.query('select * from public.profile_media')).rows.length,0);
+  assert.equal((await db.query("select * from public.profile_avatars(array['Alice_2'])")).rows.length,1);
+  await db.exec('reset role; set role anon');
+  await assert.rejects(db.query("select * from public.profile_avatars(array['Alice_2'])"),/permission denied/);
+ } finally {await db.close();}
+});

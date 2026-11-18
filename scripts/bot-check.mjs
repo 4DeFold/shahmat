@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 const base=process.env.RESPONSIVE_BASE_URL||'http://127.0.0.1:4174';
 const browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.CHROMIUM_EXECUTABLE_PATH}:{}),...(process.env.CHROMIUM_EXTRA_ARGS?{args:process.env.CHROMIUM_EXTRA_ARGS.split(' ')}:{})});
+const avatar='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aS/8AAAAASUVORK5CYII=';
 const uid='12345678-1234-1234-1234-123456789012', user={id:uid,aud:'authenticated',role:'authenticated',user_metadata:{palette:'forest',palette_theme:'dark'}};
 const token=['e30',Buffer.from(JSON.stringify({sub:uid,exp:Math.floor(Date.now()/1000)+3600,role:'authenticated'})).toString('base64url'),'x'].join('.');
 const session={access_token:token,token_type:'bearer',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,refresh_token:'mock',user};
@@ -15,6 +16,7 @@ try {
    const path=new URL(route.request().url()).pathname;
    if(path==='/auth/v1/user') return route.fulfill({json:user});
    if(path==='/rest/v1/profiles') return route.fulfill({json:{username:'Alice',bio:'',palette:'forest'}});
+   if(path==='/rest/v1/profile_media') return route.fulfill({json:{avatar}});
    if(path==='/rest/v1/bot_games') { if(route.request().method()!=='GET') writes.push(route.request().postDataJSON()); return route.fulfill({json:route.request().method()==='GET'?[]:{}}); }
    return route.fulfill({json:{game:null}});
   });
@@ -95,7 +97,8 @@ try {
   if(reducedMotion==='no-preference') { await frame.locator('#bot-app[data-phase=launching]').waitFor(); await frame.locator('.fly-board .board').waitFor({timeout:10000}); const replacements=await frame.locator('#orbit-stage').evaluate(()=>window.launchReplacements); assert.equal(replacements.length,1); assert.ok(replacements[0].bottom<=replacements[0].top,'initial board substituted outside the visible area'); destination=await frame.locator('#target-board').boundingBox(); await page.waitForTimeout(450); const ringOpacity=await frame.locator('#orbit-stage .orbit-ring-outer').evaluate(el=>Number(getComputedStyle(el).opacity)); assert.ok(ringOpacity<.35,'orbit ring fades while the board arrives'); }
   await frame.locator('#bot-app[data-phase=playing]').waitFor({timeout:12000});
   if(destination) { const live=await frame.locator('#target-board').boundingBox(); for(const key of ['x','y','width','height']) assert.ok(Math.abs(destination[key]-live[key])<2,`board arrival has stable ${key}`); }
-  assert.equal(await frame.locator('#board .square').count(),64); assert.equal(await frame.locator('#resign-wrap').getAttribute('aria-hidden'),'true');
+  assert.equal(await frame.locator('#board .square').count(),64);
+  await frame.locator('#bot-player-avatar-image.custom-profile-avatar').waitFor(); assert.equal(await frame.locator('#resign-wrap').getAttribute('aria-hidden'),'true');
   assert.equal(await frame.locator('#orbit-slot').evaluate(el=>getComputedStyle(el).display),'none','all orbit boards remain absent after landing');
   await page.waitForTimeout(700);
   assert.equal(await frame.locator('#orbit-stage .orbit-board').first().evaluate(el=>el.getClientRects().length),0,'inline child visibility cannot reveal the background boards');

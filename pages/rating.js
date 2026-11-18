@@ -96,15 +96,31 @@ export function createRatingView(root, client, { showSelf = false } = {}) {
       const row = root.ownerDocument.createElement('li'); row.className = 'rating-row';
       if (ownName && player.username === ownName) row.classList.add('rating-row-self');
       const place = root.ownerDocument.createElement('span'); place.className='rating-place'; place.textContent = String(index + 1);
-      const name = root.ownerDocument.createElement('span'); name.className='rating-player'; name.textContent = String(player.username ?? '');
+      const person = root.ownerDocument.createElement('span'); person.className='rating-person';
+      const avatar = root.ownerDocument.createElement('img'); avatar.className='rating-avatar'; avatar.alt=''; avatar.src='/pieces/cburnett/wP.svg';
+      const name = root.ownerDocument.createElement('span'); name.className='rating-player'; name.textContent = String(player.username ?? ''); person.append(avatar,name);
       const score = root.ownerDocument.createElement('span'); score.className='rating-score'; score.textContent = formatScore(player);
-      row.append(place,name,score); fragment.append(row);
+      row.append(place,person,score); fragment.append(row);
       if (animate) { animated.push({el:name,type:'name',value:player.username ?? ''}, {el:score,type:'score',value:player[unit]}); }
     }
     list.replaceChildren(fragment);
     if (animate) animateItems(animated);
+    void loadAvatars(data);
     status.hidden = data.length > 0;
     status.textContent = data.length ? '' : 'Пока нет игроков';
+  }
+
+  let avatarRequest = 0;
+  async function loadAvatars(data) {
+    const request=++avatarRequest, names=[...new Set(data.map(p=>p.username).filter(name=>typeof name==='string'))].slice(0,100);
+    if (!names.length) return;
+    try {
+      const {data:avatars,error}=await client.rpc('profile_avatars',{p_names:names});
+      if(error||!Array.isArray(avatars)||destroyed||request!==avatarRequest) return;
+      const images=new Map(avatars.filter(a=>typeof a.avatar==='string'&&a.avatar.startsWith('data:image/png;base64,')).map(a=>[a.username,a.avatar]));
+      for(const row of list.children) { const name=row.querySelector('.rating-player')?.textContent, img=row.querySelector('.rating-avatar'); if(img&&images.has(name)) {img.src=images.get(name);img.classList.add('has-custom-avatar');} }
+      const own=self?.querySelector('.rating-avatar'); if(own&&images.has(ownName)) {own.src=images.get(ownName);own.classList.add('has-custom-avatar');}
+    } catch { /* Ranking remains available if images cannot load. */ }
   }
 
   function formatScore(player) { return player?.[unit] == null ? '—' : number.format(Number(player[unit])); }
@@ -145,6 +161,9 @@ export function createRatingView(root, client, { showSelf = false } = {}) {
       self.querySelector('.rating-self-name').textContent = String(player.username ?? '');
       self.querySelector('.rating-self-score').textContent = formatScore(player);
       self.hidden = false;
+      {
+        void client.rpc('profile_avatars',{p_names:[ownName]}).then(({data})=>{if(!destroyed&&request===sequence&&data?.[0]?.avatar?.startsWith('data:image/png;base64,')){const image=self.querySelector('.rating-avatar'); if(image){image.src=data[0].avatar;image.classList.add('has-custom-avatar');}}}).catch(()=>{});
+      }
       animateItems([{el:self.querySelector('.rating-self-name'),type:'name',value:player.username ?? ''}, {el:self.querySelector('.rating-self-score'),type:'score',value:player[unit]}]);
       for (const row of list.children) row.classList.toggle('rating-row-self', row.querySelector('.rating-player')?.textContent === ownName);
     } catch { if (!destroyed && request === sequence && selfMode !== requestedMode) self.hidden = true; }
@@ -195,6 +214,7 @@ export function createRatingView(root, client, { showSelf = false } = {}) {
   root.addEventListener('click', onClick);
   return {
     refresh,
+    invalidate() { cache.clear(); avatarRequest++; },
     setUnit(value) {
       const next = value === 'elo' ? 'elo' : 'yar';
       if (unit === next) return;

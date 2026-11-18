@@ -4,6 +4,7 @@ import { startMatchHeartbeat } from './pages/match-heartbeat.js';
 import { createClient } from '@supabase/supabase-js';
 import './theme.js';
 import './pages/profile.css';
+import { createProfileView } from './pages/profile-view.js';
 
 // Preserve the callback type before Supabase consumes and clears the URL fragment.
 const callbackParams = new URLSearchParams(window.location.hash.slice(1));
@@ -259,7 +260,7 @@ const pageLoaders = {
 let pageRequest = 0;
 const viewId = name => name === 'home' ? 'dashboard-home' : `page-${name}`;
 const viewLoads = new Map();
-let frameReady = null, botFrameReady = null, ratingView = null;
+let frameReady = null, botFrameReady = null, ratingView = null, profileView = null;
 let onlineStop = null, heartbeatStop = null, onlineUser = null, onlineCount = null;
 function sendOnline() { $('member-game-frame')?.contentWindow?.postMessage({ type: 'shahmat-online', count: onlineCount }, window.location.origin); }
 function startOnline(id) {
@@ -278,7 +279,13 @@ async function loadView(name) {
     $('page-content').insertAdjacentHTML('beforeend', html);
     if (name === 'rating') { ratingView = createRatingView($('page-rating'), supabase, { showSelf:true }); ratingView.setUnit(rankUnit); }
     if (name === 'settings') { applyPalette(selectedPalette); applyRankUnit(rankUnit); }
-    if (name === 'profile') updateProfileAppearance();
+    if (name === 'profile') {
+      updateProfileAppearance();
+      profileView = createProfileView($('page-profile'), supabase, { onLoaded(updated) { profile = updated; }, onSaved(updated, media) {
+        profile = updated; ratingView?.invalidate?.();
+        for (const id of ['member-game-frame','bot-game-frame']) $(id)?.contentWindow?.postMessage({type:'shahmat-profile-updated',username:updated.username,avatar:media.avatar}, window.location.origin);
+      } });
+    }
     if (name === 'game' || name === 'bot') {
       const frame = $(name === 'game' ? 'member-game-frame' : 'bot-game-frame');
       const ready = new Promise((resolve, reject) => {
@@ -318,6 +325,7 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
     $('page-loading')?.remove();
     $('member-game-frame')?.contentWindow?.postMessage({ type: name === 'game' ? 'shahmat-game-shown' : 'shahmat-game-hidden' }, window.location.origin);
     $('bot-game-frame')?.contentWindow?.postMessage({ type: name === 'bot' ? 'shahmat-bot-shown' : 'shahmat-bot-hidden' }, window.location.origin);
+    const profileWasHidden = $('page-profile')?.hidden;
     document.querySelectorAll('#dashboard-screen [data-view]').forEach(view => {
       const active = view.dataset.view === name;
       const changed = active && view.hidden;
@@ -331,6 +339,8 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
         view.classList.remove('page-enter'); void view.offsetWidth; view.classList.add('page-enter');
       }
     });
+    if (name === 'profile' && profileWasHidden) void profileView?.show(profile, appearanceUserId);
+    else if (name !== 'profile') profileView?.hide();
     if (name === 'rating') ratingView?.show(); else ratingView?.hide();
     if (name !== 'settings') { clearTimeout(rankInfoTimer); rankInfoPinned = false; showRankInfo(false); }
     document.querySelectorAll('#dashboard-screen [data-page]').forEach(link => {
@@ -820,6 +830,7 @@ document.querySelectorAll('.signout').forEach(button => button.addEventListener(
     // Discard account-specific views on logout.
     $('page-game')?.remove(); frameReady = null; $('page-bot')?.remove(); botFrameReady = null;
     ratingView?.destroy(); $('page-rating')?.remove(); ratingView = null;
+    profileView?.destroy(); $('page-profile')?.remove(); profileView = null;
     profile = null; applyPalette('monochrome'); applyTheme(null); applyRankUnit('yar'); $('auth-form').reset(); setMode('login');
     window.history.replaceState(null, '', '/');
     await show('auth-screen');

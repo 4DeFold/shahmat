@@ -13,7 +13,9 @@ const ui = createMemberGame({ document, opponentName: async gameId => {
   return error ? null : data;
 }, playerRatings: async gameId => {
   const { data, error } = await supabase.rpc('rank_game_players', { p_game:gameId });
-  return error ? null : data;
+  if(error||!Array.isArray(data)) return null;
+  try { const {data:avatars}=await supabase.rpc('profile_avatars',{p_names:data.map(row=>row.username).filter(Boolean)}); const byName=new Map((avatars||[]).map(row=>[row.username,row.avatar])); return data.map(row=>({...row,avatar:byName.get(row.username)||null})); }
+  catch { return data; }
 }, api: createMatchApi(supabase) });
 const updateOnline = createOnlineCounter(document);
 let stopOnline = null, stopHeartbeat = null;
@@ -23,7 +25,7 @@ let cachedId = null;
 try { cachedId = cachedUserId(window.localStorage); if (cachedId) { const local = JSON.parse(localStorage.getItem(`shahmat.appearance.${cachedId}`) || 'null'); const session = JSON.parse(localStorage.getItem('sb-eswyxbyddkajysogtglp-auth-token') || 'null'); ui.setRatingUnit(local?.rankUnit || session?.user?.user_metadata?.rank_unit); } } catch { /* Storage may be blocked. */ }
 startSessionMonitor({
   auth: supabase.auth, cachedId,
-  open: id => { void supabase.from('profiles').select('username').eq('id', id).maybeSingle().then(({data}) => ui.setPlayerName(data?.username)).catch(() => {}); if (window.parent === window && !stopOnline) { stopOnline = startOnlinePresence(supabase, id, updateOnline); stopHeartbeat = startMatchHeartbeat(supabase, window); } return ui.open(id); },
+  open: id => { void supabase.from('profiles').select('username').eq('id', id).maybeSingle().then(async ({data}) => { ui.setPlayerName(data?.username); if(data?.username) { const result=await supabase.rpc('profile_avatars',{p_names:[data.username]}); ui.setPlayerAvatar(result.data?.[0]?.avatar); } }).catch(() => {}); if (window.parent === window && !stopOnline) { stopOnline = startOnlinePresence(supabase, id, updateOnline); stopHeartbeat = startMatchHeartbeat(supabase, window); } return ui.open(id); },
   logout: () => { stopOnline?.(); stopHeartbeat?.(); ui.destroy(); document.getElementById('member-game').hidden = true; window.top.location.replace('/'); },
   accountChanged: () => { stopOnline?.(); stopHeartbeat?.(); ui.destroy(); document.getElementById('member-game').hidden = true; window.location.reload(); },
 });
@@ -33,6 +35,7 @@ ui.browserVisibility(!document.hidden);
 if (window.parent !== window) {
   window.addEventListener('message', event => {
     if (event.origin !== window.location.origin || event.source !== window.parent) return;
+    if (event.data?.type === 'shahmat-profile-updated') { ui.setPlayerName(event.data.username); ui.setPlayerAvatar(event.data.avatar); return; }
     if (event.data?.type === 'shahmat-rank-unit') { ui.setRatingUnit(event.data.value); return; }
     if (event.data?.type === 'shahmat-online') { updateOnline(event.data.count); return; }
     if (event.data?.type === 'shahmat-game-hidden') { ui.hide(); return; }

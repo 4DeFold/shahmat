@@ -342,7 +342,8 @@ async function restore(id) {
   } catch { game=null; status('Не удалось восстановить партию. Можно начать новую.'); }
 }
 showLevel(); draw(); startOrbit(); if(pageVisible) animateEntry(); $('bot-play').disabled=true;
-startSessionMonitor({auth:supabase.auth,cachedId:cachedUserId(localStorage),open:async id=>{ await restore(id); if(!destroyed) $('bot-play').disabled=false; },logout:()=>{ destroyed=true; ++generation; stopOrbit(); engine?.destroy(); store?.destroy(); clearInterval(timer); sound.destroy(); if(window.parent===window) location.replace('/'); },accountChanged:()=>location.reload()});
+function setPlayerAvatar(value) { const img=$('bot-player-avatar-image'), custom=typeof value==='string'&&value.startsWith('data:image/png;base64,'); img.src=custom?value:'/pieces/cburnett/wP.svg'; img.classList.toggle('custom-profile-avatar',custom); }
+startSessionMonitor({auth:supabase.auth,cachedId:cachedUserId(localStorage),open:async id=>{ void supabase.from('profile_media').select('avatar').eq('user_id',id).maybeSingle().then(({data})=>{if(!destroyed&&userId===id)setPlayerAvatar(data?.avatar);}).catch(()=>{}); await restore(id); if(!destroyed) $('bot-play').disabled=false; },logout:()=>{ destroyed=true; ++generation; stopOrbit(); engine?.destroy(); store?.destroy(); clearInterval(timer); sound.destroy(); if(window.parent===window) location.replace('/'); },accountChanged:()=>location.reload()});
 window.addEventListener('online',()=>store?.flush());
 // If Play is pressed during the entrance, continue from the current opacity
 // rather than letting a still-running entrance override the launch fade.
@@ -375,6 +376,7 @@ function animateEntry() {
 }
 window.addEventListener('message',event=>{
   if(event.origin!==location.origin || event.source!==window.parent) return;
+  if(event.data?.type==='shahmat-profile-updated') { setPlayerAvatar(event.data.avatar); return; }
   if(event.data?.type==='shahmat-bot-hidden') { pageVisible=false; stopOrbit(); return; }
   if(event.data?.type==='shahmat-bot-shown') { const wasHidden=!pageVisible; pageVisible=true; startOrbit(); if(wasHidden) animateEntry(); return; }
   if(event.data?.type!=='shahmat-appearance') return;

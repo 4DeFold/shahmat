@@ -60,3 +60,38 @@
 }
 @media (max-width:360px) { .profile-identity { align-items:start; }.profile-identity h3 { font-size:25px; }.profile-stat-card { min-height:150px; padding:15px; }.profile-card-label { font-size:9px; }.profile-stat-value { font-size:38px; } }
 @media (prefers-reduced-motion:reduce) { .profile-page.profile-enter .profile-reveal,.profile-banner-glow { animation:none; } }
+/* Editor controls are present only in edit mode; file inputs remain keyboard accessible. */
+.profile-file { position:absolute; width:1px; height:1px; opacity:0; overflow:hidden; }
+.profile-banner-image { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+.profile-upload-overlay { position:absolute; z-index:3; display:flex; align-items:center; justify-content:center; gap:8px; color:#111; background:#fff9; cursor:pointer; opacity:0; transition:opacity .2s ease; font:14px 'Charis SIL',serif; }
+.profile-upload-overlay[hidden] { display:none; }
+.profile-upload-overlay svg,.profile-edit-button svg { width:24px; height:24px; stroke:currentColor; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; }
+.profile-banner-upload { inset:0; }.profile-avatar-upload { inset:6px; border-radius:50%; }
+.profile-banner:hover .profile-upload-overlay,.profile-portrait:hover .profile-upload-overlay,.profile-banner:focus-within .profile-upload-overlay,.profile-portrait:focus-within .profile-upload-overlay { opacity:1; }
+.profile-portrait-inner img.profile-custom-avatar { width:100%; height:100%; object-fit:cover; filter:none; }
+.profile-rail-top { display:flex; justify-content:flex-end; }
+.profile-edit-button { display:grid; place-items:center; width:44px; height:44px; padding:10px; color:var(--foreground); border:1px solid var(--line); background:transparent; cursor:pointer; }
+.profile-edit-button:focus-visible,.profile-edit-actions button:focus-visible { outline:2px solid var(--foreground); outline-offset:2px; }
+.profile-rail-label { margin:12px 0 12px; }
+.profile-palette-card { width:100%; }
+.profile-identity-copy { flex:1; }
+.profile-identity-copy textarea { width:100%; max-width:480px; display:block; resize:vertical; padding:8px; border:1px solid var(--line); background:var(--page-background); color:var(--foreground); font:16px/1.4 'Charis SIL',serif; }
+.profile-identity-copy textarea[hidden] { display:none; }
+#profile-edit-name { min-height:45px; font:26px/1.1 'Playfair Display',serif; resize:none; }
+#profile-edit-bio { margin-top:8px; }
+.profile-section-line { padding:12px 0 0; margin-bottom:12px; }
+.profile-stat-value .profile-stat-number { font:inherit; letter-spacing:inherit; vertical-align:baseline; }
+.profile-edit-actions { margin-top:18px; }.profile-edit-actions[hidden] { display:none; }
+.profile-edit-help,.profile-edit-status { font:13px/1.5 'Charis SIL',serif; }
+.profile-edit-actions button { display:block; width:100%; min-height:44px; margin-top:8px; border:1px solid var(--foreground); background:var(--foreground); color:var(--page-background); font:16px 'Charis SIL',serif; cursor:pointer; }
+.profile-edit-actions #profile-discard { background:transparent; color:var(--foreground); }
+.profile-edit-actions button:disabled { opacity:.5; cursor:wait; }
+.profile-edit-status:empty { display:none; }
+@media (hover:none) { .profile-upload-overlay:not([hidden]) { opacity:.8; } }
+@media (prefers-reduced-motion:reduce) { .profile-upload-overlay { transition:none; } }
+
+.profile-edit-button[hidden] { display:none; }
+
+.profile-retry { padding:8px 12px; color:var(--foreground); border:1px solid var(--line); background:transparent; cursor:pointer; font:14px 'Charis SIL',serif; }
+.profile-retry[hidden] { display:none; }
+.profile-retry:focus-visible { outline:2px solid var(--foreground); outline-offset:2px; }

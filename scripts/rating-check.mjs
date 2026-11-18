@@ -4,6 +4,7 @@ const base=process.env.RESPONSIVE_BASE_URL || 'http://127.0.0.1:4174';
 const browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_EXECUTABLE_PATH ? {executablePath:process.env.CHROMIUM_EXECUTABLE_PATH} : {}),...(process.env.CHROMIUM_EXTRA_ARGS ? {args:process.env.CHROMIUM_EXTRA_ARGS.split(' ')} : {})});
 const user={id:'12345678-1234-1234-1234-123456789012',aud:'authenticated',role:'authenticated',user_metadata:{}};
 const token=['e30',Buffer.from(JSON.stringify({sub:user.id,exp:Math.floor(Date.now()/1000)+3600,role:'authenticated'})).toString('base64url'),'x'].join('.');
+const avatar='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aS/8AAAAASUVORK5CYII=';
 const session={access_token:token,token_type:'bearer',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,refresh_token:'mock',user};
 try {
   for (const viewport of [{width:280,height:800},{width:390,height:844},{width:800,height:900},{width:1440,height:900}]) {
@@ -15,6 +16,7 @@ try {
         const path=new URL(route.request().url()).pathname;
         if (path==='/auth/v1/user') return route.fulfill({json:user});
         if (path==='/rest/v1/profiles') return route.fulfill({json:{username:'Player',bio:'',palette:'monochrome'}});
+        if (path==='/rest/v1/rpc/profile_avatars') return route.fulfill({json:[{username:'Player_One',avatar}]});
         if (path==='/rest/v1/rpc/rank_leaderboard') {
           const mode=route.request().postDataJSON().p_mode; modes.push(mode);
           return route.fulfill({json:[{username:'Player_One',yar:mode==='rapid'?1250:1100,ranked:true},{username:'New_Player',yar:1000,ranked:false}]});
@@ -27,6 +29,8 @@ try {
       assert.ok(rating.y>=play.y+play.height-1,'rating follows play');
       await page.locator('#nav-rating').click(); await page.locator('#page-rating').waitFor({state:'visible'});
       await page.locator('.rating-row').first().waitFor();
+      await page.locator('.rating-row .rating-avatar.has-custom-avatar').first().waitFor();
+      assert.equal(await page.locator('.rating-row .rating-avatar').first().getAttribute('src'),avatar);
       assert.equal(new URL(page.url()).pathname,'/rating');
       assert.equal(await page.locator('.rating-score').first().innerText(),'1 100');
       await page.waitForFunction(() => { const el=document.querySelector('.rating-indicator.is-ready'); return el && Number(getComputedStyle(el).opacity)>0; });

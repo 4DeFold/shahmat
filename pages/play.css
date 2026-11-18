@@ -97,3 +97,5 @@ body.demo-page .new-game { transition: opacity .2s ease, transform .3s cubic-bez
 body.demo-page .status-card { position: relative; isolation: isolate; overflow: hidden; }
 body.demo-page .status-card::before { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(160px circle at var(--spot-x, 50%) var(--spot-y, 50%), color-mix(in srgb, var(--ink) 10%, transparent), transparent 75%); }
 .demo-spark { position: fixed; z-index: 1000; width: 6px; height: 1.5px; background: var(--ink); pointer-events: none; }
+
+.avatar img.custom-profile-avatar { width:100%; height:100%; object-fit:cover; border-radius:inherit; }

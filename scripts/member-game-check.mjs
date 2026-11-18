@@ -8,6 +8,7 @@ const browser = await chromium.launch({ headless: true,
   ...(process.env.CHROMIUM_EXTRA_ARGS ? { args: process.env.CHROMIUM_EXTRA_ARGS.split(' ') } : {}),
 });
 const user = { id:'12345678-1234-1234-1234-123456789012', email:'test@example.com', aud:'authenticated', role:'authenticated', user_metadata:{} };
+const avatar='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aS/8AAAAASUVORK5CYII=';
 let snapshot = null;
 try {
   const page = await browser.newPage({ viewport:{ width:390, height:844 }, reducedMotion:'reduce' });
@@ -19,6 +20,8 @@ try {
     }
     if (path === '/auth/v1/user') return route.fulfill({ json:user });
     if (path === '/rest/v1/profiles') return route.fulfill({ json:{ username:'Player', bio:'', palette:'monochrome' } });
+    if (path === '/rest/v1/rpc/rank_game_players') return route.fulfill({json:[{player:'self',username:'Player',yar:1000},{player:'opponent',username:'Friend',yar:1000}]});
+    if (path === '/rest/v1/rpc/profile_avatars') return route.fulfill({json:[{username:'Player',avatar},{username:'Friend',avatar}]});
     if (path === '/functions/v1/matchplay') {
       const body = JSON.parse(request.postData());
       if (body.action === 'heartbeat') return route.fulfill({json:{ok:true}});
@@ -55,6 +58,8 @@ try {
   assert.equal(await game.locator('#player-clock').getAttribute('aria-label'), '03:00');
   await game.locator('#start-search').click();
   await game.locator('#status').filter({ hasText:'Ваш ход' }).waitFor();
+  await game.locator('#player-avatar-image.custom-profile-avatar').waitFor(); await game.locator('#opponent-avatar-image.custom-profile-avatar').waitFor();
+  assert.equal(await game.locator('#player-avatar-image').getAttribute('src'),avatar); assert.equal(await game.locator('#opponent-avatar-image').getAttribute('src'),avatar);
   assert.equal(await game.locator('#mode-picker').getAttribute('aria-hidden'), 'true');
   assert.equal(await game.locator('#mode-picker').evaluate(el => el.getBoundingClientRect().height), 0);
   assert.equal(await game.locator('#mode-summary').innerText(), 'Блиц · 3 мин');

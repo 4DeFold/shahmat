@@ -79,7 +79,7 @@ test('registration requires a profile, saves chosen palette and opens dashboard'
   await choose('onboarding-palettes', 'atelier'); assert.equal(document.querySelector('.landing').dataset.palette, 'atelier');
   await submit('palette-form'); assert.equal(getMetadata().palette, 'atelier');
   assert.equal($('dashboard-screen').hidden, false);
-  assert.ok($('page-profile').textContent.includes('Тихий игрок')); assert.equal(getMetadata().palette, 'atelier');
+  assert.ok($('page-profile').querySelector('#profile-edit-button')); assert.equal(getMetadata().palette, 'atelier');
   assert.equal($('dashboard-screen').hidden, false);
   await choose('dashboard-palettes', 'wood'); assert.equal(getMetadata().palette, 'wood');
   $('dashboard-screen').querySelector('.signout').click(); await tick();
@@ -90,7 +90,7 @@ test('registration requires a profile, saves chosen palette and opens dashboard'
 
 test('existing session opens dashboard with saved palette', async () => {
   const { $, document } = await setup({ existing: true, palette: 'forest' });
-  assert.equal($('dashboard-screen').hidden, false); assert.ok($('page-profile').textContent.includes('Тихий игрок'));
+  assert.equal($('dashboard-screen').hidden, false); assert.ok($('page-profile').querySelector('#profile-edit-button'));
   assert.equal(document.querySelector('.landing').dataset.palette, 'forest');
 });
 
@@ -283,9 +283,9 @@ test('background sync refuses to save with a different account session', async (
 });
 
 
-test('profile demo keeps stored profile untouched and reflects the active appearance', async () => {
+test('profile markup keeps stored profile untouched and reflects the active appearance', async () => {
   const { $, getProfile, choose, changeSystemTheme } = await setup({ existing: true });
-  assert.ok($('page-profile').textContent.includes('Тихий игрок'));
+  assert.ok($('page-profile').querySelector('#profile-edit-button'));
   assert.equal(getProfile().username, 'Player');
   assert.equal($('profile-palette-name').textContent, 'Монохром');
   assert.ok($('profile-palette-swatch').classList.contains('monochrome'));
@@ -320,7 +320,7 @@ test('sidebar navigates between pages, moves the dashboard to profile and return
     pageButton(name).click(); await tick();
     assert.equal($(`page-${name}`).hidden, false);
     if (name === 'profile') {
-      assert.ok($('page-profile').textContent.includes('Тихий игрок'));
+      assert.ok($('page-profile').querySelector('#profile-edit-button'));
     }
     assert.equal($('account-menu').hidden, true);
     assert.equal(window.location.pathname, `/${name}`);
