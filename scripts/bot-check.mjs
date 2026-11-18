@@ -43,6 +43,7 @@ try {
    const before=await frame.locator('.orbit-board').first().getAttribute('style'); await page.waitForTimeout(250);
    assert.notEqual(await frame.locator('.orbit-board').first().getAttribute('style'),before,'boards orbit');
    assert.match(before,/rotate\(/,'boards turn along the orbit');
+   assert.equal(await frame.locator('#orbit-stage .bot-glow').evaluate(el=>getComputedStyle(el).animationName),'bot-glow','glow remains animated');
    for(let sample=0;sample<6;sample++) {
     const escaped=await frame.locator('#orbit-stage').evaluate(stage=>{const bounds=document.querySelector('.bot-stage').getBoundingClientRect();return [...stage.querySelectorAll('.orbit-board')].some(board=>{const r=board.getBoundingClientRect();return r.left<bounds.left-1||r.right>bounds.right+1;});});
     assert.equal(escaped,false,'rotated boards stay clear of both rails'); await page.waitForTimeout(100);
@@ -85,7 +86,7 @@ try {
     const visible=el=>!!el && getComputedStyle(el).visibility==='visible' && Number(getComputedStyle(el).opacity)>.95;
     const flyer=document.querySelector('.fly-board'), live=document.querySelector('#target-board'), wrap=document.querySelector('#bot-board-wrap');
     const mini=[...document.querySelectorAll('.orbit-board > .board-frame')].some(el=>visible(el) && visible(el.parentElement));
-    if(phase==='launching'||phase==='playing'||phase==='returning') window.motionSamples.push({phase,fly:visible(flyer),live:visible(live)&&visible(wrap),mini,body:Number(getComputedStyle(document.body).opacity)});
+    if(phase==='launching'||phase==='playing'||phase==='returning') window.motionSamples.push({phase,fly:visible(flyer),live:visible(live)&&visible(wrap),mini,orbit:getComputedStyle(document.querySelector('#orbit-slot')).display,body:Number(getComputedStyle(document.body).opacity)});
     if(phase==='choose'&&previous==='returning') return; previous=phase; requestAnimationFrame(sample);
    }; requestAnimationFrame(sample);
   });
@@ -95,6 +96,9 @@ try {
   await frame.locator('#bot-app[data-phase=playing]').waitFor({timeout:12000});
   if(destination) { const live=await frame.locator('#target-board').boundingBox(); for(const key of ['x','y','width','height']) assert.ok(Math.abs(destination[key]-live[key])<2,`board arrival has stable ${key}`); }
   assert.equal(await frame.locator('#board .square').count(),64); assert.equal(await frame.locator('#resign-wrap').getAttribute('aria-hidden'),'true');
+  assert.equal(await frame.locator('#orbit-slot').evaluate(el=>getComputedStyle(el).display),'none','all orbit boards remain absent after landing');
+  await page.waitForTimeout(700);
+  assert.equal(await frame.locator('#orbit-stage .orbit-board').first().evaluate(el=>el.getClientRects().length),0,'inline child visibility cannot reveal the background boards');
   await frame.locator('[data-square=e2]').click(); await frame.locator('[data-square=e4]').click();
   await frame.locator('#status').getByText(/Ваш ход/).waitFor({timeout:30000});
   await page.waitForFunction(()=>JSON.parse(localStorage.getItem('shahmat.bot-games.v1.12345678-1234-1234-1234-123456789012'))?.current?.moves?.length===2,{timeout:30000});
@@ -103,25 +107,41 @@ try {
    const samples=await frame.locator('#bot-app').evaluate(()=>window.motionSamples);
    assert.ok(samples.some(s=>s.phase==='playing'),'board handoff was sampled');
    assert.ok(samples.filter(s=>s.phase==='playing').every(s=>s.fly||s.live),'no empty frame at arrival');
+   assert.ok(samples.filter(s=>s.phase==='playing').every(s=>s.orbit==='none'),'no background orbit after arrival, even for one frame');
    assert.ok(samples.every(s=>s.body===1),'the page never flashes its opacity');
   }
   await page.reload(); await page.locator('#page-bot').waitFor({state:'visible'}); await frame.locator('#bot-app[data-phase=playing]').waitFor({timeout:20000});
   assert.ok((await frame.locator('#move-list').innerText()).includes('e4'),'active game restored after reload');
   if(reducedMotion==='no-preference') await frame.locator('#bot-app').evaluate(()=>{
    window.returnSamples=[];
-   const sample=()=>{const shell=document.querySelector('#bot-app'), phase=shell.dataset.phase;
-    const visible=el=>!!el && getComputedStyle(el).visibility==='visible' && Number(getComputedStyle(el).opacity)>.95;
-    const flyer=document.querySelector('.fly-board'), mini=[...document.querySelectorAll('.orbit-board > .board-frame')].some(el=>visible(el)&&visible(el.parentElement));
-    if(phase==='returning') window.returnSamples.push({fly:visible(flyer),mini,body:Number(getComputedStyle(document.body).opacity)});
+   const sample=()=>{const shell=document.querySelector('#bot-app'), phase=shell.dataset.phase, flyer=document.querySelector('.fly-board');
+    if(phase==='returning') {
+     const rect=flyer?.getBoundingClientRect();
+     window.returnSamples.push({fly:!!flyer, top:rect?.top, width:rect?.width, opacity:flyer?Number(getComputedStyle(flyer).opacity):0, transform:flyer?getComputedStyle(flyer).transform:'', orbit:getComputedStyle(document.querySelector('#orbit-slot')).display, body:Number(getComputedStyle(document.body).opacity)});
+    }
     if(phase==='returning'||(phase==='playing'&&!window.returnSamples.length)) requestAnimationFrame(sample);
    }; requestAnimationFrame(sample);
   });
   page.once('dialog',d=>d.accept()); await frame.locator('#return-button').click();
   if(reducedMotion==='no-preference') { await frame.locator('#bot-app[data-phase=returning]').waitFor(); await frame.locator('.fly-board .board').waitFor(); assert.equal(await frame.locator('#target-board').evaluate(el=>getComputedStyle(el).visibility),'hidden'); }
   await frame.locator('#bot-app[data-phase=choose]').waitFor({timeout:10000});
-  if(reducedMotion==='no-preference') { const samples=await frame.locator('#bot-app').evaluate(()=>window.returnSamples); assert.ok(samples.length>0); assert.ok(samples.every(s=>s.fly||s.mini),'no empty frame during return'); assert.ok(samples.every(s=>s.body===1),'no full-page opacity flash during return'); }
+  if(reducedMotion==='no-preference') { const samples=await frame.locator('#bot-app').evaluate(()=>window.returnSamples); assert.ok(samples.length>0); assert.ok(samples.every(s=>s.fly && s.orbit==='none'),'only the departing board is shown during return'); assert.ok(samples.at(-1).width<samples[0].width*.3,'board shrinks during exit'); assert.ok(samples.at(-1).top<samples[0].top,'board moves upward'); assert.notEqual(samples.at(-1).transform,samples[0].transform,'board rotates during exit'); assert.ok(samples.every(s=>s.body===1),'no full-page opacity flash during return'); }
   await page.waitForFunction(()=>JSON.parse(localStorage.getItem('shahmat.bot-games.v1.12345678-1234-1234-1234-123456789012')).current.status==='abandoned');
   assert.deepEqual(errors,[]); await page.close();
+ }
+ // The ceiling gradient follows the actual active palette and light/dark mode.
+ {
+  const p=await browser.newPage({viewport:{width:1100,height:800},reducedMotion:'reduce'});
+  await p.addInitScript(value=>localStorage.setItem('sb-eswyxbyddkajysogtglp-auth-token',JSON.stringify(value)),session);
+  await p.route('https://eswyxbyddkajysogtglp.supabase.co/**',route=>{const path=new URL(route.request().url()).pathname;return route.fulfill({json:path==='/auth/v1/user'?user:path==='/rest/v1/profiles'?{username:'Alice',bio:'',palette:'forest'}:path==='/rest/v1/bot_games'?[]:{game:null}});});
+  await p.goto(`${base}/bot`); const f=p.frameLocator('#bot-game-frame'); await f.locator('#bot-play:not([disabled])').waitFor();
+  for(const [palette,theme,hex,rgb] of [['forest','dark','#26362e','38, 54, 46'],['wood','light','#ede0d4','237, 224, 212'],['monochrome','dark','#000','0, 0, 0'],['monochrome','light','#fff','255, 255, 255']]) {
+   await p.evaluate(({palette,theme})=>{const landing=document.querySelector('.landing'); landing.dataset.palette=palette;landing.dataset.paletteTheme=theme;},{palette,theme});
+   await p.waitForFunction(hex=>document.querySelector('#bot-game-frame').contentDocument.documentElement.style.getPropertyValue('--bg').trim()===hex,hex);
+   const gradient=await f.locator('.bot-stage').evaluate(el=>getComputedStyle(el,'::after').backgroundImage);
+   assert.ok(gradient.includes(rgb),`${palette} ${theme} uses its palette extreme: ${gradient}`);
+  }
+  await p.close();
  }
  // A completed puzzle fades its pieces, then a different position fades in.
  {

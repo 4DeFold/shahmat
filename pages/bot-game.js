@@ -173,7 +173,7 @@ function setPhase(value) {
   showcase.inert=inGame||value==='launching'||value==='returning'; showcase.setAttribute('aria-hidden',String(inGame||value==='launching'||value==='returning'));
   $('bot-board-wrap').inert=!inGame; $('bot-board-wrap').setAttribute('aria-hidden',String(!inGame));
   for(const id of ['bot-actions','moves']) { $(id).inert=!inGame; $(id).setAttribute('aria-hidden',String(!inGame)); }
-  if(inGame) stopOrbit(); else startOrbit();
+  if(inGame || value==='returning') stopOrbit(); else startOrbit();
 }
 function draw(move=null) {
   const legal=selected?chess.moves({square:selected,verbose:true}).map(m=>m.to):[];
@@ -257,24 +257,20 @@ async function returnToSelection() {
   reveal('promotion',false); reveal('retry-wrap',false); promotion=null;
   const target=$('target-board');
   if(!motion.matches && pageVisible && !document.hidden && target.animate) {
-    const scene=stages[level], chosen=scene.demos[0];
-    setPhase('returning'); stopOrbit(); orbitAngle=Math.PI/2; orbitSpeed=0; carouselPosition=level; carouselVelocity=0; positionOrbit();
-    for(const item of scene.demos) item.wrapper.style.visibility='hidden';
-    const restoreMiniature=putBoardInOrbit(chosen,target);
-    const from=target.getBoundingClientRect(), to=chosen.wrapper.getBoundingClientRect();
-    const flyer=cleanBoardClone(target); flyer.classList.add('fly-board');
-    const dx=to.left+to.width/2-(from.left+from.width/2), dy=to.top+to.height/2-(from.top+from.height/2), scale=chosen.wrapper.offsetWidth/from.width;
+    setPhase('returning');
+    const from=target.getBoundingClientRect(), flyer=cleanBoardClone(target);
+    flyer.classList.add('fly-board');
     Object.assign(flyer.style,{left:`${from.left}px`,top:`${from.top}px`,width:`${from.width}px`,height:`${from.height}px`});
     document.body.append(flyer); target.style.visibility='hidden';
-    const animation=await holdAnimation(flyer,[{transform:'translate(0,0) rotate(0deg) scale(1)'},{transform:`translate(${dx}px,${dy}px) rotate(0deg) scale(${scale})`}],{duration:1250,easing:'cubic-bezier(.65,0,.35,1)'});
-    if(current!==generation || destroyed) { animation?.cancel(); flyer.remove(); target.style.visibility=''; restoreMiniature(); for(const item of scene.demos) item.wrapper.style.visibility=''; return; }
-    // The orbit copy is an exact scaled clone at the same position. Exchange
-    // it in one paint, then carry it behind the top edge before replacing it.
-    chosen.wrapper.style.visibility=''; flyer.remove(); animation?.cancel();
-    orbitSpeed=2.4; startOrbit();
-    const started=performance.now();
-    while(current===generation && !destroyed && pageVisible && !document.hidden && !motion.matches && performance.now()-started<4000 && chosen.wrapper.getBoundingClientRect().bottom>showcase.getBoundingClientRect().top) await wait(16);
-    restoreMiniature(); for(const item of scene.demos) item.wrapper.style.visibility=''; target.style.visibility='';
+    // One continuous flight: the existing game board shrinks, turns and leaves
+    // above the page. No miniature or orbit is shown until the flight ends.
+    const upward=from.top+from.height/2+from.width*.12+32;
+    const animation=await holdAnimation(flyer,[
+      {offset:0,transform:'translateY(0) rotate(0deg) scale(1)',opacity:1},
+      {offset:.45,transform:`translateY(${-from.height*.18}px) rotate(-105deg) scale(.56)`,opacity:1},
+      {offset:1,transform:`translateY(${-upward}px) rotate(-300deg) scale(.10)`,opacity:0},
+    ],{duration:1450,easing:'cubic-bezier(.45,0,.55,1)'});
+    animation?.cancel(); flyer.remove(); target.style.visibility='';
     if(current!==generation || destroyed) return;
   }
   game=null; chess=new Chess(); selected=null; last=null; setPhase('choose'); status('');
