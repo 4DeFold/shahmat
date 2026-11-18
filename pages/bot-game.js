@@ -4,6 +4,7 @@ import { createMemberBoard } from './member-board.js';
 import { createGameSound } from './game-sound.js';
 import { createStockfish, BOT_LEVELS } from './stockfish-engine.js';
 import { createBotStorage } from './bot-storage.js';
+import { BOT_DEMO_SCENARIOS as scenarios } from './bot-demo-scenarios.js';
 import { cachedUserId, startSessionMonitor } from './member-session.js';
 import './game-theme.js';
 
@@ -20,32 +21,36 @@ let pageVisible=window.parent===window, orbitFrame=null, orbitAngle=0, orbitSpee
 const status=text=>{ if ($('status').textContent!==text) $('status').textContent=text; };
 function reveal(id, open) { const el=$(id); if (el.classList.contains('is-open')===open) return; el.classList.toggle('is-open',open); el.inert=!open; el.setAttribute('aria-hidden',String(!open)); }
 const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-const runAnimation=(el, frames, options)=>{
-  if(motion.matches || !el.animate) return Promise.resolve();
-  const animation=el.animate(frames,options);
-  return animation.finished.catch(()=>{}).finally(()=>animation.cancel());
-};
+// Keep the final frame on screen until the identical real board takes over.
+async function holdAnimation(el,frames,options) {
+  if(motion.matches || !el.animate) return null;
+  const animation=el.animate(frames,{...options,fill:'forwards'});
+  await animation.finished.catch(()=>{}); return animation;
+}
+const nextFrame=()=>new Promise(resolve=>requestAnimationFrame(resolve));
+function cleanBoardClone(source) {
+  const clone=source.cloneNode(true); clone.removeAttribute('id'); clone.querySelectorAll('[id]').forEach(el=>el.removeAttribute('id'));
+  clone.inert=true; clone.setAttribute('aria-hidden','true'); return clone;
+}
+function putBoardInOrbit(demo, source) {
+  const original=[...demo.wrapper.childNodes], previousPadding=demo.wrapper.style.padding, previousShadow=demo.wrapper.style.boxShadow;
+  const rect=source.getBoundingClientRect(), miniature=cleanBoardClone(source);
+  Object.assign(miniature.style,{position:'absolute',left:'0',top:'0',width:`${rect.width}px`,height:`${rect.height}px`,transformOrigin:'top left',transform:`scale(${demo.wrapper.offsetWidth/rect.width})`});
+  demo.wrapper.style.padding='0'; demo.wrapper.style.boxShadow='none'; demo.wrapper.replaceChildren(miniature);
+  return ()=>{ demo.wrapper.replaceChildren(...original); demo.wrapper.style.padding=previousPadding; demo.wrapper.style.boxShadow=previousShadow; };
+}
 
-// Real, legal demonstration positions: opening play, check, mate and stalemate.
-const scenarios=[
- {moves:['e4','e5','Nf3','Nc6','Bc4','Nf6','d3','Bc5']},
- {moves:['d4','d5','c4','e6','Nc3','Nf6','Bg5','Be7']},
- {fen:'7k/5Q2/6K1/8/8/8/8/8 w - - 0 1',moves:['Qg7#']},
- {moves:['e4','e5','Bc4','Nc6','Qh5','Nf6','Qxf7#']},
- {fen:'7k/8/5KQ1/8/8/8/8/8 w - - 0 1',moves:['Qf7']},
- {moves:['e4','f5','Qh5+','g6','Qxf5','Nf6']},
- {moves:['e4','c5','Nf3','d6','d4','cxd4','Nxd4','Nf6']},
- {moves:['e4','e5','Qh5','Nc6','Bc4','Nf6','Qxf7#']},
-];
+// Real, legal demonstration positions: openings, check, mate and stalemate.
 function createDemo(spec,index) {
   const wrapper=document.createElement('div'); wrapper.className='orbit-board'; wrapper.dataset.index=String(index);
   const grid=document.createElement('div'); grid.className='mini-grid'; wrapper.append(grid);
   const cells=new Map();
   for(let rank=8;rank>=1;rank--) for(let f=0;f<8;f++) { const square='abcdefgh'[f]+rank; const cell=document.createElement('div'); cell.className=`mini-square ${(rank+f)%2?'dark':'light'}`; cells.set(square,cell); grid.append(cell); }
   const label=document.createElement('span'); label.className='mini-label'; label.hidden=true; wrapper.append(label); $('orbit-boards').append(wrapper);
-  return {wrapper,cells,label,spec,chess:new Chess(spec.fen),step:0,nextTick:500+Math.random()*2200};
+  wrapper.dataset.scenario=String(index);
+  return {wrapper,cells,label,spec,scenarioIndex:index,chess:new Chess(spec.fen),step:0,resetting:false,nextTick:500+Math.random()*2200};
 }
-const demos=scenarios.map(createDemo);
+const demos=scenarios.slice(0,8).map(createDemo);
 function renderDemo(demo,move=null) {
   for(const [square,cell] of demo.cells) {
     const p=demo.chess.get(square); cell.classList.toggle('last',!!move && (move.from===square || move.to===square));
@@ -65,9 +70,22 @@ function renderDemo(demo,move=null) {
   }
 }
 for(const demo of demos) renderDemo(demo);
+async function nextDemo(demo) {
+  if(demo.resetting) return;
+  demo.resetting=true;
+  // Keep the board itself in place: only the pieces and result fade away.
+  if(!motion.matches) { demo.wrapper.classList.add('demo-clearing'); await wait(500); }
+  demo.scenarioIndex=(demo.scenarioIndex+8)%scenarios.length;
+  demo.spec=scenarios[demo.scenarioIndex]; demo.chess=new Chess(demo.spec.fen); demo.step=0; demo.wrapper.dataset.scenario=String(demo.scenarioIndex);
+  renderDemo(demo);
+  if(!motion.matches) { await new Promise(resolve=>requestAnimationFrame(resolve)); demo.wrapper.classList.remove('demo-clearing'); }
+  demo.resetting=false;
+}
 function stepDemo(demo) {
-  if(demo.step>=demo.spec.moves.length) { demo.chess=new Chess(demo.spec.fen); demo.step=0; renderDemo(demo); }
-  else { try { const move=demo.chess.move(demo.spec.moves[demo.step++]); renderDemo(demo,move); } catch { demo.chess=new Chess(demo.spec.fen); demo.step=0; renderDemo(demo); } }
+  if(demo.resetting) return;
+  if(demo.step>=demo.spec.moves.length) { void nextDemo(demo); return; }
+  try { const move=demo.chess.move(demo.spec.moves[demo.step++]); renderDemo(demo,move); }
+  catch { void nextDemo(demo); }
 }
 // Every level occupies a fixed slot on one shared moving track. A spring moves
 // the entire track; even rapid reversals can never collapse the distance between
@@ -81,13 +99,22 @@ for(let i=1;i<BOT_LEVELS.length;i++) {
   const items=[...node.querySelectorAll('.orbit-board')].map((wrapper,index)=>{
     const cells=new Map(), squares=wrapper.querySelectorAll('.mini-square'); let k=0;
     for(let rank=8;rank>=1;rank--) for(let f=0;f<8;f++) cells.set('abcdefgh'[f]+rank,squares[k++]);
-    const demo={wrapper,cells,label:wrapper.querySelector('.mini-label'),spec:scenarios[index],chess:new Chess(scenarios[index].fen),step:0,nextTick:500+Math.random()*2200};
+    const demo={wrapper,cells,label:wrapper.querySelector('.mini-label'),spec:scenarios[index],scenarioIndex:index,chess:new Chess(scenarios[index].fen),step:0,resetting:false,nextTick:500+Math.random()*2200};
     renderDemo(demo); return demo;
   });
   stages.push({node,demos:items});
 }
 function positionStage(scene) {
-  const {node,demos:items}=scene, rx=node.clientWidth*.39, ry=node.clientHeight*.39;
+  const {node,demos:items}=scene, width=node.clientWidth;
+  if(scene.layoutWidth!==width) {
+    scene.layoutWidth=width;
+    // Exact worst-case rotated square bounds at every orbit angle. This brings
+    // the path close to both rails without letting any corner cross them.
+    const half=items[0].wrapper.offsetWidth/2, limit=Math.max(0,width/2-6);
+    scene.radius=Math.max(0,Math.sqrt(Math.max(0,limit*limit-half*half))-half);
+    node.style.setProperty('--orbit-radius',`${scene.radius}px`);
+  }
+  const rx=scene.radius, ry=scene.radius;
   items.forEach((demo,i)=>{
     const angle=orbitAngle+i*Math.PI/4, x=Math.cos(angle)*rx, y=Math.sin(angle)*ry;
     // The bottom (white/player side) points radially away from the figure.
@@ -108,7 +135,7 @@ function positionOrbit() {
 function animateOrbit(t) {
   orbitFrame=null; if(!pageVisible || document.hidden || destroyed || phase==='playing' || phase==='finished' || motion.matches) return;
   const dt=lastFrame ? Math.min((t-lastFrame)/1000,.05):0; lastFrame=t;
-  const target=phase==='launching'?5.8:.25; orbitSpeed+=(target-orbitSpeed)*Math.min(1,dt*(phase==='launching'?3:1.4)); orbitAngle+=orbitSpeed*dt;
+  const target=(phase==='launching'||phase==='returning')?5.8:.25; orbitSpeed+=(target-orbitSpeed)*Math.min(1,dt*((phase==='launching'||phase==='returning')?3:1.4)); orbitAngle+=orbitSpeed*dt;
   // Critically damped spring, shared by all scenes (no per-item easing).
   carouselVelocity+=(level-carouselPosition)*55*dt; carouselVelocity*=Math.exp(-15*dt); carouselPosition+=carouselVelocity*dt;
   if(Math.abs(level-carouselPosition)<.0005 && Math.abs(carouselVelocity)<.002) { carouselPosition=level; carouselVelocity=0; }
@@ -120,7 +147,7 @@ function animateOrbit(t) {
   }
   orbitFrame=requestAnimationFrame(animateOrbit);
 }
-function startOrbit() { positionOrbit(); lastFrame=0; if(pageVisible && !document.hidden && !motion.matches && orbitFrame===null && (phase==='choose'||phase==='launching')) orbitFrame=requestAnimationFrame(animateOrbit); }
+function startOrbit() { positionOrbit(); lastFrame=0; if(pageVisible && !document.hidden && !motion.matches && orbitFrame===null && (phase==='choose'||phase==='launching'||phase==='returning')) orbitFrame=requestAnimationFrame(animateOrbit); }
 function stopOrbit() { if(orbitFrame!==null) cancelAnimationFrame(orbitFrame); orbitFrame=null; lastFrame=0; }
 window.addEventListener('resize',positionOrbit);
 motion.addEventListener('change',()=>{ stopOrbit(); if(motion.matches) { carouselPosition=level; carouselVelocity=0; } startOrbit(); });
@@ -143,7 +170,7 @@ function switchLevel(next) {
 $('bot-prev').addEventListener('click',()=>switchLevel(level-1)); $('bot-next').addEventListener('click',()=>switchLevel(level+1));
 function setPhase(value) {
   phase=value; shell.dataset.phase=value; const inGame=value==='playing'||value==='finished';
-  showcase.inert=inGame||value==='launching'; showcase.setAttribute('aria-hidden',String(inGame||value==='launching'));
+  showcase.inert=inGame||value==='launching'||value==='returning'; showcase.setAttribute('aria-hidden',String(inGame||value==='launching'||value==='returning'));
   $('bot-board-wrap').inert=!inGame; $('bot-board-wrap').setAttribute('aria-hidden',String(!inGame));
   for(const id of ['bot-actions','moves']) { $(id).inert=!inGame; $(id).setAttribute('aria-hidden',String(!inGame)); }
   if(inGame) stopOrbit(); else startOrbit();
@@ -221,23 +248,49 @@ $('toggle-moves').addEventListener('click',()=>{ const toggle=$('toggle-moves'),
 $('resign-button').addEventListener('click',()=>{ if(resignAvailable()) $('resign-dialog').showModal(); });
 $('resign-cancel').addEventListener('click',()=>$('resign-dialog').close());
 $('resign-confirm').addEventListener('click',()=>{ $('resign-dialog').close(); if(!resignAvailable()) return; ++generation; engine?.destroy(); engine=null; thinking=false; game.status='black_win'; snapshot(); setPhase('finished'); status('Вы сдались. ЯР не изменился.'); updateResign(); });
-$('return-button').addEventListener('click',()=>{
+$('return-button').addEventListener('click',()=>void returnToSelection());
+async function returnToSelection() {
+  if(phase!=='playing' && phase!=='finished') return;
   if(phase==='playing' && !confirm('Вернуться к выбору? Текущая партия будет завершена.')) return;
-  ++generation; engine?.destroy(); engine=null; thinking=false;
+  const current=++generation; engine?.destroy(); engine=null; thinking=false;
   if(game?.status==='active') { game.status='abandoned'; snapshot(); }
-  game=null; chess=new Chess(); selected=null; last=null; promotion=null; reveal('promotion',false); reveal('retry-wrap',false); setPhase('choose'); status('');
-});
+  reveal('promotion',false); reveal('retry-wrap',false); promotion=null;
+  const target=$('target-board');
+  if(!motion.matches && pageVisible && !document.hidden && target.animate) {
+    const scene=stages[level], chosen=scene.demos[0];
+    setPhase('returning'); stopOrbit(); orbitAngle=Math.PI/2; orbitSpeed=0; carouselPosition=level; carouselVelocity=0; positionOrbit();
+    for(const item of scene.demos) item.wrapper.style.visibility='hidden';
+    const restoreMiniature=putBoardInOrbit(chosen,target);
+    const from=target.getBoundingClientRect(), to=chosen.wrapper.getBoundingClientRect();
+    const flyer=cleanBoardClone(target); flyer.classList.add('fly-board');
+    const dx=to.left+to.width/2-(from.left+from.width/2), dy=to.top+to.height/2-(from.top+from.height/2), scale=chosen.wrapper.offsetWidth/from.width;
+    Object.assign(flyer.style,{left:`${from.left}px`,top:`${from.top}px`,width:`${from.width}px`,height:`${from.height}px`});
+    document.body.append(flyer); target.style.visibility='hidden';
+    const animation=await holdAnimation(flyer,[{transform:'translate(0,0) rotate(0deg) scale(1)'},{transform:`translate(${dx}px,${dy}px) rotate(0deg) scale(${scale})`}],{duration:1250,easing:'cubic-bezier(.65,0,.35,1)'});
+    if(current!==generation || destroyed) { animation?.cancel(); flyer.remove(); target.style.visibility=''; restoreMiniature(); for(const item of scene.demos) item.wrapper.style.visibility=''; return; }
+    // The orbit copy is an exact scaled clone at the same position. Exchange
+    // it in one paint, then carry it behind the top edge before replacing it.
+    chosen.wrapper.style.visibility=''; flyer.remove(); animation?.cancel();
+    orbitSpeed=2.4; startOrbit();
+    const started=performance.now();
+    while(current===generation && !destroyed && pageVisible && !document.hidden && !motion.matches && performance.now()-started<4000 && chosen.wrapper.getBoundingClientRect().bottom>showcase.getBoundingClientRect().top) await wait(16);
+    restoreMiniature(); for(const item of scene.demos) item.wrapper.style.visibility=''; target.style.visibility='';
+    if(current!==generation || destroyed) return;
+  }
+  game=null; chess=new Chess(); selected=null; last=null; setPhase('choose'); status('');
+  if(pageVisible && !document.hidden) animateEntry();
+}
 $('retry-bot').addEventListener('click',()=>{ reveal('retry-wrap',false); void botMove(); });
 async function launch() {
   if(phase!=='choose'||!userId||!store) return;
   sound.prime(); const current=++generation;
   game={id:crypto.randomUUID(),level:level+1,moves:[],status:'active',started_at:new Date().toISOString(),updated_at:new Date().toISOString()};
   chess=new Chess(); selected=null; last=null; draw(); history(); snapshot();
-  setPhase('launching'); status('Готовим доску…');
+  fadeEntryIntoLaunch(); setPhase('launching'); status('Готовим доску…');
   if(!motion.matches) {
-    const scene=stages[level]; let chosen=null, original=null, previousPadding='', previousShadow='';
+    const scene=stages[level]; let chosen=null, restoreBoard=null;
     const restoreMiniature=()=>{
-      if(chosen && original) { chosen.wrapper.replaceChildren(...original); chosen.wrapper.style.padding=previousPadding; chosen.wrapper.style.boxShadow=previousShadow; }
+      restoreBoard?.();
       for(const item of scene.demos) item.wrapper.style.visibility='';
       launchDrain=null;
     };
@@ -249,12 +302,7 @@ async function launch() {
       if(!chosen && performance.now()-started>600 && Math.abs(carouselPosition-level)<.025 && Math.abs(carouselVelocity)<.15) {
         chosen=scene.demos.find(demo=>demo.wrapper.getBoundingClientRect().bottom<=top-2) || null;
         if(chosen) {
-          original=[...chosen.wrapper.childNodes]; previousPadding=chosen.wrapper.style.padding; previousShadow=chosen.wrapper.style.boxShadow;
-          const initial=$('target-board').getBoundingClientRect(), miniature=$('target-board').cloneNode(true);
-          miniature.removeAttribute('id'); miniature.querySelectorAll('[id]').forEach(el=>el.removeAttribute('id'));
-          miniature.inert=true; miniature.setAttribute('aria-hidden','true');
-          Object.assign(miniature.style,{position:'absolute',left:'0',top:'0',width:`${initial.width}px`,height:`${initial.height}px`,transformOrigin:'top left',transform:`scale(${chosen.wrapper.offsetWidth/initial.width})`});
-          chosen.wrapper.style.padding='0'; chosen.wrapper.style.boxShadow='none'; chosen.wrapper.replaceChildren(miniature);
+          restoreBoard=putBoardInOrbit(chosen,$('target-board'));
           launchDrain=scene.demos.filter(item=>item!==chosen);
         }
       } else if(chosen) {
@@ -266,14 +314,18 @@ async function launch() {
     if(current!==generation || destroyed) { restoreMiniature(); return; }
     if(chosen && pageVisible && !document.hidden && !motion.matches && performance.now()-started<8000) {
       const from=chosen.wrapper.getBoundingClientRect(), to=$('target-board').getBoundingClientRect();
-      const flyer=$('target-board').cloneNode(true); flyer.removeAttribute('id'); flyer.querySelectorAll('[id]').forEach(el=>el.removeAttribute('id')); flyer.classList.add('fly-board'); flyer.setAttribute('aria-hidden','true'); flyer.inert=true;
+      const flyer=cleanBoardClone($('target-board')); flyer.classList.add('fly-board');
       const size=chosen.wrapper.offsetWidth, dx=from.left+from.width/2-(to.left+to.width/2), dy=from.top+from.height/2-(to.top+to.height/2);
       const rotation=chosen.rotation||0, finalRotation=Math.round(rotation/360)*360;
       Object.assign(flyer.style,{left:`${to.left}px`,top:`${to.top}px`,width:`${to.width}px`,height:`${to.height}px`}); document.body.append(flyer); chosen.wrapper.style.visibility='hidden';
-      await runAnimation(flyer,[{transform:`translate(${dx}px,${dy}px) rotate(${rotation}deg) scale(${size/to.width})`},{transform:`translate(0,0) rotate(${finalRotation}deg) scale(1)`}],{duration:1350,easing:'cubic-bezier(.22,1,.36,1)',fill:'forwards'});
-      if(current!==generation || destroyed) { flyer.remove(); restoreMiniature(); return; }
+      const animation=await holdAnimation(flyer,[{transform:`translate(${dx}px,${dy}px) rotate(${rotation}deg) scale(${size/to.width})`},{transform:`translate(0,0) rotate(${finalRotation}deg) scale(1)`}],{duration:1350,easing:'cubic-bezier(.22,1,.36,1)',fill:'forwards'});
+      if(current!==generation || destroyed) { animation?.cancel(); flyer.remove(); restoreMiniature(); return; }
+      // Keep the completed flyer opaque while the live board is laid out.
+      // Replace them together in the next paint, without an opacity crossfade.
+      $('target-board').style.visibility='hidden';
       shell.classList.add('board-arrival'); setPhase('playing'); updateResign(); status('Ваш ход. Вы играете белыми.');
-      flyer.remove(); restoreMiniature(); requestAnimationFrame(()=>shell.classList.remove('board-arrival'));
+      await nextFrame(); $('target-board').style.visibility=''; flyer.remove(); animation?.cancel(); restoreMiniature();
+      requestAnimationFrame(()=>shell.classList.remove('board-arrival'));
     } else {
       restoreMiniature(); setPhase('playing'); updateResign(); status('Ваш ход. Вы играете белыми.');
     }
@@ -296,10 +348,34 @@ async function restore(id) {
 showLevel(); draw(); startOrbit(); if(pageVisible) animateEntry(); $('bot-play').disabled=true;
 startSessionMonitor({auth:supabase.auth,cachedId:cachedUserId(localStorage),open:async id=>{ await restore(id); if(!destroyed) $('bot-play').disabled=false; },logout:()=>{ destroyed=true; ++generation; stopOrbit(); engine?.destroy(); store?.destroy(); clearInterval(timer); sound.destroy(); if(window.parent===window) location.replace('/'); },accountChanged:()=>location.reload()});
 window.addEventListener('online',()=>store?.flush());
+// If Play is pressed during the entrance, continue from the current opacity
+// rather than letting a still-running entrance override the launch fade.
+function fadeEntryIntoLaunch() {
+  if(motion.matches) return;
+  const scene=stages[level].node;
+  for(const el of [scene.querySelector('.hero-piece'),...scene.querySelectorAll('.orbit-ring')]) {
+    const opacity=Number(getComputedStyle(el).opacity);
+    el.getAnimations().forEach(animation=>animation.cancel());
+    el.animate([{opacity},{opacity:0}],{duration:950,easing:'cubic-bezier(.22,1,.36,1)'});
+  }
+}
+// React Bits / Magic UI-inspired soft focus and stagger: the orbit is already
+// moving underneath; only the individual elements fade into place.
 function animateEntry() {
   if(motion.matches || destroyed) return;
-  const elements=phase==='choose'?[$('orbit-slot'),document.querySelector('.bot-selector'),$('bot-play')]:[$('bot-board-wrap')];
-  elements.forEach((el,index)=>{ el.getAnimations().forEach(animation=>animation.cancel()); el.animate([{opacity:0,translate:'0 -24px'},{opacity:1,translate:'0 0'}],{duration:700,delay:index*90,easing:'cubic-bezier(.22,1,.36,1)'}); });
+  const easing='cubic-bezier(.22,1,.36,1)';
+  const animate=(el,frames,duration,delay=0)=>{ el.getAnimations().forEach(animation=>animation.cancel()); el.animate(frames,{duration,delay,easing,fill:'backwards'}); };
+  if(phase==='choose') {
+    const scene=stages[level].node;
+    const hero=scene.querySelector('.hero-piece'); hero.getAnimations().forEach(animation=>animation.cancel());
+    const finalFilter=getComputedStyle(hero).filter;
+    animate(hero,[{opacity:0,filter:`${finalFilter} blur(8px)`,translate:'0 -18px'},{opacity:1,filter:finalFilter,translate:'0 0'}],1100);
+    for(const ring of scene.querySelectorAll('.orbit-ring')) { const opacity=ring.classList.contains('orbit-ring-inner')?.5:1; animate(ring,[{opacity:0},{opacity}],1300,100); }
+    scene.querySelectorAll('.orbit-board').forEach((el,index)=>animate(el,[{opacity:0,filter:'blur(3px)'},{opacity:1,filter:'blur(0px)'}],850,80+index*65));
+    [document.querySelector('.bot-selector'),$('bot-play')].forEach((el,index)=>animate(el,[{opacity:0,translate:'0 12px'},{opacity:1,translate:'0 0'}],800,200+index*100));
+  } else if(phase==='playing'||phase==='finished') {
+    for(const el of $('bot-board-wrap').querySelectorAll('.player-row')) animate(el,[{opacity:0,translate:'0 8px'},{opacity:1,translate:'0 0'}],700,100);
+  }
 }
 window.addEventListener('message',event=>{
   if(event.origin!==location.origin || event.source!==window.parent) return;

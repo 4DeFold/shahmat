@@ -33,6 +33,7 @@ try {
   assert.ok(selector.y+selector.height<=playButton.y+1,'selector remains above play button');
   assert.equal(await frame.locator('#bot-prev').isDisabled(),true);
   assert.equal(await frame.locator('.bot-arrow').first().evaluate(el=>getComputedStyle(el).borderTopWidth),'0px');
+  assert.ok((await frame.locator('#bot-next').boundingBox()).width>=64,'arrow has a large hit target');
   assert.equal(await frame.locator('#bot-name').textContent(),'1 уровень');
   if(reducedMotion==='no-preference') {
    await frame.locator('#orbit-boards').evaluate(el=>{
@@ -42,6 +43,10 @@ try {
    const before=await frame.locator('.orbit-board').first().getAttribute('style'); await page.waitForTimeout(250);
    assert.notEqual(await frame.locator('.orbit-board').first().getAttribute('style'),before,'boards orbit');
    assert.match(before,/rotate\(/,'boards turn along the orbit');
+   for(let sample=0;sample<6;sample++) {
+    const escaped=await frame.locator('#orbit-stage').evaluate(stage=>{const bounds=document.querySelector('.bot-stage').getBoundingClientRect();return [...stage.querySelectorAll('.orbit-board')].some(board=>{const r=board.getBoundingClientRect();return r.left<bounds.left-1||r.right>bounds.right+1;});});
+    assert.equal(escaped,false,'rotated boards stay clear of both rails'); await page.waitForTimeout(100);
+   }
    await page.waitForTimeout(3000);
    const events=await frame.locator('#orbit-boards').evaluate(()=>window.demoEvents);
    assert.ok(new Set(events.map(event=>event.index)).size>=3,'demonstration boards tick independently');
@@ -64,7 +69,7 @@ try {
    if(viewport.width>=1000) {
     await page.locator('.sidebar-nav [data-page=rating]').click(); await page.locator('#page-rating:not([hidden])').waitFor();
     await page.locator('.sidebar-nav [data-page=bot]').click(); await page.locator('#page-bot:not([hidden])').waitFor();
-    await page.waitForFunction(()=>document.querySelector('#bot-game-frame').contentDocument.querySelector('#orbit-slot').getAnimations().length>0,{timeout:3000});
+    await page.waitForFunction(()=>document.querySelector('#bot-game-frame').contentDocument.querySelector('#hero-piece').getAnimations().length>0,null,{timeout:3000});
    }
    await frame.locator('#orbit-stage').evaluate(stage=>{
      window.launchReplacements=[];
@@ -74,9 +79,19 @@ try {
    await frame.locator('#bot-next').click(); assert.equal(await frame.locator('#bot-name').textContent(),'2 уровень');
    await frame.locator('#bot-prev').click(); assert.equal(await frame.locator('#bot-name').textContent(),'1 уровень');
   }
+  if(reducedMotion==='no-preference') await frame.locator('#bot-app').evaluate(()=>{
+   window.motionSamples=[]; let previous=null;
+   const sample=()=>{ const shell=document.querySelector('#bot-app'), phase=shell.dataset.phase;
+    const visible=el=>!!el && getComputedStyle(el).visibility==='visible' && Number(getComputedStyle(el).opacity)>.95;
+    const flyer=document.querySelector('.fly-board'), live=document.querySelector('#target-board'), wrap=document.querySelector('#bot-board-wrap');
+    const mini=[...document.querySelectorAll('.orbit-board > .board-frame')].some(el=>visible(el) && visible(el.parentElement));
+    if(phase==='launching'||phase==='playing'||phase==='returning') window.motionSamples.push({phase,fly:visible(flyer),live:visible(live)&&visible(wrap),mini,body:Number(getComputedStyle(document.body).opacity)});
+    if(phase==='choose'&&previous==='returning') return; previous=phase; requestAnimationFrame(sample);
+   }; requestAnimationFrame(sample);
+  });
   await frame.locator('#bot-play').click();
   let destination;
-  if(reducedMotion==='no-preference') { await frame.locator('#bot-app[data-phase=launching]').waitFor(); await frame.locator('.fly-board .board').waitFor({timeout:10000}); const replacements=await frame.locator('#orbit-stage').evaluate(()=>window.launchReplacements); assert.equal(replacements.length,1); assert.ok(replacements[0].bottom<=replacements[0].top,'initial board substituted outside the visible area'); destination=await frame.locator('#target-board').boundingBox(); }
+  if(reducedMotion==='no-preference') { await frame.locator('#bot-app[data-phase=launching]').waitFor(); await frame.locator('.fly-board .board').waitFor({timeout:10000}); const replacements=await frame.locator('#orbit-stage').evaluate(()=>window.launchReplacements); assert.equal(replacements.length,1); assert.ok(replacements[0].bottom<=replacements[0].top,'initial board substituted outside the visible area'); destination=await frame.locator('#target-board').boundingBox(); await page.waitForTimeout(450); const ringOpacity=await frame.locator('#orbit-stage .orbit-ring-outer').evaluate(el=>Number(getComputedStyle(el).opacity)); assert.ok(ringOpacity<.35,'orbit ring fades while the board arrives'); }
   await frame.locator('#bot-app[data-phase=playing]').waitFor({timeout:12000});
   if(destination) { const live=await frame.locator('#target-board').boundingBox(); for(const key of ['x','y','width','height']) assert.ok(Math.abs(destination[key]-live[key])<2,`board arrival has stable ${key}`); }
   assert.equal(await frame.locator('#board .square').count(),64); assert.equal(await frame.locator('#resign-wrap').getAttribute('aria-hidden'),'true');
@@ -84,11 +99,43 @@ try {
   await frame.locator('#status').getByText(/Ваш ход/).waitFor({timeout:30000});
   await page.waitForFunction(()=>JSON.parse(localStorage.getItem('shahmat.bot-games.v1.12345678-1234-1234-1234-123456789012'))?.current?.moves?.length===2,{timeout:30000});
   assert.ok(writes.length>=2, 'game and moves sent to separate table');
+  if(reducedMotion==='no-preference') {
+   const samples=await frame.locator('#bot-app').evaluate(()=>window.motionSamples);
+   assert.ok(samples.some(s=>s.phase==='playing'),'board handoff was sampled');
+   assert.ok(samples.filter(s=>s.phase==='playing').every(s=>s.fly||s.live),'no empty frame at arrival');
+   assert.ok(samples.every(s=>s.body===1),'the page never flashes its opacity');
+  }
   await page.reload(); await page.locator('#page-bot').waitFor({state:'visible'}); await frame.locator('#bot-app[data-phase=playing]').waitFor({timeout:20000});
   assert.ok((await frame.locator('#move-list').innerText()).includes('e4'),'active game restored after reload');
-  page.once('dialog',d=>d.accept()); await frame.locator('#return-button').click(); await frame.locator('#bot-app[data-phase=choose]').waitFor();
+  if(reducedMotion==='no-preference') await frame.locator('#bot-app').evaluate(()=>{
+   window.returnSamples=[];
+   const sample=()=>{const shell=document.querySelector('#bot-app'), phase=shell.dataset.phase;
+    const visible=el=>!!el && getComputedStyle(el).visibility==='visible' && Number(getComputedStyle(el).opacity)>.95;
+    const flyer=document.querySelector('.fly-board'), mini=[...document.querySelectorAll('.orbit-board > .board-frame')].some(el=>visible(el)&&visible(el.parentElement));
+    if(phase==='returning') window.returnSamples.push({fly:visible(flyer),mini,body:Number(getComputedStyle(document.body).opacity)});
+    if(phase==='returning'||(phase==='playing'&&!window.returnSamples.length)) requestAnimationFrame(sample);
+   }; requestAnimationFrame(sample);
+  });
+  page.once('dialog',d=>d.accept()); await frame.locator('#return-button').click();
+  if(reducedMotion==='no-preference') { await frame.locator('#bot-app[data-phase=returning]').waitFor(); await frame.locator('.fly-board .board').waitFor(); assert.equal(await frame.locator('#target-board').evaluate(el=>getComputedStyle(el).visibility),'hidden'); }
+  await frame.locator('#bot-app[data-phase=choose]').waitFor({timeout:10000});
+  if(reducedMotion==='no-preference') { const samples=await frame.locator('#bot-app').evaluate(()=>window.returnSamples); assert.ok(samples.length>0); assert.ok(samples.every(s=>s.fly||s.mini),'no empty frame during return'); assert.ok(samples.every(s=>s.body===1),'no full-page opacity flash during return'); }
   await page.waitForFunction(()=>JSON.parse(localStorage.getItem('shahmat.bot-games.v1.12345678-1234-1234-1234-123456789012')).current.status==='abandoned');
   assert.deepEqual(errors,[]); await page.close();
+ }
+ // A completed puzzle fades its pieces, then a different position fades in.
+ {
+  const p=await browser.newPage({viewport:{width:1100,height:800}});
+  await p.addInitScript(value=>{Math.random=()=>0; localStorage.setItem('sb-eswyxbyddkajysogtglp-auth-token',JSON.stringify(value));},session);
+  await p.route('https://eswyxbyddkajysogtglp.supabase.co/**',route=>{const path=new URL(route.request().url()).pathname; return route.fulfill({json:path==='/auth/v1/user'?user:path==='/rest/v1/profiles'?{username:'Alice',bio:'',palette:'forest'}:path==='/rest/v1/bot_games'?[]:{game:null}});});
+  await p.goto(`${base}/bot`); const f=p.frameLocator('#bot-game-frame'), puzzle=f.locator('#orbit-stage .orbit-board[data-index="2"]');
+  await puzzle.waitFor({state:'attached'}); assert.equal(await puzzle.getAttribute('data-scenario'),'2');
+  await puzzle.locator('.mini-label').getByText('МАТ').waitFor({state:'attached',timeout:5000});
+  await f.locator('#orbit-stage .orbit-board[data-index="2"].demo-clearing').waitFor({state:'attached',timeout:5000});
+  await puzzle.locator('.mini-square img').first().evaluate(el=>new Promise(resolve=>setTimeout(resolve,250)));
+  const fading=await puzzle.locator('.mini-square img').first().evaluate(el=>Number(getComputedStyle(el).opacity)); assert.ok(fading<1,'pieces fade away');
+  await f.locator('#orbit-stage .orbit-board[data-index="2"][data-scenario="10"]').waitFor({state:'attached',timeout:5000});
+  assert.ok(await puzzle.locator('.mini-square img').count()>3,'a different game appears'); await p.close();
  }
  // Launch immediately during a carousel transition: selected level is retained
  // and the board still emerges only after its orbit has settled.
