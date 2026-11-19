@@ -22,7 +22,7 @@ try {
    return route.fulfill({json:{game:null}});
   });
   await page.goto(`${base}/bot`); await page.locator('#page-bot').waitFor({state:'visible'});
-  const nav=await page.locator('.sidebar-nav [data-page]').evaluateAll(els=>els.map(el=>el.dataset.page)); assert.deepEqual(nav,['game','bot','rating','watch']);
+  const nav=await page.locator('.sidebar-nav [data-page]').evaluateAll(els=>els.map(el=>el.dataset.page)); assert.deepEqual(nav,['game','bot','rating','watch','archive']);
   const frame=page.frameLocator('#bot-game-frame'); await frame.locator('#bot-play:not([disabled])').waitFor({timeout:20000});
   assert.equal(await frame.locator('#orbit-stage .orbit-board').count(),8);
   assert.equal(await frame.locator('.orbit-stage').count(),6);
@@ -142,7 +142,7 @@ try {
   for(const [palette,theme,hex,rgb] of [['forest','dark','#26362e','38, 54, 46'],['wood','light','#ede0d4','237, 224, 212'],['monochrome','dark','#000','0, 0, 0'],['monochrome','light','#fff','255, 255, 255']]) {
    await p.evaluate(({palette,theme})=>{const landing=document.querySelector('.landing'); landing.dataset.palette=palette;landing.dataset.paletteTheme=theme;},{palette,theme});
    await p.waitForFunction(hex=>document.querySelector('#bot-game-frame').contentDocument.documentElement.style.getPropertyValue('--bg').trim()===hex,hex);
-   const gradient=await f.locator('.bot-stage').evaluate(el=>getComputedStyle(el,'::after').backgroundImage);
+   const gradient=await f.locator('#orbit-stage').evaluate(el=>getComputedStyle(el,'::after').backgroundImage);
    assert.ok(gradient.includes(rgb),`${palette} ${theme} uses its palette extreme: ${gradient}`);
   }
   await p.close();

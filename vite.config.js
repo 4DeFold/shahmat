@@ -35,7 +35,7 @@ function serveStockfish(req, res, next) {
 }
 export default defineConfig({
   plugins: [gameRoute, stockfishAssets],
-  build: { rollupOptions: { input: { main: resolve('index.html'), demo: resolve('pages/play.html'), game: resolve('pages/game.html'), bot: resolve('pages/bot-game.html'), watch: resolve('pages/watch.html') } } },
+  build: { rollupOptions: { input: { main: resolve('index.html'), demo: resolve('pages/play.html'), game: resolve('pages/game.html'), bot: resolve('pages/bot-game.html'), watch: resolve('pages/watch.html'), archive: resolve('pages/archive.html') } } },
   server: { host: '0.0.0.0', allowedHosts: ['.e2b.app'] },
   preview: { host: '0.0.0.0', allowedHosts: ['.e2b.app'] },
 });

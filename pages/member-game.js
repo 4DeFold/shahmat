@@ -350,7 +350,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   }
   const onHistoryKey = event => {
     if (event.defaultPrevented || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey || event.target.closest?.('input, textarea, select, [contenteditable]:not([contenteditable=false]), [role=textbox]') || document.querySelector('dialog[open]') || pending) return;
-    if (navigateHistory(event.key)) event.preventDefault();
+    if (navigateHistory(event.code === 'KeyA' ? 'a' : event.code === 'KeyD' ? 'd' : event.key)) event.preventDefault();
   };
   document.addEventListener('keydown', onHistoryKey);
   start.addEventListener('pointerdown', () => sound.prime());
@@ -442,7 +442,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   $('offline-draw').addEventListener('click', () => void finishAction('offline_draw'));
   $('mode-list').addEventListener('change', event => { if (phase === 'idle' && times[event.target.value]) { mode = event.target.value; modeControls(); drawClocks(); if (ready) setStatus('Всё готово к поиску.'); } });
   start.addEventListener('click', () => void search()); cancel.addEventListener('click', () => void cancelSearch());
-  reset.addEventListener('click', () => { annotations.clear(); cancelTimer(); generation++; snapshot = null; scores = null; ratingsKey = null; ratingsRetryAt = 0; ratingsRequest++; renderRatings(); clockSync.clear(); chess = new Chess(); latestMove = null; phase = 'idle'; mode = null; $('mode-list').querySelectorAll('input').forEach(input => { input.checked = false; }); premove = []; historyIndex = null; nameForGame = null; profileTrigger.disabled = true; profilePinned = false; showProfile(false); clearInterval(nameTimer); $('opponent-name').textContent = 'Соперник'; setAvatar('opponent',null); modeControls(); renderBoard(); renderHistory(); drawClocks(); setStatus('Выбери режим.'); });
+  reset.addEventListener('click', () => { annotations.clear(); cancelTimer(); generation++; snapshot = null; scores = null; ratingsKey = null; ratingsRetryAt = 0; ratingsRequest++; renderRatings(); clockSync.clear(); chess = new Chess(); latestMove = null; phase = 'idle'; mode = null; $('mode-list').querySelectorAll('input').forEach(input => { input.checked = false; }); premove = []; historyIndex = null; nameForGame = null; profileTrigger.disabled = true; profilePinned = false; showProfile(false); clearInterval(nameTimer); $('opponent-name').textContent = 'Соперник'; setAvatar('opponent',null); modeControls(); renderBoard(); renderHistory(); drawClocks(); setStatus(''); });
   function pause() { cancelDrag(); if (moving) reconciling = true; if (phase === 'searching') void cancelSearch(); else if (phase !== 'cancelling') { generation++; cancelTimer(); } }
   function resume() {
     if (!userId || destroyed) return;
@@ -462,7 +462,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
         if (!result || !Object.hasOwn(result, 'game') || (result.game && !Array.isArray(result.game.moves))) throw Error('invalid current state');
         ready = true; pollFailures = 0;
         if (result.game && phase === 'idle') applyGame(result.game);
-        else if (phase === 'idle') setStatus(mode ? 'Всё готово к поиску.' : 'Выбери режим.');
+        else if (phase === 'idle') setStatus(mode ? 'Всё готово к поиску.' : '');
         modeControls();
         if (isVisible() && phase === 'active') void poll(++generation);
       } catch (error) {

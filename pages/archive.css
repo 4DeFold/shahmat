@@ -1,0 +1,19 @@
+.archive-main { min-width:0; min-height:0; overflow:auto; padding:clamp(20px,4vw,52px); }
+.archive-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(210px,100%),1fr)); gap:clamp(18px,2.5vw,32px); }
+.archive-card { display:block; width:100%; padding:0; border:0; color:var(--ink); background:none; text-align:left; cursor:pointer; visibility:hidden; }
+.archive-card.is-ready { visibility:visible; animation:archive-reveal .5s cubic-bezier(.22,1,.36,1) both; }
+.archive-mini { display:grid; grid-template-columns:repeat(8,1fr); aspect-ratio:1; border:5px solid var(--board-frame); box-shadow:0 10px 25px #0002; transition:transform .4s cubic-bezier(.22,1,.36,1),box-shadow .4s ease; }
+.archive-mini-square { position:relative; aspect-ratio:1; }
+.archive-mini-square.light {background:var(--board-light)} .archive-mini-square.dark {background:var(--board-dark)} .archive-mini-square.last {box-shadow:inset 0 0 0 100px #f8d54788} .archive-mini-square.check {box-shadow:inset 0 0 0 100px #eb3535a8}
+.archive-mini-square img {position:absolute; inset:0; width:100%; height:100%}
+.archive-card strong {display:block; padding:10px 2px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font:600 15px system-ui,sans-serif}
+@media (hover:hover) { .archive-card:hover .archive-mini {transform:translateY(-5px);box-shadow:0 16px 32px #0003} }
+.archive-card:focus-visible {outline:2px solid var(--accent);outline-offset:5px}
+.archive-modes {display:grid;gap:8px}.archive-modes button,.archive-back,.archive-more {border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:13px;text-align:left;font:600 14px system-ui,sans-serif;cursor:pointer;transition:background .25s,color .25s,transform .25s}
+.archive-modes button[aria-pressed=true] {background:var(--control);color:var(--control-ink);border-color:var(--control)}
+.archive-back {width:100%}.archive-more {margin-top:24px}.archive-detail {margin:auto; animation:archive-reveal .48s cubic-bezier(.22,1,.36,1) both} .archive-main:has(.archive-detail:not([hidden])) {display:grid;place-items:center}
+#archive-status {font-size:13px;color:var(--muted)} #archive-status:empty {display:none} #archive-history .history-times {display:none} #archive-history #move-list li {grid-template-columns:36px minmax(0,1fr) minmax(0,1fr)}
+@keyframes archive-reveal {from{opacity:0;transform:translateY(12px) scale(.98);filter:blur(5px)}to{opacity:1;transform:none;filter:blur(0)}}
+@media(max-width:700px){.archive-main{padding:18px;}.archive-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.archive-modes{grid-template-columns:repeat(4,1fr);gap:4px}.archive-modes button{padding:10px 4px;text-align:center;font-size:12px}.archive-detail{width:min(100%,max(140px,calc(100dvh - 300px)),500px)}}
+@media(prefers-reduced-motion:reduce){.archive-card.is-ready,.archive-detail{animation:none}.archive-mini,.archive-modes button{transition:none}}
+#archive-app .game-rail #move-list .history-times { display:none; }

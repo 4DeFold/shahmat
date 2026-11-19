@@ -93,21 +93,42 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
   motionPreference?.addEventListener?.('change', onMotionPreferenceChange);
 
   function render(data, animate = false) {
+    const previous = new Map([...list.children].map(row => [row.dataset.profileName, row]));
+    // Capture the current visual position, including an interrupted animation.
+    const positions = new Map([...previous].map(([name,row]) => [name,row.getBoundingClientRect()]));
+    for (const row of previous.values()) row.getAnimations?.().forEach(animation => animation.cancel());
     displayed = data;
-    const fragment = root.ownerDocument.createDocumentFragment(), animated = [];
+    const animated = [], ordered = [], fresh = [];
     for (const [index, player] of data.slice(0,100).entries()) {
-      const row = root.ownerDocument.createElement('li'); row.className = 'rating-row'; row.dataset.profileNoHover=''; row.dataset.profileName=String(player.username ?? '');
-      if (ownName && player.username === ownName) row.classList.add('rating-row-self');
-      const place = root.ownerDocument.createElement('span'); place.className='rating-place'; place.textContent = String(index + 1);
-      const person = root.ownerDocument.createElement('button'); person.type='button'; person.className='rating-person rating-profile-trigger'; person.dataset.profileName=String(player.username ?? '');
-      const avatar = root.ownerDocument.createElement('img'); avatar.className='rating-avatar'; avatar.alt=''; avatar.src='/pieces/cburnett/wN.svg';
-      const name = root.ownerDocument.createElement('span'); name.className='rating-player'; name.textContent = String(player.username ?? ''); person.append(avatar,name);
-      const score = root.ownerDocument.createElement('span'); score.className='rating-score'; score.textContent = formatScore(player);
-      row.append(place,person,score); fragment.append(row);
-      if (animate) { animated.push({el:name,type:'name',value:player.username ?? ''}, {el:score,type:'score',value:player[unit]}); }
+      const nameText=String(player.username ?? '');
+      let row=previous.get(nameText);
+      if (!row) {
+        row=root.ownerDocument.createElement('li'); row.className='rating-row'; row.dataset.profileNoHover=''; row.dataset.profileName=nameText;
+        const place=root.ownerDocument.createElement('span'); place.className='rating-place';
+        const person=root.ownerDocument.createElement('button'); person.type='button'; person.className='rating-person rating-profile-trigger'; person.dataset.profileName=nameText;
+        const avatar=root.ownerDocument.createElement('img'); avatar.className='rating-avatar'; avatar.alt=''; avatar.src='/pieces/cburnett/wN.svg';
+        const name=root.ownerDocument.createElement('span'); name.className='rating-player'; name.textContent=nameText; person.append(avatar,name);
+        const score=root.ownerDocument.createElement('span'); score.className='rating-score'; row.append(place,person,score); fresh.push(row);
+        if (animate && !previous.size) animated.push({el:name,type:'name',value:nameText},{el:score,type:'score',value:player[unit]});
+      }
+      row.classList.toggle('rating-row-self',!!ownName && nameText===ownName);
+      row.querySelector('.rating-place').textContent=String(index+1);
+      row.querySelector('.rating-score').textContent=formatScore(player);
+      ordered.push(row);
     }
-    list.replaceChildren(fragment);
-    if (animate) animateItems(animated);
+    // Reordering keeps player elements and avatars; restore focus if a moved row held it.
+    const focused=list.contains(root.ownerDocument.activeElement)?root.ownerDocument.activeElement:null;
+    for (const row of ordered) list.append(row);
+    for (const row of previous.values()) if (!ordered.includes(row)) row.remove();
+    if (focused?.isConnected && root.ownerDocument.activeElement!==focused) focused.focus({preventScroll:true});
+    if (!motionPreference?.matches) for (const row of ordered) {
+      const before=positions.get(row.dataset.profileName), after=row.getBoundingClientRect();
+      if (before && row.animate) {
+        const dx=before.left-after.left,dy=before.top-after.top;
+        if (Math.abs(dx)>.5 || Math.abs(dy)>.5) row.animate([{transform:`translate(${dx}px,${dy}px)`},{transform:'translate(0,0)'}],{duration:600,easing:'cubic-bezier(.22,1,.36,1)'});
+      } else if (previous.size && row.animate) row.animate([{opacity:0,transform:'translateY(8px)'},{opacity:1,transform:'none'}],{duration:350,easing:'ease-out'});
+    }
+    if (animated.length) animateItems(animated);
     void loadAvatars(data);
     status.hidden = data.length > 0;
     status.textContent = data.length ? '' : 'Пока нет игроков';

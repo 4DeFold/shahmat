@@ -99,3 +99,11 @@ test('calibrating players are numbered and identical forced refresh preserves ro
   assert.equal(root.querySelector('.rating-row'),row);
   view.destroy(); dom.window.close();
 });
+
+test('mode changes reuse and reorder player elements', async () => {
+ const dom=new JSDOM(html),root=dom.window.document.querySelector('section');
+ const data={overall:[{username:'Alice',yar:1300},{username:'Bob',yar:1200}],rapid:[{username:'Bob',yar:1400},{username:'Alice',yar:1100}]};
+ const client={rpc:async (fn,args)=>({data:fn==='rank_leaderboard'?data[args.p_mode]:[]})};
+ const view=createRatingView(root,client);await view.refresh();const alice=root.querySelectorAll('.rating-row')[0],bob=root.querySelectorAll('.rating-row')[1];
+ root.querySelector('[data-rating-mode="rapid"]').click();await tick();assert.equal(root.querySelectorAll('.rating-row')[0],bob);assert.equal(root.querySelectorAll('.rating-row')[1],alice);assert.equal(alice.querySelector('.rating-place').textContent,'2');view.destroy();dom.window.close();
+});

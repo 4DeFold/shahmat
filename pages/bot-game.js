@@ -194,8 +194,17 @@ function showHistory(index) {
  status(historyIndex!==null?`Просмотр позиции: ход ${historyIndex} из ${length}.`:phase==='finished'?'Партия завершена.':chess.turn()==='w'?'Ваш ход.':'Ход бота.');
 }
 function navigateHistory(key) { if(!pageVisible || !['playing','finished'].includes(phase) || promotion || document.querySelector('dialog[open]'))return false;const delta=key==='ArrowLeft'||key.toLowerCase()==='a'?-1:key==='ArrowRight'||key.toLowerCase()==='d'?1:0;if(!delta)return false;showHistory((historyIndex??chess.history().length)+delta);return true; }
+function handleNavigation(key,code='') {
+ const physical=code==='KeyA'?'a':code==='KeyD'?'d':key;
+ if(pageVisible && phase==='choose' && !document.querySelector('dialog[open]')) {
+  if(physical==='ArrowLeft'||physical.toLowerCase()==='a') { switchLevel(level-1); return true; }
+  if(physical==='ArrowRight'||physical.toLowerCase()==='d') { switchLevel(level+1); return true; }
+  if(physical==='Enter' && !$('bot-play').disabled) { $('bot-play').click(); return true; }
+ }
+ return navigateHistory(physical);
+}
 for(const [id,fn] of [['history-first',()=>0],['history-prev',()=>(historyIndex??chess.history().length)-1],['history-next',()=>(historyIndex??chess.history().length)+1],['history-last',()=>chess.history().length]]) $(id).addEventListener('click',()=>showHistory(fn()));
-document.addEventListener('keydown',event=>{if(event.defaultPrevented||event.ctrlKey||event.altKey||event.metaKey||event.shiftKey||event.target.closest?.('input,textarea,select,[contenteditable]:not([contenteditable=false])'))return;if(navigateHistory(event.key))event.preventDefault();});
+document.addEventListener('keydown',event=>{if(event.defaultPrevented||event.ctrlKey||event.altKey||event.metaKey||event.shiftKey||event.target.closest?.('input,textarea,select,[contenteditable]:not([contenteditable=false])'))return;if(event.key==='Enter' && event.target.closest?.('button,a'))return;if(handleNavigation(event.key,event.code))event.preventDefault();});
 function snapshot() { game.moves=chess.history(); game.updated_at=new Date().toISOString(); store?.put(game); }
 function finishIfNeeded() {
   if(!game || phase!=='playing') return false;
@@ -214,7 +223,7 @@ async function botMove() {
   const current=++generation; thinking=true; status(!engine && level===5 ? 'Загружаем полную сеть Stockfish (около 75 МБ)…' : 'Stockfish думает…');
   try {
     if(!engine) engine=createStockfish(level);
-    const move=await engine.move(chess.fen());
+    const [move]=await Promise.all([engine.move(chess.fen()),wait(500)]);
     if(current!==generation || phase!=='playing') return;
     cancelDrag(); selected=null; if(promotion?.premove) { promotion=null; reveal('promotion',false); } last=chess.move(move); thinking=false; draw(last); history(); sound.play(chess.isCheck()?'check':last.captured?'capture':'move');
     if(!finishIfNeeded()) {
@@ -399,7 +408,7 @@ function animateEntry() {
 }
 window.addEventListener('message',event=>{
   if(event.origin!==location.origin || event.source!==window.parent) return;
-  if(event.data?.type==='shahmat-history-key' && typeof event.data.key==='string') { navigateHistory(event.data.key); return; }
+  if(event.data?.type==='shahmat-history-key' && typeof event.data.key==='string') { handleNavigation(event.data.key,event.data.code); return; }
   if(event.data?.type==='shahmat-profile-updated') { setPlayerAvatar(event.data.avatar); return; }
   if(event.data?.type==='shahmat-bot-hidden') { pageVisible=false; stopOrbit(); return; }
   if(event.data?.type==='shahmat-bot-shown') { const wasHidden=!pageVisible; pageVisible=true; startOrbit(); if(wasHidden) animateEntry(); return; }

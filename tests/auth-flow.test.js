@@ -554,26 +554,16 @@ test('settings contains palette options and keeps selection when navigating', as
 });
 
 
-test('palette mouse wheel scrolls the strip and leaves page scrolling available at edges', async () => {
+test('palette scrolling ignores vertical wheel and preserves native horizontal scrolling', async () => {
   const { $, window } = await setup({ existing: true });
   const strip = $('palette-scroll');
   Object.defineProperties(strip, { scrollWidth: { value: 900 }, clientWidth: { value: 300 } });
-  let scroll = null;
-  strip.scrollBy = options => { scroll = options; };
-  const wheel = values => {
-    const event = new window.WheelEvent('wheel', { bubbles: true, cancelable: true, ...values });
-    strip.dispatchEvent(event); return event;
-  };
-  assert.equal(wheel({ deltaY: -30 }).defaultPrevented, false);
-  assert.equal(wheel({ deltaY: 60 }).defaultPrevented, true);
-  assert.equal(scroll.left, 60);
-  assert.equal(scroll.behavior, 'instant'); // test setup prefers reduced motion
-  scroll = null;
-  assert.equal(wheel({ deltaX: 60, deltaY: 10 }).defaultPrevented, false);
-  assert.equal(wheel({ deltaY: 50, ctrlKey: true }).defaultPrevented, false);
+  let scroll = null; strip.scrollBy = options => { scroll = options; };
+  const wheel = values => { const event = new window.WheelEvent('wheel', { bubbles:true, cancelable:true, ...values }); strip.dispatchEvent(event); return event; };
+  assert.equal(wheel({ deltaY:60 }).defaultPrevented, false);
+  assert.equal(wheel({ deltaX:60, deltaY:10 }).defaultPrevented, false);
+  assert.equal(wheel({ deltaY:50, ctrlKey:true }).defaultPrevented, false);
   assert.equal(scroll, null);
-  strip.scrollLeft = 600;
-  assert.equal(wheel({ deltaY: 20 }).defaultPrevented, false);
 });
 
 
