@@ -233,3 +233,17 @@ html, body { width: 100%; height: 100%; overflow: hidden; }
 .opponent-trigger > span:not(.avatar),.player-name-line strong { min-width:0; }
 .player-name-line strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .player-top-status { flex:none; }
+/* History stays independently scrollable and each half-move is a target. */
+.game-rail #move-list { padding:0; overflow-y:auto; overscroll-behavior:contain; }
+.game-rail #move-list li { padding:0; align-items:stretch; grid-template-columns: 40px minmax(0,1fr) minmax(0,1fr); }
+.game-rail #move-list li > span { padding:9px 10px; }
+.game-rail #move-list button { padding:9px 10px; min-width:0; }
+.game-rail #move-list button:hover { background:var(--line); }
+.game-rail #move-list button.current { background:var(--control); color:var(--control-ink); }
+.history-controls button:disabled { opacity:.35; cursor:default; }
+.opponent-profile-card { cursor:pointer; }
+.opponent-profile-card:focus-visible { outline:2px solid currentColor; outline-offset:2px; }
+.board .square.premove { box-shadow: inset 0 0 0 100px rgba(20,30,85,.5); }
+.board .square.possible.premove-dest::after { background:rgba(20,30,85,.5); }
+.board .square.possible.premove-dest:has(.piece)::after { background:transparent; border-color:rgba(20,30,85,.3); }
+.player-rating { white-space:nowrap; }

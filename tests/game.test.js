@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { JSDOM } from 'jsdom';
 import { Chess } from 'chess.js';
 import { chooseBotMove } from '../pages/bot.js';
-import { premoveTargets, validPremove } from '../pages/premove.js';
+import { premoveTargets, validPremove, normalizePremove } from '../pages/premove.js';
 import { createBoardAnnotations } from '../pages/board-annotations.js';
 
 const html = await readFile('pages/play.html', 'utf8');
@@ -22,7 +22,7 @@ function setup({ saved = null, storageError = false, memberId = null, now = null
   dom.window.Math.random = () => random;
   dom.window.Chess = Chess;
   dom.window.chooseBotMove = botMove;
-  Object.assign(dom.window,{premoveTargets,validPremove,createBoardAnnotations});
+  Object.assign(dom.window,{premoveTargets,validPremove,normalizePremove,createBoardAnnotations});
   dom.window.eval(source);
   const { document } = dom.window;
   const click = square => document.querySelector(`[data-square="${square}"]`).click();

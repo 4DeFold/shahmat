@@ -114,3 +114,7 @@ body.demo-page .status-card::before { content: ''; position: absolute; inset: 0;
 @keyframes premove-flash { from { opacity: .45; } to { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .square.premove::before { animation: none; opacity: 0; } }
 .demo-page .board { touch-action: none; }
+.demo-page .square.premove { box-shadow: inset 0 0 0 100px rgba(20,30,85,.5); }
+.square.premove::before { background:#203085; }
+.square.possible.premove-dest::after { background:rgba(20,30,85,.5); }
+.square.possible.premove-dest:has(.piece)::after { background:transparent; border-color:rgba(20,30,85,.3); }

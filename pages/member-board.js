@@ -44,7 +44,7 @@ export function createMemberBoard({ document, board, reducedMotion }) {
       if (animations.get(image) === animation) { animations.delete(image); cell.classList.remove('is-moving'); }
     });
   }
-  function render({ shown, selected, legal = [], premove, last, animatedMove }) {
+  function render({ shown, selected, legal = [], premove, last, animatedMove, premoveMode = false }) {
     const moves = new Set(legal), checked = shown.isCheck(), turn = shown.turn();
     let movingImage = null, rookImage = null, rookFrom, rookTo;
     if (animatedMove) {
@@ -57,6 +57,7 @@ export function createMemberBoard({ document, board, reducedMotion }) {
       const piece = shown.get(square);
       cell.classList.toggle('selected', selected === square);
       cell.classList.toggle('possible', moves.has(square));
+      cell.classList.toggle('premove-dest', premoveMode && moves.has(square));
       cell.classList.toggle('last-move', !!last && (last.from === square || last.to === square));
       cell.classList.toggle('premove', !!premove && (premove.from === square || premove.to === square));
       cell.classList.toggle('check', !!piece && piece.type === 'k' && piece.color === turn && checked);

@@ -13,7 +13,7 @@ async function arrow(page,from,to) {
 async function mark(page,square) { const r=await page.locator(`[data-square=${square}]`).boundingBox();await page.mouse.click(r.x+r.width/2,r.y+r.height/2,{button:'right'}); }
 async function annotations(page) {
  await arrow(page,'e2','e4'); assert.equal(await page.locator('[data-annotation="e2-e4"]').count(),1);
- await mark(page,'d5');assert.equal(await page.locator('[data-annotation="d5-d5"] rect').count(),1);
+ await mark(page,'d5');assert.equal(await page.locator('[data-annotation="d5-d5"] circle').count(),1);
  const board=page.locator('#board'),r=await board.boundingBox();
  const hit=await page.locator('[data-annotation="e2-e4"] line').evaluate(el=>{const r=el.getBoundingClientRect(),a=document.querySelector('[data-square=e2]').getBoundingClientRect();return Math.hypot(r.x+r.width/2-(a.x+a.width/2),r.y+r.height/2-(a.y+a.height/2));});
  assert.ok(hit<r.width*.2,'arrow starts at the selected cell, including flipped boards');

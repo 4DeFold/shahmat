@@ -1,6 +1,6 @@
 import {applyProfileTheme,isProfileImage,profileAvatarColor} from './profile-theme.js';
 import { Chess } from 'chess.js';
-import { premoveTargets, validPremove } from './premove.js';
+import { premoveTargets, validPremove, normalizePremove } from './premove.js';
 import { createBoardAnnotations } from './board-annotations.js';
 import { createMemberBoard } from './member-board.js';
 import { createGameSound } from './game-sound.js';
@@ -28,12 +28,12 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   let snapshot = null, receivedAt = 0, polling = null, generation = 0, moving = false, pendingSearch = null, viewVisible = true, browserVisible = true, pollFailures = 0;
   let currentRequest = null, destroyed = false, reconciling = false, cancelPending = false;
   let premove = null, historyIndex = null, nameForGame = null, nameTimer = null, drag = null, suppressClick = false, actionPending = false;
-  let rankUnit = 'yar', scores = null, ratingsKey = null, ratingsRequest = 0, ratingsRetryAt = 0;
+  let rankUnit = 'yar', ownScore = null, scores = null, ratingsKey = null, ratingsRequest = 0, ratingsRetryAt = 0;
   const format = value => value == null || !Number.isFinite(Number(value)) ? '' : `(${new Intl.NumberFormat('ru-RU', { maximumFractionDigits:0 }).format(Number(value))} ${rankUnit === 'elo' ? 'Эло' : 'ЯР'})`;
   function setAvatar(who, value) { const img = $(`${who}-avatar-image`); if(!img)return; const custom=typeof value==='string' && /^data:image\/(?:png|jpeg);base64,/.test(value); img.src=custom?value:`/pieces/cburnett/${who==='player'?'wN':'bN'}.svg`; img.classList.toggle('custom-profile-avatar',custom); }
   function renderRatings() {
     for (const who of ['player','opponent']) {
-      const data=scores?.[who === 'player' ? 'self' : who]; const rating = $(who + '-rating'); if (rating) rating.textContent = format(data?.[rankUnit]); const badge=$(who+'-top-status'); if(badge){const place=Number(data?.topPlace);badge.hidden=!(place>=1&&place<=5);badge.textContent=badge.hidden?'':`Топ ${place}`;} const img=$(who+'-avatar-image');if(img)img.parentElement.style.backgroundColor=profileAvatarColor(data?.palette);
+      const data=who === 'player' ? (scores?.self || ownScore) : scores?.opponent; const rating = $(who + '-rating'); if (rating) rating.textContent = format(data?.[rankUnit]); const badge=$(who+'-top-status'); if(badge){const place=Number(data?.topPlace);badge.hidden=!(place>=1&&place<=5);badge.textContent=badge.hidden?'':`Топ ${place}`;} const img=$(who+'-avatar-image');if(img)img.parentElement.style.backgroundColor=profileAvatarColor(data?.palette);
     }
   }
   function loadRatings(game) {
@@ -45,7 +45,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
       if (destroyed || request !== ratingsRequest || snapshot?.id !== game.id) return;
       if (!Array.isArray(rows)) throw new Error('missing ratings');
       scores = Object.fromEntries(rows.filter(row => row.player === 'self' || row.player === 'opponent').map(row => [row.player,row]));
-      const name = scores.self?.username; if (typeof name === 'string' && name && $('player-name')) $('player-name').textContent = name;
+      const name = scores.self?.username; if (typeof name === 'string' && name && $('player-name')) { $('player-name').textContent = name; $('player-profile-trigger').dataset.profileName = name; }
       setAvatar('player',scores.self?.avatar); setAvatar('opponent',scores.opponent?.avatar);
       renderRatings();
     }).catch(() => { if (request === ratingsRequest) { ratingsKey = null; ratingsRetryAt = now() + 8000; } });
@@ -58,7 +58,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   const reducedMotion = () => win.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const clocks = { player: createRollingClock($('player-clock'), reducedMotion), opponent: createRollingClock($('opponent-clock'), reducedMotion) };
   const boardView = createMemberBoard({ document, board, reducedMotion });
-  const annotations = createBoardAnnotations({ document, board });
+  const annotations = createBoardAnnotations({ document, board, enabled: () => !!snapshot });
   // Age is provided by the server, then advanced monotonically between snapshots.
   const canResign = () => phase === 'active' && Number.isFinite(snapshot?.game_age_ms) && snapshot.game_age_ms + Math.max(0, now() - receivedAt) >= 60000;
   const playSound = move => sound.play(chess.isCheck() ? 'check' : move?.captured ? 'capture' : 'move');
@@ -109,7 +109,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     const position = new Chess(); chess.history().slice(0, historyIndex).forEach(move => position.move(move)); return position;
   }
   const historyButtons = [], historyMoves = [];
-  let activeHistoryButton = null;
+  let activeHistoryButton = null, lastHistoryIndex = -1, lastHistoryCount = -1;
   function renderHistory() {
     const moves = chess.history(), list = $('move-list');
     let common = 0;
@@ -132,6 +132,14 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     const index = historyIndex ?? moves.length;
     activeHistoryButton = historyButtons[index - 1] || null;
     activeHistoryButton?.classList.add('current');
+    historyButtons.forEach((button, i) => { if (i === index - 1) button.setAttribute('aria-current','step'); else button.removeAttribute('aria-current'); });
+    if (activeHistoryButton && (lastHistoryIndex !== index || (historyIndex === null && lastHistoryCount !== moves.length))) {
+      const top=activeHistoryButton.getBoundingClientRect().top - list.getBoundingClientRect().top + list.scrollTop, bottom=top+activeHistoryButton.offsetHeight;
+      if (top < list.scrollTop) list.scrollTop=top; else if (bottom > list.scrollTop+list.clientHeight) list.scrollTop=bottom-list.clientHeight;
+    }
+    lastHistoryIndex=index; lastHistoryCount=moves.length;
+    $('history-first').disabled = $('history-prev').disabled = index === 0;
+    $('history-next').disabled = $('history-last').disabled = index === moves.length;
     $('move-count').textContent = String(Math.ceil(moves.length / 2)).padStart(2, '0');
   }
   $('move-list').addEventListener('click', event => {
@@ -151,14 +159,10 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     const color = currentColor(), shown = displayChess();
     const legal = selected && historyIndex === null ? legalFor(selected).map(move => move.to) : [];
     const last = historyIndex === null ? latestMove : shown.history({ verbose:true }).at(-1);
-    boardView.render({ shown, selected, legal, last, premove, animatedMove: historyIndex === null ? animatedMove : null });
+    boardView.render({ shown, selected, legal, last, premove: historyIndex === null ? premove : null, premoveMode: chess.turn() !== color && historyIndex === null, animatedMove: historyIndex === null ? animatedMove : null });
     // Establish initial rotation before the board changes sides.
     if (board.classList.contains('waiting') && snapshot) void board.offsetWidth;
     board.classList.toggle('waiting', !snapshot); board.classList.toggle('black', !!snapshot && color === 'b');
-    const playerColor = snapshot ? (color === 'w' ? 'Белые' : 'Чёрные') : '';
-    const opponentColor = snapshot ? (color === 'w' ? 'Чёрные' : 'Белые') : '';
-    if ($('player-color').textContent !== playerColor) $('player-color').textContent = playerColor;
-    if ($('opponent-color').textContent !== opponentColor) $('opponent-color').textContent = opponentColor;
   }
   function revealName(text) {
     clearInterval(nameTimer); const el = $('opponent-name'); el.setAttribute('aria-label', text);
@@ -176,6 +180,9 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   profileTrigger.addEventListener('blur', event => { if (!profilePinned && !profileCard.contains(event.relatedTarget)) showProfile(false); });
   profileCard.addEventListener('focusout', event => { if(!profilePinned && !profileCard.contains(event.relatedTarget) && event.relatedTarget!==profileTrigger) showProfile(false); });
   profileTrigger.addEventListener('click', openOpponent);
+  profileCard.setAttribute('role','button'); profileCard.tabIndex=0; profileCard.setAttribute('aria-label','Открыть профиль соперника');
+  profileCard.addEventListener('click', openOpponent);
+  profileCard.addEventListener('keydown', event => { if(event.key==='Enter'||event.key===' ') { event.preventDefault(); openOpponent(); } });
   document.addEventListener('keydown', event => { if (event.key === 'Escape') { profilePinned = false; showProfile(false); } });
   document.addEventListener('pointerdown', event => { if (!profileTrigger.parentElement.contains(event.target)) { profilePinned = false; showProfile(false); } });
   function loadName(game) {
@@ -195,7 +202,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     if (!premove || phase !== 'active' || moving || reconciling || chess.turn() !== currentColor()) return false;
     const move = premove; premove = null;
     const valid = validPremove(chess, move, currentColor());
-    if (valid) { void submitMove(move.from, move.to, move.promotion); return true; }
+    if (valid) { const actual=normalizePremove(chess,move); void submitMove(actual.from, actual.to, actual.promotion); return true; }
     renderBoard(); setStatus('Предварительный ход отменён: он больше невозможен.'); return false;
   }
   function applyGame(game) {
@@ -205,7 +212,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     }
     const previous = snapshot, localMoves = chess.history(), selectedPiece = selected ? chess.get(selected) : null;
     const sameGame = previous?.id === game.id;
-    if (!sameGame) { premove = null; annotations.clear(); setAvatar('opponent',null); ratingsKey = null; ratingsRetryAt = 0; ratingsRequest++; scores = null; renderRatings(); }
+    if (!sameGame) { historyIndex = null; premove = null; annotations.clear(); setAvatar('opponent',null); ratingsKey = null; ratingsRetryAt = 0; ratingsRequest++; scores = null; renderRatings(); }
     const alreadyDisplayed = sameGame && localMoves.length === game.moves.length && localMoves.every((move, i) => move === game.moves[i]);
     let next = chess, nextLast = latestMove;
     if (!alreadyDisplayed) {
@@ -222,6 +229,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     }
     const newMove = sameGame && game.moves.length === previous.moves.length + 1 && !alreadyDisplayed ? nextLast : null;
     snapshot = game; receivedAt = now(); clockSync.update(game, receivedAt); chess = next; latestMove = nextLast;
+    if (historyIndex !== null && historyIndex >= game.moves.length) historyIndex = game.moves.length ? null : 0;
     if (!alreadyDisplayed) { cancelDrag(); const piece = selected && next.get(selected); if (!sameGame || !selectedPiece || !piece || piece.color !== currentColor() || piece.type !== selectedPiece.type || piece.color !== selectedPiece.color) selected = null; pending = null; promotion.hidden = true; }
     phase = game.status === 'active' ? 'active' : 'finished'; mode = game.mode;
     const clearedPremove = phase === 'finished' && !!premove;
@@ -295,7 +303,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     try { move = chess.move({ from, to, ...(piece ? { promotion:piece } : {}) }); } catch { return; }
     // Invalidate any old snapshot request before it can overwrite the optimistic move.
     cancelTimer(); const moveGeneration = ++generation;
-    moving = true; modeControls(); selected = null; pending = null; promotion.hidden = true; historyIndex = null; latestMove = move;
+    moving = true; modeControls(); selected = null; pending = null; promotion.hidden = true; latestMove = move;
     renderBoard(animate ? move : null); renderHistory(); playSound(move); setStatus('Отправляем ход…');
     try {
       const result = await api({ action:'move', gameId:saved.id, version:saved.version, from, to, ...(piece ? { promotion:piece } : {}) });
@@ -361,6 +369,16 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   board.addEventListener('pointerdown', event => { if(event.button === 2 && premove) { premove=null; selected=null; renderBoard(); statusGame(); } });
   const onPremoveKey = event => { if(event.key === 'Escape' && premove) { premove=null; selected=null; renderBoard(); statusGame(); } };
   document.addEventListener('keydown', onPremoveKey);
+  function navigateHistory(key) {
+    if (!isVisible() || !snapshot || !['active','finished'].includes(phase) || pending || document.querySelector('dialog[open]')) return false;
+    const delta = key === 'ArrowLeft' || key.toLowerCase() === 'a' ? -1 : key === 'ArrowRight' || key.toLowerCase() === 'd' ? 1 : 0;
+    if (!delta) return false; showHistory((historyIndex ?? chess.history().length) + delta); return true;
+  }
+  const onHistoryKey = event => {
+    if (event.defaultPrevented || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey || event.target.closest?.('input, textarea, select, [contenteditable]:not([contenteditable=false]), [role=textbox]') || document.querySelector('dialog[open]') || pending) return;
+    if (navigateHistory(event.key)) event.preventDefault();
+  };
+  document.addEventListener('keydown', onHistoryKey);
   start.addEventListener('pointerdown', () => sound.prime());
   start.addEventListener('keydown', () => sound.prime());
   function moveGhost(d) {
@@ -494,6 +512,8 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   modeControls(); renderBoard(); drawClocks(); board.classList.add('ready');
   if (win.parent === win) revealPieces();
   return {
+    navigateHistory,
+    setOwnRating(value) { ownScore = value; renderRatings(); },
     setRatingUnit(value) { rankUnit = value === 'elo' ? 'elo' : 'yar'; renderRatings(); },
     setPlayerAvatar(value) { setAvatar('player',value); },
     setPlayerName(value) { if (typeof value === 'string' && value && $('player-name')) $('player-name').textContent = value; },
@@ -506,6 +526,6 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     hide() { const wasVisible = isVisible(); viewVisible = false; if (wasVisible) pause(); },
     show() { const wasVisible = isVisible(); const wasShown = viewVisible; viewVisible = true; if (!wasShown) revealPieces(); if (!wasVisible && isVisible()) resume(); },
     browserVisibility(value) { const wasVisible = isVisible(); browserVisible = value; if (wasVisible && !isVisible()) pause(); else if (!wasVisible && isVisible()) resume(); },
-    destroy() { destroyed = true; document.removeEventListener('keydown', onPremoveKey); annotations.destroy(); generation++; cancelDrag(); cancelTimer(); clearInterval(clockInterval); clearInterval(nameTimer); revealAnimations.forEach(animation => animation.cancel()); Object.values(clocks).forEach(clock => clock.destroy()); sound.destroy(); },
+    destroy() { destroyed = true; document.removeEventListener('keydown', onPremoveKey); document.removeEventListener('keydown', onHistoryKey); annotations.destroy(); generation++; cancelDrag(); cancelTimer(); clearInterval(clockInterval); clearInterval(nameTimer); revealAnimations.forEach(animation => animation.cancel()); Object.values(clocks).forEach(clock => clock.destroy()); sound.destroy(); },
   };
 }

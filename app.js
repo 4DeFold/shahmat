@@ -413,6 +413,10 @@ document.addEventListener('click', event => {
   if (accountToggle.getAttribute('aria-expanded') === 'true' && !$('sidebar-account').contains(event.target)) closeAccountMenu();
 });
 document.addEventListener('keydown', event => {
+  if (currentPage() !== 'game' || $('dashboard-screen').hidden || event.defaultPrevented || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey || event.target.closest?.('input, textarea, select, [contenteditable]:not([contenteditable=false]), [role=textbox]') || document.querySelector('dialog[open]')) return;
+  if (['ArrowLeft','ArrowRight','a','A','d','D'].includes(event.key)) { event.preventDefault(); $('member-game-frame')?.contentWindow?.postMessage({type:'shahmat-history-key',key:event.key},window.location.origin); }
+});
+document.addEventListener('keydown', event => {
   if (event.key !== 'Escape') return;
   if (accountToggle.getAttribute('aria-expanded') === 'true') { closeAccountMenu(); accountToggle.focus(); }
   else if (sidebarOpen) setSidebarOpen(false, { restoreFocus: true });

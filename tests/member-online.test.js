@@ -38,7 +38,7 @@ test('board opens at starting position, modes are explicit and a real request st
   assert.deepEqual([...app.$('mode-list').querySelectorAll('input')].map(input => input.value), ['blitz','rapid','classical']);
   assert.equal(app.$('start-search').disabled, true); assert.equal(app.$('start-search').hidden, true);
   await app.ui.open(A);
-  assert.equal(app.$('player-color').textContent, '');
+  assert.equal(app.$('player-color'), null);
   const rapid = app.$('mode-list').querySelector('[value=rapid]'); rapid.checked = true; rapid.dispatchEvent(new app.dom.window.Event('change', { bubbles:true }));
   assert.equal(app.$('player-clock').getAttribute('aria-label'), '10:00'); assert.equal(app.$('start-search').disabled, false); assert.equal(app.$('start-search').hidden, false);
   app.$('start-search').click(); await flush();
@@ -60,7 +60,7 @@ test('matched players can only submit legal moves on their turn; black sees flip
   await app.ui.open(B); await flush();
   assert.equal(app.$('board').firstElementChild.dataset.square, 'a8');
   assert.equal(app.$('board').classList.contains('black'), true);
-  assert.equal(app.$('player-color').textContent, 'Чёрные');
+  assert.equal(app.$('player-color'), null);
   assert.equal(app.$('player-clock-card').dataset.color, 'b');
   assert.equal(app.$('opponent-clock-card').dataset.color, 'w');
   assert.equal(app.$('player-clock-label').textContent, 'Вы · Чёрные');
@@ -280,7 +280,7 @@ test('history panel can be rapidly toggled with accessible state and focus', asy
   const app = setup(async () => ({game:game()})); t.after(() => app.close());
   await app.ui.open(A); await flush();
   const button = app.$('toggle-moves'), content = app.$('history-content');
-  app.$('history-first').focus(); button.click();
+  app.$('history-last').disabled = false; app.$('history-last').focus(); button.click();
   assert.equal(app.dom.window.document.activeElement, button);
   assert.equal(button.getAttribute('aria-expanded'), 'false'); assert.equal(content.inert, true);
   assert.equal(content.getAttribute('aria-hidden'), 'true');
@@ -391,7 +391,7 @@ test('initial failure retries without a refresh and cannot start a search before
   assert.equal(app.$('start-search').disabled, true);
   assert.match(app.$('status').textContent, /Повторяем/);
   await new Promise(resolve => setTimeout(resolve, 950));
-  assert.equal(calls, 2); assert.equal(app.$('player-color').textContent, 'Белые');
+  assert.equal(calls, 2); assert.equal(app.$('player-color'), null);
   assert.ok(app.$('board').querySelector('[data-square=e4] img'));
 });
 
@@ -527,4 +527,22 @@ test('capture premove lets the player select an underpromotion',async t=>{
  assert.equal(app.$('promotion').hidden,true);assert.ok(app.$('board').querySelector('[data-square=a8].premove'));
  current=game({moves:[...opening,'hxg2'],turn:'w'});app.ui.hide();app.ui.show();await flush();
  assert.equal(sent.length,1);assert.equal(sent[0].promotion,'n');assert.match(app.$('board').querySelector('[data-square=a8] img').src,/wN.svg/);
+});
+
+test('history keys navigate half-moves and incoming moves do not dislodge a past position', async t => {
+  let state=game({moves:['e4','e5','Nf3'],turn:'b'});
+  const app=setup(async()=>({game:state})); t.after(()=>app.close());
+  await app.ui.open(A); await flush();
+  const doc=app.dom.window.document, key=k=>doc.dispatchEvent(new app.dom.window.KeyboardEvent('keydown',{key:k,bubbles:true,cancelable:true}));
+  key('a'); assert.equal(app.$('move-list').querySelector('.current').textContent,'e5');
+  assert.ok(app.$('board').querySelector('[data-square=g1] img'));
+  state=game({moves:['e4','e5','Nf3','Nc6'],turn:'w'}); app.ui.hide(); app.ui.show(); await flush();
+  assert.equal(app.$('move-list').querySelector('.current').textContent,'e5');
+  assert.ok(app.$('board').querySelector('[data-square=b8] img'));
+  key('ArrowRight'); assert.equal(app.$('move-list').querySelector('.current').textContent,'Nf3');
+  key('d'); assert.equal(app.$('move-list').querySelector('.current').textContent,'Nc6');
+  key('ArrowLeft'); assert.equal(app.$('move-list').querySelector('.current').getAttribute('aria-current'),'step');
+  app.$('move-list').querySelector('[data-history-index="1"]').click(); assert.equal(app.$('move-list').querySelector('.current').textContent,'e4');
+  const input=app.$('mode-list').querySelector('input'); input.disabled=false; input.focus(); input.dispatchEvent(new app.dom.window.KeyboardEvent('keydown',{key:'d',bubbles:true}));
+  assert.equal(app.$('move-list').querySelector('.current').textContent,'e4');
 });

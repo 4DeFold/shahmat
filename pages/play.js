@@ -1,6 +1,6 @@
 import '../smooth-scroll.js';
 import { Chess } from 'chess.js';
-import { premoveTargets, validPremove } from './premove.js';
+import { premoveTargets, validPremove, normalizePremove } from './premove.js';
 import { createBoardAnnotations } from './board-annotations.js';
 import { chooseBotMove } from './bot.js';
 import './game-theme.js';
@@ -62,7 +62,7 @@ function scheduleBot() {
     if (botMove) { lastMove = game.move(botMove); saveGame(); }
     botThinking = false; botTimer = null; selected = null; if(pending?.premove) { pending=null; promotion.hidden=true; } cancelDrag(); render(lastMove);
     const queued = premove; premove = null;
-    if (!game.isGameOver() && queued && validPremove(game, queued, playerColor)) { playMove(queued); return; }
+    if (!game.isGameOver() && queued && validPremove(game, queued, playerColor)) { playMove(normalizePremove(game,queued)); return; }
     if (queued) { render(); if (!game.isGameOver()) status.textContent = 'Предварительный ход отменён: он больше невозможен.'; }
   }, 380);
 }
@@ -136,6 +136,7 @@ function render(move = null) {
     cell.classList.toggle('selected', selected === square);
     cell.classList.toggle('premove', !!premove && (premove.from === square || premove.to === square));
     cell.classList.toggle('possible', legal.includes(square));
+    cell.classList.toggle('premove-dest', game.turn() !== playerColor && legal.includes(square));
     cell.classList.toggle('last-move', !!lastMove && (lastMove.from === square || lastMove.to === square));
     cell.setAttribute('aria-label', `${square}, ${piece ? (piece.color === 'w' ? 'белые, ' : 'чёрные, ') + names[piece.type] : 'пусто'}${legal.includes(square) ? ', возможный ход' : ''}${premove && (premove.from === square || premove.to === square) ? ', предварительный ход' : ''}`);
     cell.setAttribute('aria-pressed', String(selected === square));

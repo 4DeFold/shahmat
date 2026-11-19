@@ -1,5 +1,5 @@
 import { Chess } from 'chess.js';
-import { premoveTargets, validPremove } from './premove.js';
+import { premoveTargets, validPremove, normalizePremove } from './premove.js';
 import { createBoardAnnotations } from './board-annotations.js';
 import { createClient } from '@supabase/supabase-js';
 import { createMemberBoard } from './member-board.js';
@@ -180,7 +180,7 @@ function setPhase(value) {
 }
 function draw(move=null) {
   const legal=selected?(chess.turn()==='w'?chess.moves({square:selected,verbose:true}):premoveTargets(chess,selected,'w')).map(m=>m.to):[];
-  boardView.render({shown:chess,selected,legal,last,premove,animatedMove:move});
+  boardView.render({shown:chess,selected,legal,last,premove,premoveMode:chess.turn()!=='w',animatedMove:move});
 }
 function history() {
   const moves=chess.history(), list=$('move-list'); list.replaceChildren();
@@ -211,7 +211,7 @@ async function botMove() {
     if(!finishIfNeeded()) {
       snapshot();
       const queued=premove; premove=null;
-      if(queued && validPremove(chess,queued,'w')) { play(queued); return; }
+      if(queued && validPremove(chess,queued,'w')) { play(normalizePremove(chess,queued)); return; }
       if(queued) draw();
       status(queued ? 'Предварительный ход отменён: он больше невозможен.' : chess.isCheck()?'Шах! Ваш ход.':'Ваш ход.');
     }
