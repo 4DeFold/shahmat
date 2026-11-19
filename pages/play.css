@@ -51,7 +51,7 @@ h1 span { color: var(--muted); }
 .square.selected { box-shadow: inset 0 0 0 100px #f6f4c588; }
 .square.possible::after { content: ''; position: absolute; width: 24%; aspect-ratio: 1; border-radius: 50%; background: #20202055; pointer-events: none; }
 .square.possible:has(.piece)::after { width: 83%; background: transparent; border: 4px solid #20202055; }
-.piece { filter: drop-shadow(0 1px 1px #0008); position: relative; z-index: 1; display: block; width: 92%; height: 92%; user-select: none; pointer-events: none; }
+.piece {  position: relative; z-index: 1; display: block; width: 92%; height: 92%; user-select: none; pointer-events: none; }
 .coord { position: absolute; font-size: clamp(8px, 1vw, 11px); font-weight: bold; line-height: 1; pointer-events: none; }
 .coord.file { right: 4px; bottom: 3px; } .coord.rank { top: 3px; left: 4px; }
 .game-panel { padding-top: 76px; }
@@ -109,7 +109,7 @@ body.demo-page .status-card::before { content: ''; position: absolute; inset: 0;
 @media (prefers-reduced-motion: reduce) { .annotation-item { animation: none; } }
 .demo-page .square.premove { box-shadow: inset 0 0 0 4px #d22f3a, inset 0 0 0 100px #f04e4e88; }
 .board .square.dragging > .piece { visibility: hidden; }
-.drag-ghost { position: fixed; top: 0; left: 0; z-index: 1000; width: var(--drag-size); height: var(--drag-size); pointer-events: none; filter: drop-shadow(0 5px 8px #0008); will-change: transform; }
+.drag-ghost { position: fixed; top: 0; left: 0; z-index: 1000; width: var(--drag-size); height: var(--drag-size); pointer-events: none;  will-change: transform; }
 .square.premove::before { content: ''; position: absolute; inset: 0; background: #ff6565; pointer-events: none; animation: premove-flash .3s ease-out both; }
 @keyframes premove-flash { from { opacity: .45; } to { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .square.premove::before { animation: none; opacity: 0; } }
@@ -118,4 +118,4 @@ body.demo-page .status-card::before { content: ''; position: absolute; inset: 0;
 .square.premove::before { background:#203085; }
 .square.possible.premove-dest::after { background:rgba(20,30,85,.5); }
 .square.possible.premove-dest:has(.piece)::after { background:transparent; border-color:rgba(20,30,85,.3); }
-.demo-page .piece.premove-ghost { opacity:.52; filter:drop-shadow(0 0 4px #203085); }
+.demo-page .piece.premove-ghost { opacity:.52;  }

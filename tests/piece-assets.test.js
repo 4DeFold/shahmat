@@ -27,3 +27,10 @@ test('all board avatars and account icons use the same set', async () => {
     assert.doesNotMatch(html, /pieces\/neo|[♔♕♖♗♘♙♚♛♜♝♞♟]/);
   }
 });
+
+test('each traced set includes six white and six black vector pieces without shadows or cream',async()=>{
+ for(const set of ['classic','angular','rounded'])for(const color of ['w','b'])for(const type of ['K','Q','B','N','R','P']){
+  const svg=await readFile(`public/pieces/${set}/${color}${type}.svg`,'utf8');
+  assert.match(svg,/<svg\b/);assert.match(svg,/viewBox="0 0 100 100"/);assert.match(svg,/<path/);assert.doesNotMatch(svg,/filter|shadow|#[a-f\d]{6}/i);assert.match(svg,/fill="#000"/);assert.match(svg,/fill="#fff"/);
+ }
+});

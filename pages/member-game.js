@@ -1,4 +1,4 @@
-import {pieceSrc as themedPieceSrc} from './piece-theme.js';
+import {pieceSrc as themedPieceSrc,setPublicPiece} from './piece-theme.js';
 import {applyProfileTheme,isProfileImage,profileAvatarColor} from './profile-theme.js';
 import { Chess } from 'chess.js';
 import {renderCaptures,renderThreats} from './board-insights.js';
@@ -34,7 +34,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   let premove = [], historyIndex = null, nameForGame = null, nameTimer = null, drag = null, suppressClick = false, actionPending = false;
   let rankUnit = 'yar', ownScore = null, scores = null, ratingsKey = null, ratingsRequest = 0, ratingsRetryAt = 0;
   const format = value => value == null || !Number.isFinite(Number(value)) ? '' : `(${new Intl.NumberFormat('ru-RU', { maximumFractionDigits:0 }).format(Number(value))} ${rankUnit === 'elo' ? 'Эло' : 'ЯР'})`;
-  function setAvatar(who, value) { const img = $(`${who}-avatar-image`); if(!img)return; const custom=typeof value==='string' && /^data:image\/(?:png|jpeg);base64,/.test(value); img.src=custom?value:`/pieces/cburnett/${who==='player'?'wN':'bN'}.svg`; img.classList.toggle('custom-profile-avatar',custom); }
+  function setAvatar(who, value, set) { const img = $(`${who}-avatar-image`); if(!img)return; const custom=typeof value==='string' && /^data:image\/(?:png|jpeg);base64,/.test(value); if(who==='opponent')setPublicPiece(img,set,'b');else {delete img.dataset.pieceFixed;img.src=themedPieceSrc('w','n');}if(custom)img.src=value; img.classList.toggle('custom-profile-avatar',custom); }
   function renderRatings() {
     for (const who of ['player','opponent']) {
       const data=who === 'player' ? (scores?.self || ownScore) : scores?.opponent; const rating = $(who + '-rating'); if (rating) rating.textContent = format(data?.[rankUnit]); const badge=$(who+'-top-status'); if(badge){const place=Number(data?.topPlace);badge.hidden=!(place>=1&&place<=5);badge.textContent=badge.hidden?'':`Топ ${place}`;} const img=$(who+'-avatar-image');if(img)img.parentElement.style.backgroundColor=profileAvatarColor(data?.palette);
@@ -50,7 +50,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
       if (!Array.isArray(rows)) throw new Error('missing ratings');
       scores = Object.fromEntries(rows.filter(row => row.player === 'self' || row.player === 'opponent').map(row => [row.player,row]));
       const name = scores.self?.username; if (typeof name === 'string' && name && $('player-name')) { $('player-name').textContent = name; $('player-profile-trigger').dataset.profileName = name; }
-      setAvatar('player',scores.self?.avatar); setAvatar('opponent',scores.opponent?.avatar);
+      setAvatar('player',scores.self?.avatar); setAvatar('opponent',scores.opponent?.avatar,scores.opponent?.piece_set);
       renderRatings();
     }).catch(() => { if (request === ratingsRequest) { ratingsKey = null; ratingsRetryAt = now() + 8000; } });
   }
@@ -172,7 +172,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
       const name = typeof profile === 'string' ? profile : profile.username;
       if (typeof name === 'string' && name) { opponentProfileName=name; revealName(name); $('opponent-profile-name').textContent = name; }
       if (typeof profile === 'object' && 'bio' in profile) { const bio=profile.bio?.trim()||''; $('opponent-profile-bio').textContent=bio; $('opponent-profile-bio').hidden=!bio; if($('opponent-profile-bio-label')) $('opponent-profile-bio-label').hidden=!bio; }
-      if(typeof profile === 'object') { applyProfileTheme(profileCard,profile.palette,profile.theme); const avatar=$('opponent-profile-avatar'),banner=$('opponent-profile-banner'); if(avatar){avatar.src=isProfileImage(profile.avatar)?profile.avatar:'/pieces/cburnett/bN.svg';avatar.classList.toggle('custom',isProfileImage(profile.avatar));} if(banner){banner.hidden=!isProfileImage(profile.banner);if(!banner.hidden)banner.src=profile.banner;} }
+      if(typeof profile === 'object') { applyProfileTheme(profileCard,profile.palette,profile.theme); const avatar=$('opponent-profile-avatar'),banner=$('opponent-profile-banner'); if(avatar){if(isProfileImage(profile.avatar))avatar.src=profile.avatar;else setPublicPiece(avatar,profile.piece_set,'b');avatar.classList.toggle('custom',isProfileImage(profile.avatar));} if(banner){banner.hidden=!isProfileImage(profile.banner);if(!banner.hidden)banner.src=profile.banner;} }
 
     }).catch(() => {});
   }

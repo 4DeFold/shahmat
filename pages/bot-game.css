@@ -10,7 +10,7 @@
 @keyframes bot-glow { 0%,100% { opacity:.5; transform:translate(-50%,-50%) rotate(0deg) scale(.96); } 50% { opacity:.95; transform:translate(-50%,-50%) rotate(18deg) scale(1.08); } }
 .glow-holder { position:absolute; inset:0; opacity:1; transition:opacity 1s ease,transform 1.1s cubic-bezier(.22,1,.36,1); pointer-events:none; }
 .bot-glow { animation:bot-glow 9s ease-in-out infinite; position:absolute; width:54%; aspect-ratio:1; left:50%; top:50%; transform:translate(-50%,-50%); background:repeating-conic-gradient(from 2deg, color-mix(in srgb,var(--accent) 21%,transparent) 0deg 2deg,transparent 4deg 17deg); mask-image:radial-gradient(circle,transparent 10%,black 27%,transparent 72%); opacity:.8; pointer-events:none; }
-.hero-piece { position:absolute; width:var(--hero-size); height:var(--hero-size); object-fit:contain; left:50%; top:50%; transform:translate(-50%,-50%); filter:drop-shadow(0 10px 22px #0003); z-index:6; }
+.hero-piece { position:absolute; width:var(--hero-size); height:var(--hero-size); object-fit:contain; left:50%; top:50%; transform:translate(-50%,-50%);  z-index:6; }
 .orbit-board { position:absolute; left:50%; top:50%; width:clamp(48px, 20%, 200px); aspect-ratio:1; background:var(--board-frame); padding:3px; border-radius:3px; box-shadow:0 8px 18px #0003; will-change:transform; }
 .mini-grid { display:grid; width:100%; height:100%; grid-template-columns:repeat(8,1fr); overflow:hidden; }
 .mini-square { position:relative; width:100%; height:100%; }

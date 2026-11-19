@@ -1,4 +1,4 @@
-import {installPieceTheme,setPieceSet} from './pages/piece-theme.js';
+import {installPieceTheme,setPieceSet,selectedPieceSet,validPieceSet} from './pages/piece-theme.js';
 installPieceTheme();
 import './pages/profile-card.css';
 import { createRatingView } from './pages/rating.js';
@@ -88,7 +88,7 @@ function writeAppearance(id, value) {
 function recordAppearance() {
   if (!appearanceUserId) return;
   const previous = readAppearance(appearanceUserId);
-  writeAppearance(appearanceUserId, { palette: selectedPalette, theme: selectedTheme, rankUnit, dirty: true, version: (previous?.version || 0) + 1 });
+  writeAppearance(appearanceUserId, { palette: selectedPalette, theme: selectedTheme, rankUnit, pieceSet:selectedPieceSet(), dirty: true, version: (previous?.version || 0) + 1 });
   if (retryTimer !== null) { clearTimeout(retryTimer); retryTimer = null; }
   void syncAppearance();
 }
@@ -110,7 +110,7 @@ async function syncAppearance() {
     if (sessionError) throw sessionError;
     if (appearanceUserId !== id) return;
     if (!data.session || data.session.user.id !== id) throw new Error('Session unavailable');
-    const { error } = await supabase.auth.updateUser({ data: { palette: pending.palette, palette_theme: pending.theme, palette_effective_theme: pending.theme || (systemTheme.matches ? 'dark' : 'light'), rank_unit: pending.rankUnit || rankUnit } });
+    const { error } = await supabase.auth.updateUser({ data: { palette: pending.palette, palette_theme: pending.theme, palette_effective_theme: pending.theme || (systemTheme.matches ? 'dark' : 'light'), rank_unit: pending.rankUnit || rankUnit, piece_set:validPieceSet(pending.pieceSet) } });
     if (error) throw error;
     const latest = readAppearance(id);
     if (latest?.version === pending.version) writeAppearance(id, { ...latest, dirty: false });
@@ -143,10 +143,11 @@ async function pollAppearance() {
     if (!palettes.has(remote.palette)) return;
     const remoteRankUnit = remote.rank_unit === 'elo' ? 'elo' : 'yar';
     const theme = remote.palette_theme === 'dark' || remote.palette_theme === 'light' ? remote.palette_theme : null;
-    if (selectedPalette !== remote.palette || selectedTheme !== theme || rankUnit !== remoteRankUnit) {
+    const remotePieceSet=validPieceSet(remote.piece_set);
+    if (selectedPalette !== remote.palette || selectedTheme !== theme || rankUnit !== remoteRankUnit || selectedPieceSet()!==remotePieceSet) {
       applyPalette(remote.palette);
-      applyTheme(theme); applyRankUnit(remoteRankUnit);
-      writeAppearance(id, { palette: selectedPalette, theme: selectedTheme, rankUnit, dirty: false, version: latest?.version || 0 });
+      applyTheme(theme); applyRankUnit(remoteRankUnit); setPieceSet(remotePieceSet);
+      writeAppearance(id, { palette: selectedPalette, theme: selectedTheme, rankUnit, pieceSet:selectedPieceSet(), dirty: false, version: latest?.version || 0 });
     }
   } catch { /* Keep the current appearance while offline. */ }
   finally { if (appearancePollInFlight === epoch) appearancePollInFlight = null; }
@@ -164,10 +165,10 @@ function restoreAppearance(user) {
   const local = readAppearance(user.id);
   const remote = user.user_metadata || {};
   if (local?.dirty || (!palettes.has(remote.palette) && local)) {
-    applyPalette(local.palette); applyTheme(local.theme); applyRankUnit(local.rankUnit || remote.rank_unit);
+    applyPalette(local.palette); applyTheme(local.theme); applyRankUnit(local.rankUnit || remote.rank_unit); setPieceSet(local.pieceSet || remote.piece_set);
   } else {
-    applyPalette(remote.palette); applyTheme(remote.palette_theme); applyRankUnit(remote.rank_unit);
-    writeAppearance(user.id, { palette: selectedPalette, theme: selectedTheme, rankUnit, dirty: false, version: local?.version || 0 });
+    applyPalette(remote.palette); applyTheme(remote.palette_theme); applyRankUnit(remote.rank_unit); setPieceSet(remote.piece_set || local?.pieceSet);
+    writeAppearance(user.id, { palette: selectedPalette, theme: selectedTheme, rankUnit, pieceSet:selectedPieceSet(), dirty: false, version: local?.version || 0 });
   }
   if (!local?.dirty && remote.palette_effective_theme !== (selectedTheme || (systemTheme.matches ? 'dark' : 'light'))) recordAppearance();
   else void syncAppearance();
@@ -903,4 +904,4 @@ async function initialize() {
 }
 export const appReady = initialize();
 
-document.addEventListener('change',event=>{if(event.target.matches?.('input[name=piece-set]'))setPieceSet(event.target.value);});
+document.addEventListener('change',event=>{if(event.target.matches?.('input[name=piece-set]')){setPieceSet(event.target.value);recordAppearance();}});

@@ -8,10 +8,11 @@ const session={access_token:token,token_type:'bearer',expires_in:3600,expires_at
 const moves=['e4','d5','exd5'],c=new Chess();for(const move of moves)c.move(move);
 let empty=false;
 try {for(const viewport of [{width:1440,height:900},{width:390,height:844}]) {
+ user.user_metadata={};
  const page=await browser.newPage({viewport,reducedMotion:'reduce'}),errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.addInitScript(s=>{localStorage.setItem('sb-eswyxbyddkajysogtglp-auth-token',JSON.stringify(s));window.Worker=class{postMessage(m){if(m==='uci')setTimeout(()=>this.onmessage?.({data:'uciok'}),0);if(m==='isready')setTimeout(()=>this.onmessage?.({data:'readyok'}),0);}terminate(){}}},session);
  await page.route('https://eswyxbyddkajysogtglp.supabase.co/**',route=>{const p=new URL(route.request().url()).pathname;
-  if(p==='/auth/v1/user')return route.fulfill({json:user});if(p==='/rest/v1/profiles')return route.fulfill({json:{username:'Alice'}});
+  if(p==='/auth/v1/user'){if(route.request().method()==='PUT')Object.assign(user.user_metadata,route.request().postDataJSON().data);return route.fulfill({json:user});}if(p==='/rest/v1/profiles')return route.fulfill({json:{username:'Alice'}});
   if(p.endsWith('/my_archive_games'))return route.fulfill({json:[{id:'a',mode:'blitz',my_color:'w',white_name:'Alice',black_name:'Bob',moves,result:'white_win'}]});
   if(p.endsWith('/my_archive_all'))return route.fulfill({json:[{id:'a',mode:'blitz',my_color:'w',white_name:'Alice',black_name:'Bob',moves,result:'white_win'},{id:'b',mode:'bot',level:2,my_color:'w',moves,result:'draw'}]});
   if(p.endsWith('/my_archive_ratings'))return route.fulfill({json:[]});

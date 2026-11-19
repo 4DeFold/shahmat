@@ -1,3 +1,4 @@
+import {setPublicPiece} from './piece-theme.js';
 import {createProfileCard} from './profile-card.js';
 import {profileAvatarColor} from './profile-theme.js';
 // Animata's Fluid Tabs, adapted to native buttons without React or animation dependencies.
@@ -139,12 +140,13 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
     const request=++avatarRequest, names=[...new Set(data.map(p=>p.username).filter(name=>typeof name==='string'))].slice(0,100);
     if (!names.length) return;
     try {
-      const [{data:avatars,error},{data:themes}]=await Promise.all([client.rpc('profile_avatars',{p_names:names}),Promise.resolve(client.rpc('profile_avatar_themes',{p_names:names})).catch(()=>({data:[]}))]);
+      const [{data:avatars,error},{data:themes},{data:sets}]=await Promise.all([client.rpc('profile_avatars',{p_names:names}),Promise.resolve(client.rpc('profile_avatar_themes',{p_names:names})).catch(()=>({data:[]})),Promise.resolve(client.rpc('profile_piece_sets',{p_names:names})).catch(()=>({data:[]}))]);
       if(error||!Array.isArray(avatars)||destroyed||request!==avatarRequest) return;
+      const pieceSets=new Map((Array.isArray(sets)?sets:[]).map(p=>[p.username,p.piece_set]));
       const colors=new Map((Array.isArray(themes)?themes:[]).map(p=>[p.username,profileAvatarColor(p.palette)]));
       const images=new Map(avatars.filter(a=>typeof a.avatar==='string'&&/^data:image\/(?:png|jpeg);base64,/.test(a.avatar)).map(a=>[a.username,a.avatar]));
-      for(const row of list.children) { const name=row.querySelector('.rating-player')?.textContent, img=row.querySelector('.rating-avatar'); if(img){img.style.backgroundColor=colors.get(name)||profileAvatarColor('monochrome');if(images.has(name)){img.src=images.get(name);img.classList.add('has-custom-avatar');}} }
-      const own=self?.querySelector('.rating-avatar'); if(own)own.style.backgroundColor=colors.get(ownName)||profileAvatarColor('monochrome'); if(own&&images.has(ownName)) {own.src=images.get(ownName);own.classList.add('has-custom-avatar');}
+      for(const row of list.children) { const name=row.querySelector('.rating-player')?.textContent, img=row.querySelector('.rating-avatar'); if(img){img.style.backgroundColor=colors.get(name)||profileAvatarColor('monochrome');if(images.has(name)){img.src=images.get(name);img.classList.add('has-custom-avatar');}else{setPublicPiece(img,pieceSets.get(name));img.classList.remove('has-custom-avatar');}} }
+      const own=self?.querySelector('.rating-avatar'); if(own)own.style.backgroundColor=colors.get(ownName)||profileAvatarColor('monochrome'); if(own&&images.has(ownName)) {own.src=images.get(ownName);own.classList.add('has-custom-avatar');}else if(own){setPublicPiece(own,pieceSets.get(ownName));own.classList.remove('has-custom-avatar');}
     } catch { /* Ranking remains available if images cannot load. */ }
   }
 
@@ -187,7 +189,7 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
       self.querySelector('.rating-self-score').textContent = formatScore(player);
       self.hidden = false;
       {
-        void Promise.all([client.rpc('profile_avatars',{p_names:[ownName]}),client.rpc('profile_avatar_themes',{p_names:[ownName]})]).then(([images,themes])=>{if(destroyed||request!==sequence)return;const image=self.querySelector('.rating-avatar');if(!image)return;image.style.backgroundColor=profileAvatarColor(themes.data?.[0]?.palette);const avatar=images.data?.[0]?.avatar;if(/^data:image\/(?:png|jpeg);base64,/.test(avatar||'')){image.src=avatar;image.classList.add('has-custom-avatar');}else {image.src='/pieces/cburnett/wN.svg';image.classList.remove('has-custom-avatar');}}).catch(()=>{});
+        void Promise.all([client.rpc('profile_avatars',{p_names:[ownName]}),client.rpc('profile_avatar_themes',{p_names:[ownName]}),client.rpc('profile_piece_sets',{p_names:[ownName]})]).then(([images,themes,sets])=>{if(destroyed||request!==sequence)return;const image=self.querySelector('.rating-avatar');if(!image)return;image.style.backgroundColor=profileAvatarColor(themes.data?.[0]?.palette);const avatar=images.data?.[0]?.avatar;if(/^data:image\/(?:png|jpeg);base64,/.test(avatar||'')){image.src=avatar;image.classList.add('has-custom-avatar');}else {setPublicPiece(image,sets.data?.[0]?.piece_set);image.classList.remove('has-custom-avatar');}}).catch(()=>{});
       }
       animateItems([{el:self.querySelector('.rating-self-name'),type:'name',value:player.username ?? ''}, {el:self.querySelector('.rating-self-score'),type:'score',value:player[unit]}]);
       for (const row of list.children) row.classList.toggle('rating-row-self', row.querySelector('.rating-player')?.textContent === ownName);

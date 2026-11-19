@@ -33,9 +33,9 @@ export function createMemberBoard({ document, board, reducedMotion }) {
     const dx = (files.indexOf(from[0]) - files.indexOf(to[0])) * step;
     const dy = (Number(to[1]) - Number(from[1])) * step;
     const animation = image.animate([
-      { translate:`${dx}px ${dy}px`, filter:'drop-shadow(0 1px 1px #0008) blur(0px)' },
-      { offset:.28, filter:'drop-shadow(0 1px 1px #0008) blur(.75px)' },
-      { translate:'0px 0px', filter:'drop-shadow(0 1px 1px #0008) blur(0px)' },
+      { translate:`${dx}px ${dy}px`, filter:'blur(0px)' },
+      { offset:.28, filter:'blur(.75px)' },
+      { translate:'0px 0px', filter:'blur(0px)' },
     ], { duration: 165, easing:'cubic-bezier(.2,.7,.25,1)' });
     const cell = image.parentElement;
     cell.classList.add('is-moving');

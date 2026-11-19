@@ -8,7 +8,7 @@ const shellHtml = await readFile('pages/app-shell.html', 'utf8');
 const pageHtml = (await Promise.all(['home', 'game-view', 'profile', 'settings', 'help'].map(name => readFile(`pages/${name}.html`, 'utf8')))).join('');
 // Unit tests preload views; browser checks verify the actual lazy loading.
 const html = rootHtml.replace('    </main>', shellHtml.replace('<div id="page-content"></div>', `<div id="page-content">${pageHtml}</div>`) + '    </main>');
-const source = 'const installPieceTheme = () => {}; const setPieceSet = () => {};\n' + (await readFile('app.js', 'utf8')).replace(/import .*?;\n/g, '').replace('export const appReady = initialize();', 'initialize();');
+const source = 'const installPieceTheme = () => {}; const setPieceSet = () => {}; const selectedPieceSet = () => "cburnett"; const validPieceSet = () => "cburnett";\n' + (await readFile('app.js', 'utf8')).replace(/import .*?;\n/g, '').replace('export const appReady = initialize();', 'initialize();');
 const tick = () => new Promise(resolve => setTimeout(resolve, 10));
 async function setup({ existing = false, palette = 'monochrome', failSave = false, systemDark = false, initialStorage = {}, saveHandler = null, getUserHandler = null, userId = 'user-1', otpReady = true, autoConfirm = false, signupError = null, signInHandler = null, url = 'https://example.com', accessToken = null, feedbackHandler = null } = {}) {
   const dom = new JSDOM(html, { runScripts: 'outside-only', url });
