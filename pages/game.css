@@ -204,3 +204,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; }
 .opponent-card-banner img { width:100%; height:100%; object-fit:cover; }
 .opponent-card-avatar { display:block; width:52px; height:52px; object-fit:contain; border:3px solid var(--page-background); background:var(--board-light); border-radius:50%; margin-top:-26px; position:relative; }
 .opponent-card-avatar.custom { object-fit:cover; }.opponent-profile-card .bio-label { color:inherit; opacity:.65; }.opponent-profile-card button { color:inherit; background:transparent; border:1px solid var(--line); padding:7px 10px; margin-top:12px; }
+.opponent-profile-card { animation:player-profile-enter .55s cubic-bezier(.22,1,.36,1) both; }
+.opponent-profile-card .bio-label[hidden],.opponent-profile-card p[hidden] { display:none; }
+@keyframes player-profile-enter { from {opacity:0;transform:translateY(10px);filter:blur(3px)} to {opacity:1;transform:translateY(0);filter:blur(0)} }
+@media(prefers-reduced-motion:reduce) { .opponent-profile-card { animation:none; } }

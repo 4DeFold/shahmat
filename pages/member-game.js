@@ -27,7 +27,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   let currentRequest = null, destroyed = false, reconciling = false, cancelPending = false;
   let premove = null, historyIndex = null, nameForGame = null, nameTimer = null, drag = null, suppressClick = false, actionPending = false;
   let rankUnit = 'yar', scores = null, ratingsKey = null, ratingsRequest = 0, ratingsRetryAt = 0;
-  const format = value => value == null || !Number.isFinite(Number(value)) ? '' : `(${new Intl.NumberFormat('ru-RU', { maximumFractionDigits:1 }).format(Number(value))} ${rankUnit === 'elo' ? 'Эло' : 'ЯР'})`;
+  const format = value => value == null || !Number.isFinite(Number(value)) ? '' : `(${new Intl.NumberFormat('ru-RU', { maximumFractionDigits:0 }).format(Number(value))} ${rankUnit === 'elo' ? 'Эло' : 'ЯР'})`;
   function setAvatar(who, value) { const img = $(`${who}-avatar-image`); if(!img)return; const custom=typeof value==='string' && /^data:image\/(?:png|jpeg);base64,/.test(value); img.src=custom?value:`/pieces/cburnett/${who==='player'?'wP':'bN'}.svg`; img.classList.toggle('custom-profile-avatar',custom); }
   function renderRatings() {
     for (const who of ['player','opponent']) {
@@ -179,12 +179,12 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   function loadName(game) {
     if (nameForGame === game.id) return;
     nameForGame = game.id; opponentProfileName=null; profilePinned = false; showProfile(false); profileTrigger.disabled = false;
-    $('opponent-profile-name').textContent = 'Соперник'; $('opponent-profile-bio').textContent = 'Информация пока недоступна.'; applyProfileTheme(profileCard,'monochrome','light'); if($('opponent-profile-banner')) $('opponent-profile-banner').hidden=true; if($('opponent-profile-avatar')) { $('opponent-profile-avatar').src='/pieces/cburnett/bN.svg'; $('opponent-profile-avatar').classList.remove('custom'); }
+    $('opponent-profile-name').textContent = 'Соперник'; $('opponent-profile-bio').textContent = ''; $('opponent-profile-bio').hidden=true; if($('opponent-profile-bio-label')) $('opponent-profile-bio-label').hidden=true; applyProfileTheme(profileCard,'monochrome','light'); if($('opponent-profile-banner')) $('opponent-profile-banner').hidden=true; if($('opponent-profile-avatar')) { $('opponent-profile-avatar').src='/pieces/cburnett/bN.svg'; $('opponent-profile-avatar').classList.remove('custom'); }
     Promise.resolve(opponentName(game.id)).then(profile => {
       if (nameForGame !== game.id || !profile) return;
       const name = typeof profile === 'string' ? profile : profile.username;
       if (typeof name === 'string' && name) { opponentProfileName=name; revealName(name); $('opponent-profile-name').textContent = name; }
-      if (typeof profile === 'object' && 'bio' in profile) $('opponent-profile-bio').textContent = profile.bio?.trim() || 'Био пока нет.';
+      if (typeof profile === 'object' && 'bio' in profile) { const bio=profile.bio?.trim()||''; $('opponent-profile-bio').textContent=bio; $('opponent-profile-bio').hidden=!bio; if($('opponent-profile-bio-label')) $('opponent-profile-bio-label').hidden=!bio; }
       if(typeof profile === 'object') { applyProfileTheme(profileCard,profile.palette,profile.theme); const avatar=$('opponent-profile-avatar'),banner=$('opponent-profile-banner'); if(avatar){avatar.src=isProfileImage(profile.avatar)?profile.avatar:'/pieces/cburnett/bN.svg';avatar.classList.toggle('custom',isProfileImage(profile.avatar));} if(banner){banner.hidden=!isProfileImage(profile.banner);if(!banner.hidden)banner.src=profile.banner;} }
 
     }).catch(() => {});

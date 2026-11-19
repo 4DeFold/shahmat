@@ -13,7 +13,7 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
   const self = root.querySelector('.rating-self');
   let ownName = null, ownPlayer = null, selfMode = null, displayedMode = null, unit = 'yar', displayed = null;
   const win = root.ownerDocument.defaultView;
-  const number = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 });
+  const number = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 });
   const motionPreference = win.matchMedia?.('(prefers-reduced-motion: reduce)');
   const cache = new Map(), pending = new Map();
   const freshness = 15000;
@@ -99,7 +99,7 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
       if (ownName && player.username === ownName) row.classList.add('rating-row-self');
       const place = root.ownerDocument.createElement('span'); place.className='rating-place'; place.textContent = String(index + 1);
       const person = root.ownerDocument.createElement('button'); person.type='button'; person.className='rating-person rating-profile-trigger'; person.dataset.profileName=String(player.username ?? '');
-      const avatar = root.ownerDocument.createElement('img'); avatar.className='rating-avatar'; avatar.alt=''; avatar.src='/pieces/cburnett/wP.svg';
+      const avatar = root.ownerDocument.createElement('img'); avatar.className='rating-avatar'; avatar.alt=''; avatar.src='/pieces/cburnett/wN.svg';
       const name = root.ownerDocument.createElement('span'); name.className='rating-player'; name.textContent = String(player.username ?? ''); person.append(avatar,name);
       const score = root.ownerDocument.createElement('span'); score.className='rating-score'; score.textContent = formatScore(player);
       row.append(place,person,score); fragment.append(row);

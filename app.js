@@ -347,6 +347,10 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
         view.classList.remove('profile-enter'); void view.offsetWidth;
         if (!reducedMotion.matches) view.classList.add('profile-enter');
       }
+      if (changed && (view.dataset.view === 'settings' || view.dataset.view === 'help')) {
+        view.classList.remove('support-enter'); void view.offsetWidth;
+        if (!reducedMotion.matches) view.classList.add('support-enter');
+      }
       if (changed && focus && !reducedMotion.matches) {
         view.classList.remove('page-enter'); void view.offsetWidth; view.classList.add('page-enter');
       }

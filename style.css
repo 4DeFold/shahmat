@@ -965,3 +965,21 @@ body.startup-ready #landing-screen:not([hidden]) .hero-reveal--tail { animation-
 
 .rating-profile-trigger { border:0; background:transparent; color:inherit; padding:0; text-align:left; cursor:pointer; }
 .rating-profile-trigger:focus-visible { outline:2px solid var(--foreground); outline-offset:4px; }
+/* Use the entire player column, with a single stable line during HyperText. */
+.rating-person { width:100%; }
+.rating-player,.rating-self-name { display:block; flex:1 1 auto; min-width:0; width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.rating-animating::after { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+/* Profile-style staggered, blurred entrances for the two support views. */
+.settings-page.page-enter,.help-page.page-enter { animation:none; }
+.support-enter > h2,.support-enter > .rank-setting,.support-enter .settings-palettes > h3,.support-enter .settings-palettes > .palette-help,.support-enter .settings-palettes > .palette-scroll,.support-enter .feedback-form > * { animation:support-reveal .75s cubic-bezier(.22,1,.36,1) both; }
+.support-enter > .rank-setting { animation-delay:70ms; }
+.support-enter .settings-palettes > h3,.support-enter .feedback-form > :nth-child(1) { animation-delay:140ms; }
+.support-enter .settings-palettes > .palette-help,.support-enter .feedback-form > :nth-child(2) { animation-delay:210ms; }
+.support-enter .settings-palettes > .palette-scroll,.support-enter .feedback-form > :nth-child(3) { animation-delay:280ms; }
+.support-enter .feedback-form > :nth-child(4) { animation-delay:350ms; }
+.support-enter .feedback-form > :nth-child(5) { animation-delay:420ms; }
+.support-enter .feedback-form > :nth-child(6) { animation-delay:490ms; }
+.support-enter .feedback-form > :nth-child(7) { animation-delay:560ms; }
+.support-enter .feedback-form > :nth-child(8) { animation-delay:630ms; }
+@keyframes support-reveal { from {opacity:0;transform:translateY(15px);filter:blur(5px)} to {opacity:1;transform:translateY(0);filter:blur(0)} }
+@media(prefers-reduced-motion:reduce) { .support-enter > h2,.support-enter > .rank-setting,.support-enter .settings-palettes > h3,.support-enter .settings-palettes > .palette-help,.support-enter .settings-palettes > .palette-scroll,.support-enter .feedback-form > * { animation:none; } }

@@ -107,3 +107,11 @@
 .profile-unlock { text-align:center; animation:profile-reveal .55s cubic-bezier(.22,1,.36,1) both; }.profile-unlock>button:first-child { float:right; }.profile-unlock>span { display:block; font-size:70px; }.profile-unlock p { font-size:16px; }
 @media(max-width:700px) { .profile-stat-details { grid-column:1 / -1; } }
 @media(prefers-reduced-motion:reduce) { .profile-stat-details,.profile-unlock { animation:none; } }
+/* Both stat buttons keep their grid positions; each disclosure animates its own height. */
+.profile-details-stack { grid-column:1 / -1; min-width:0; }
+.landing.palette-active .dashboard .profile-stat-details { display:grid; grid-template-rows:0fr; padding:0; border:0; opacity:0; overflow:hidden; animation:none; transition:grid-template-rows .6s cubic-bezier(.22,1,.36,1),opacity .38s ease; }
+.landing.palette-active .dashboard .profile-stat-details.is-open { grid-template-rows:1fr; opacity:1; }
+.profile-detail-clip { min-height:0; overflow:hidden; }
+.profile-detail-inner { margin-top:12px; border:1px solid var(--line); padding:8px 20px; }
+.profile-stat-number,.profile-detail-row strong { font-variant-numeric:tabular-nums; }
+@media(prefers-reduced-motion:reduce) { .landing.palette-active .dashboard .profile-stat-details { transition:none; } }

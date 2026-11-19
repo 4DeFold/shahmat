@@ -304,6 +304,16 @@ test('opponent card is accessible, treats bio as text, and clears between games'
   ui.destroy(); dom.window.close();
 });
 
+test('empty opponent bio is absent rather than a placeholder', async t => {
+  const dom = new JSDOM(html, { url:'https://example.com/pages/game.html' });
+  const ui=createMemberGame({document:dom.window.document,api:async()=>({game:game()}),opponentName:async()=>({username:'Friend',bio:'  '})});
+  t.after(()=>{ui.destroy();dom.window.close();});
+  await ui.open(A); await flush();
+  assert.equal(dom.window.document.getElementById('opponent-profile-bio').hidden,true);
+  assert.equal(dom.window.document.getElementById('opponent-profile-bio-label').hidden,true);
+  assert.equal(dom.window.document.getElementById('opponent-profile-bio').textContent,'');
+});
+
 test('piece reveal is restarted on show but not on a move or visibility change', async () => {
   const dom = new JSDOM(html, { url:'https://example.com/pages/game.html' });
   let calls = 0;
@@ -478,7 +488,7 @@ test('selection survives an opponent move but clears when the selected piece is 
 test('player names and game-mode ratings switch between yar and shadow elo', async () => {
   const dom = new JSDOM(html, { url:'https://example.com/pages/game.html', pretendToBeVisual:true });
   dom.window.matchMedia=()=>({matches:true,addEventListener(){},removeEventListener(){}});
-  const ui=createMemberGame({document:dom.window.document, api:async body=>({game:body.action==='current'?game():null}), playerRatings:async()=>[{player:'self',username:'Alice',yar:1200,elo:1050},{player:'opponent',username:'Bob',yar:1100,elo:1150}],opponentName:async()=>({username:'Bob'})});
+  const ui=createMemberGame({document:dom.window.document, api:async body=>({game:body.action==='current'?game():null}), playerRatings:async()=>[{player:'self',username:'Alice',yar:1200.4,elo:1050.3},{player:'opponent',username:'Bob',yar:1100.4,elo:1150.4}],opponentName:async()=>({username:'Bob'})});
   await ui.open(A); await flush();
   assert.equal(dom.window.document.getElementById('player-name').textContent,'Alice');
   assert.equal(dom.window.document.getElementById('opponent-rating').textContent.replace(/\s/g,''),'(1100ЯР)');

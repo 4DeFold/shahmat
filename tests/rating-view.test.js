@@ -17,6 +17,8 @@ test('rating switches modes, escapes names, and ignores stale requests', async (
   assert.equal(root.querySelector('[data-rating-mode="rapid"]').getAttribute('aria-pressed'),'true');
   assert.equal(root.querySelector('.rating-player').textContent,'<b>Player</b>');
   assert.equal(root.querySelector('.rating-player b'),null);
+  assert.equal(root.querySelector('.rating-score').textContent.replace(/\s/g,''),'1235');
+  assert.equal(root.querySelector('.rating-avatar').getAttribute('src'),'/pieces/cburnett/wN.svg');
   assert.equal(root.querySelectorAll('.rating-row')[1].querySelector('.rating-place').textContent,'2');
   assert.equal(root.querySelector('.rating-board').getAttribute('aria-busy'),'false');
   root.querySelector('[data-rating-mode="blitz"]').click(); await Promise.resolve(); requests[2].resolve({error:'unavailable'}); await tick();
