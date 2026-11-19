@@ -1,8 +1,9 @@
 import { Chess } from 'chess.js';
-import { premoveTargets, validPremove, normalizePremove } from './premove.js';
+import { premoveTargets, validPremove, normalizePremove, projectPremoves } from './premove.js';
 import { createBoardAnnotations } from './board-annotations.js';
 import { createClient } from '@supabase/supabase-js';
 import { createMemberBoard } from './member-board.js';
+import { createMoveHistory, historyTransition } from './move-history.js';
 import { createGameSound } from './game-sound.js';
 import { createStockfish, BOT_LEVELS } from './stockfish-engine.js';
 import { createBotStorage } from './bot-storage.js';
@@ -19,7 +20,7 @@ const annotations=createBoardAnnotations({document,board});
 const names={q:'ферзь',r:'ладья',b:'слон',n:'конь'};
 const piece=(color,type)=>`/pieces/cburnett/${color}${type.toUpperCase()}.svg`;
 let level=0, phase='choose', userId=null, store=null, game=null, chess=new Chess(), selected=null, promotion=null, last=null, engine=null, thinking=false, generation=0;
-let launchDrain=null, premove=null;
+let launchDrain=null, premove=[], historyIndex=null;
 let pageVisible=window.parent===window, orbitFrame=null, orbitAngle=0, orbitSpeed=0, lastFrame=0, demoClock=0, carouselPosition=0, carouselVelocity=0, drag=null, suppressClick=false, destroyed=false;
 const status=text=>{ if ($('status').textContent!==text) $('status').textContent=text; };
 function reveal(id, open) { const el=$(id); if (el.classList.contains('is-open')===open) return; el.classList.toggle('is-open',open); el.inert=!open; el.setAttribute('aria-hidden',String(!open)); }
@@ -178,15 +179,23 @@ function setPhase(value) {
   for(const id of ['bot-actions','moves']) { $(id).inert=!inGame; $(id).setAttribute('aria-hidden',String(!inGame)); }
   if(inGame || value==='returning') stopOrbit(); else startOrbit();
 }
-function draw(move=null) {
-  const legal=selected?(chess.turn()==='w'?chess.moves({square:selected,verbose:true}):premoveTargets(chess,selected,'w')).map(m=>m.to):[];
-  boardView.render({shown:chess,selected,legal,last,premove,premoveMode:chess.turn()!=='w',animatedMove:move});
+function projected() { return premove.length ? projectPremoves(chess,premove,'w') : chess; }
+function shownChess() { if(historyIndex===null)return projected();const p=new Chess();chess.history().slice(0,historyIndex).forEach(m=>p.move(m));return p; }
+function draw(move=null,transitions=[]) {
+  const shown=shownChess(), isLive=historyIndex===null;
+  const legal=selected&&isLive?(chess.turn()==='w'&&!premove.length?chess.moves({square:selected,verbose:true}):premoveTargets(shown,selected,'w')).map(m=>m.to):[];
+  const displayedLast=isLive?last:shown.history({verbose:true}).at(-1);
+  boardView.render({shown,selected,legal,last:displayedLast,premoves:isLive?premove:[],actual:isLive&&premove.length?chess:null,premoveMode:chess.turn()!=='w'||premove.length>0,animatedMove:isLive?move:null,transitions});
 }
-function history() {
-  const moves=chess.history(), list=$('move-list'); list.replaceChildren();
-  for(let i=0;i<moves.length;i+=2) { const row=document.createElement('li'); for(const text of [`${i/2+1}.`,moves[i],moves[i+1]||'—']) { const el=document.createElement('span'); el.textContent=text; row.append(el); } list.append(row); }
-  $('move-count').textContent=String(Math.ceil(moves.length/2)).padStart(2,'0');
+const renderMoves=createMoveHistory({document,list:$('move-list'),count:$('move-count'),onSelect:showHistory});
+function history() { const length=chess.history().length,index=historyIndex??length;renderMoves(chess,historyIndex);$('history-first').disabled=$('history-prev').disabled=index===0;$('history-next').disabled=$('history-last').disabled=index===length; }
+function showHistory(index) {
+ const length=chess.history().length,old=historyIndex??length; historyIndex=index>=length?null:Math.max(0,index); selected=null; annotations.clear();draw(null,historyTransition(chess,old,historyIndex??length));history();
+ status(historyIndex!==null?`Просмотр позиции: ход ${historyIndex} из ${length}.`:phase==='finished'?'Партия завершена.':chess.turn()==='w'?'Ваш ход.':'Ход бота.');
 }
+function navigateHistory(key) { if(!pageVisible || !['playing','finished'].includes(phase) || promotion || document.querySelector('dialog[open]'))return false;const delta=key==='ArrowLeft'||key.toLowerCase()==='a'?-1:key==='ArrowRight'||key.toLowerCase()==='d'?1:0;if(!delta)return false;showHistory((historyIndex??chess.history().length)+delta);return true; }
+for(const [id,fn] of [['history-first',()=>0],['history-prev',()=>(historyIndex??chess.history().length)-1],['history-next',()=>(historyIndex??chess.history().length)+1],['history-last',()=>chess.history().length]]) $(id).addEventListener('click',()=>showHistory(fn()));
+document.addEventListener('keydown',event=>{if(event.defaultPrevented||event.ctrlKey||event.altKey||event.metaKey||event.shiftKey||event.target.closest?.('input,textarea,select,[contenteditable]:not([contenteditable=false])'))return;if(navigateHistory(event.key))event.preventDefault();});
 function snapshot() { game.moves=chess.history(); game.updated_at=new Date().toISOString(); store?.put(game); }
 function finishIfNeeded() {
   if(!game || phase!=='playing') return false;
@@ -195,7 +204,7 @@ function finishIfNeeded() {
   else if(chess.isStalemate()) { game.status='draw'; result='Ничья: пат.'; }
   else if(chess.isDraw() || chess.history().length>=1000) { game.status='draw'; result='Ничья.'; }
   if(!result) return false;
-  thinking=false; premove=null; draw(); setPhase('finished'); reveal('resign-wrap',false); status(result); snapshot(); return true;
+  thinking=false; premove=[]; draw(); setPhase('finished'); reveal('resign-wrap',false); status(result); snapshot(); return true;
 }
 function resignAvailable() { return phase==='playing' && game && Date.now()-Date.parse(game.started_at)>=60000; }
 function updateResign() { reveal('resign-wrap',!!resignAvailable()); }
@@ -210,10 +219,10 @@ async function botMove() {
     cancelDrag(); selected=null; if(promotion?.premove) { promotion=null; reveal('promotion',false); } last=chess.move(move); thinking=false; draw(last); history(); sound.play(chess.isCheck()?'check':last.captured?'capture':'move');
     if(!finishIfNeeded()) {
       snapshot();
-      const queued=premove; premove=null;
+      const queued=premove.shift();
       if(queued && validPremove(chess,queued,'w')) { play(normalizePremove(chess,queued)); return; }
-      if(queued) draw();
-      status(queued ? 'Предварительный ход отменён: он больше невозможен.' : chess.isCheck()?'Шах! Ваш ход.':'Ваш ход.');
+      if(queued) { premove=[]; draw(); }
+      status(historyIndex!==null ? `Просмотр позиции: ход ${historyIndex} из ${chess.history().length}.` : queued ? 'Предварительный ход отменён: он больше невозможен.' : chess.isCheck()?'Шах! Ваш ход.':'Ваш ход.');
     }
   } catch (error) {
     if(current!==generation || phase!=='playing') return;
@@ -227,25 +236,27 @@ function play(move) {
   if(!finishIfNeeded()) { snapshot(); void botMove(); }
 }
 function attempt(from,to) {
-  const moves=(chess.turn()==='w'?chess.moves({square:from,verbose:true}):premoveTargets(chess,from,'w')).filter(m=>m.to===to);
+  const moves=(chess.turn()==='w'&&!premove.length?chess.moves({square:from,verbose:true}):premoveTargets(projected(),from,'w')).filter(m=>m.to===to);
   if(!moves.length) return false;
+  if(chess.turn()!=='w' && premove.length>=20){status('Можно добавить не более 20 предварительных ходов.');return true;}
   if(moves.some(m=>m.promotion)) {
     promotion={from,to,premove:chess.turn()!=='w'}; reveal('promotion',true); const options=$('promotion-options'); options.replaceChildren();
-    for(const type of ['q','r','b','n']) { const button=document.createElement('button'); button.type='button'; button.setAttribute('aria-label',names[type]); const img=document.createElement('img'); img.src=piece('w',type); img.alt=''; button.append(img); button.addEventListener('click',()=>{ if(!promotion)return; const choice=promotion; promotion=null; reveal('promotion',false); if(choice.premove && chess.turn()!=='w') { premove={from:choice.from,to:choice.to,promotion:type}; selected=null; draw(); status('Предварительный ход готов. Нажмите на него, чтобы отменить.'); } else play({from:choice.from,to:choice.to,promotion:type}); }); options.append(button); } options.firstElementChild.focus();
-  } else if(chess.turn()!=='w') { premove={from,to}; selected=null; draw(); status('Предварительный ход готов. Нажмите на него, чтобы отменить.'); } else play({from,to});
+    for(const type of ['q','r','b','n']) { const button=document.createElement('button'); button.type='button'; button.setAttribute('aria-label',names[type]); const img=document.createElement('img'); img.src=piece('w',type); img.alt=''; button.append(img); button.addEventListener('click',()=>{ if(!promotion)return; const choice=promotion; promotion=null; reveal('promotion',false); if(choice.premove && chess.turn()!=='w') { if(premove.length>=20)return; premove.push({from:choice.from,to:choice.to,promotion:type}); selected=null; draw(); status('Предварительный ход готов. До 20 ходов; пустая клетка отменяет очередь.'); } else play({from:choice.from,to:choice.to,promotion:type}); }); options.append(button); } options.firstElementChild.focus();
+  } else if(chess.turn()!=='w') { if(premove.length>=20){status('Можно добавить не более 20 предварительных ходов.');return true;} premove.push({from,to}); selected=null; draw(); status('Предварительный ход готов. До 20 ходов; пустая клетка отменяет очередь.'); } else play({from,to});
   return true;
 }
 board.addEventListener('click',event=>{
-  if(suppressClick || promotion || phase!=='playing') return;
+  if(suppressClick || promotion || phase!=='playing' || historyIndex!==null) return;
   const square=event.target.closest('[data-square]')?.dataset.square; if(!square) return;
-  sound.prime(); if(premove && (premove.from===square||premove.to===square)) { premove=null; selected=null; draw(); status(chess.turn()==='w'?'Ваш ход.':'Ход бота.'); return; }
+  sound.prime();
   if(selected && attempt(selected,square)) return;
-  selected=chess.get(square)?.color==='w' && selected!==square?square:null; draw(); boardView.cell(square)?.focus();
+  if(premove.length && !projected().get(square)) { premove=[]; selected=null; draw(); status(chess.turn()==='w'?'Ваш ход.':'Ход бота.'); return; }
+  selected=projected().get(square)?.color==='w' && selected!==square?square:null; draw(); boardView.cell(square)?.focus();
 });
-board.addEventListener('pointerdown',event=>{ if(event.button===2 && premove) { premove=null; selected=null; draw(); status('Ход бота.'); } if(event.button!==0||phase!=='playing'||promotion) return; const cell=event.target.closest('[data-square]'); if(cell && chess.get(cell.dataset.square)?.color==='w') drag={from:cell.dataset.square,x:event.clientX,y:event.clientY,pointer:event.pointerId,ghost:null,cell}; });
+board.addEventListener('pointerdown',event=>{ if(event.button===2 && premove.length) { premove=[]; selected=null; draw(); status('Ход бота.'); } if(event.button!==0||phase!=='playing'||promotion||historyIndex!==null) return; const cell=event.target.closest('[data-square]'); if(cell && projected().get(cell.dataset.square)?.color==='w') drag={from:cell.dataset.square,x:event.clientX,y:event.clientY,pointer:event.pointerId,ghost:null,cell}; });
 board.addEventListener('pointermove',event=>{
   if(!drag||drag.pointer!==event.pointerId) return;
-  if(!drag.ghost && Math.hypot(event.clientX-drag.x,event.clientY-drag.y)>5) { board.setPointerCapture?.(event.pointerId); selected=drag.from; draw(); drag.ghost=document.createElement('img'); drag.ghost.className='drag-ghost'; drag.ghost.src=piece('w',chess.get(drag.from).type); drag.ghost.alt=''; drag.ghost.style.setProperty('--drag-size',`${drag.cell.getBoundingClientRect().width}px`); drag.cell.classList.add('dragging'); document.body.append(drag.ghost); }
+  if(!drag.ghost && Math.hypot(event.clientX-drag.x,event.clientY-drag.y)>5) { board.setPointerCapture?.(event.pointerId); selected=drag.from; draw(); drag.ghost=document.createElement('img'); drag.ghost.className='drag-ghost'; drag.ghost.src=piece('w',projected().get(drag.from).type); drag.ghost.alt=''; drag.ghost.style.setProperty('--drag-size',`${drag.cell.getBoundingClientRect().width}px`); drag.cell.classList.add('dragging'); document.body.append(drag.ghost); }
   if(drag.ghost) drag.ghost.style.transform=`translate3d(${event.clientX}px,${event.clientY}px,0) translate(-50%,-50%)`;
 });
 function cancelDrag() { if(!drag)return; drag.ghost?.remove(); drag.cell.classList.remove('dragging'); drag=null; }
@@ -255,16 +266,16 @@ function endDrag(event,cancel=false) {
   suppressClick=true; setTimeout(()=>{suppressClick=false;},0); if(!target || !attempt(d.from,target)) { selected=null; draw(); }
 }
 board.addEventListener('pointerup',event=>endDrag(event)); board.addEventListener('pointercancel',event=>endDrag(event,true));
-document.addEventListener('keydown',event=>{ if(event.key==='Escape' && premove) { premove=null; selected=null; draw(); status(chess.turn()==='w'?'Ваш ход.':'Ход бота.'); } });
+document.addEventListener('keydown',event=>{ if(event.key==='Escape' && premove.length) { premove=[]; selected=null; draw(); status(chess.turn()==='w'?'Ваш ход.':'Ход бота.'); } });
 $('toggle-moves').addEventListener('click',()=>{ const toggle=$('toggle-moves'), expanded=toggle.getAttribute('aria-expanded')!=='true'; toggle.setAttribute('aria-expanded',String(expanded)); $('history-content').classList.toggle('is-collapsed',!expanded); $('history-content').inert=!expanded; });
 $('resign-button').addEventListener('click',()=>{ if(resignAvailable()) $('resign-dialog').showModal(); });
 $('resign-cancel').addEventListener('click',()=>$('resign-dialog').close());
-$('resign-confirm').addEventListener('click',()=>{ $('resign-dialog').close(); if(!resignAvailable()) return; ++generation; engine?.destroy(); engine=null; thinking=false; premove=null; cancelDrag(); draw(); game.status='black_win'; snapshot(); setPhase('finished'); status('Вы сдались. ЯР не изменился.'); updateResign(); });
+$('resign-confirm').addEventListener('click',()=>{ $('resign-dialog').close(); if(!resignAvailable()) return; ++generation; engine?.destroy(); engine=null; thinking=false; premove=[]; cancelDrag(); draw(); game.status='black_win'; snapshot(); setPhase('finished'); status('Вы сдались. ЯР не изменился.'); updateResign(); });
 $('return-button').addEventListener('click',()=>void returnToSelection());
 async function returnToSelection() {
   if(phase!=='playing' && phase!=='finished') return;
   if(phase==='playing' && !confirm('Вернуться к выбору? Текущая партия будет завершена.')) return;
-  const current=++generation; engine?.destroy(); engine=null; thinking=false; premove=null; cancelDrag(); annotations.clear();
+  const current=++generation; engine?.destroy(); engine=null; thinking=false; premove=[]; cancelDrag(); annotations.clear();
   if(game?.status==='active') { game.status='abandoned'; snapshot(); }
   reveal('promotion',false); reveal('retry-wrap',false); promotion=null;
   const target=$('target-board');
@@ -293,7 +304,7 @@ async function launch() {
   if(phase!=='choose'||!userId||!store) return;
   sound.prime(); const current=++generation;
   game={id:crypto.randomUUID(),level:level+1,moves:[],status:'active',started_at:new Date().toISOString(),updated_at:new Date().toISOString()};
-  chess=new Chess(); selected=null; premove=null; annotations.clear(); last=null; draw(); history(); snapshot();
+  chess=new Chess(); selected=null; premove=[]; historyIndex=null; annotations.clear(); last=null; draw(); history(); snapshot();
   fadeEntryIntoLaunch(); setPhase('launching'); status('Готовим доску…');
   if(!motion.matches) {
     const scene=stages[level]; let chosen=null, restoreBoard=null;
@@ -388,6 +399,7 @@ function animateEntry() {
 }
 window.addEventListener('message',event=>{
   if(event.origin!==location.origin || event.source!==window.parent) return;
+  if(event.data?.type==='shahmat-history-key' && typeof event.data.key==='string') { navigateHistory(event.data.key); return; }
   if(event.data?.type==='shahmat-profile-updated') { setPlayerAvatar(event.data.avatar); return; }
   if(event.data?.type==='shahmat-bot-hidden') { pageVisible=false; stopOrbit(); return; }
   if(event.data?.type==='shahmat-bot-shown') { const wasHidden=!pageVisible; pageVisible=true; startOrbit(); if(wasHidden) animateEntry(); return; }

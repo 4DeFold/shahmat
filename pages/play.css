@@ -118,3 +118,4 @@ body.demo-page .status-card::before { content: ''; position: absolute; inset: 0;
 .square.premove::before { background:#203085; }
 .square.possible.premove-dest::after { background:rgba(20,30,85,.5); }
 .square.possible.premove-dest:has(.piece)::after { background:transparent; border-color:rgba(20,30,85,.3); }
+.demo-page .piece.premove-ghost { opacity:.52; filter:drop-shadow(0 0 4px #203085); }

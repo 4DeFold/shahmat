@@ -25,12 +25,21 @@ test('pins, checks, castling and sliding pieces use future rather than current l
  assert.deepEqual(targets(sliding,'d4','w'),[]);
 });
 
-test('premove geometry ignores friendly blockers and supports castling on the rook',()=>{
+test('premove geometry respects friendly blockers and supports castling on the rook',()=>{
  const c=new Chess(); c.move('e4');
- assert.ok(targets(c,'a8','b').includes('a5'));
- assert.ok(targets(c,'a8','b').includes('a7'));
- assert.ok(targets(c,'e8','b').includes('h8'));
+ assert.ok(!targets(c,'a8','b').includes('a5'));
+ assert.ok(!targets(c,'a8','b').includes('a7'));
+ assert.ok(!targets(c,'e8','b').includes('h8'));
  const ready=new Chess('r3k2r/8/8/8/8/8/8/4K3 b kq - 0 1');
  assert.deepEqual(normalizePremove(ready,{from:'e8',to:'h8'}),{from:'e8',to:'g8'});
  assert.equal(validPremove(ready,{from:'e8',to:'h8'},'b'),true);
+});
+
+test('sliders cannot jump multiple blockers and hypothetical queue is isolated',async()=>{
+ const {projectPremoves}=await import('../pages/premove.js');
+ const blocked=new Chess('4k3/8/3p4/3p4/3p4/3p4/3p4/3QK3 b - - 0 1');
+ assert.ok(!targets(blocked,'d1','w').includes('d6'));
+ const game=new Chess();game.move('e4');const before=game.fen();
+ const view=projectPremoves(game,[{from:'g1',to:'f3'},{from:'f3',to:'g5'}],'w');
+ assert.equal(view.get('g5').type,'n');assert.equal(view.get('g1'),undefined);assert.equal(game.fen(),before);
 });

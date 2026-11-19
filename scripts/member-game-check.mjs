@@ -78,7 +78,7 @@ try {
   await page.mouse.move(to.x + to.width/2, to.y + to.height/2, { steps:8 }); await page.mouse.up();
   assert.equal(await game.locator('[data-square=f3]').evaluate(el => el.classList.contains('premove')), true);
   snapshot = { ...snapshot, moves:['e4','e5'], turn:'w', version:2 };
-  await game.locator('[data-square=f3] img').waitFor();
+  await game.locator('[data-square=f3] img:not(.premove-ghost)').waitFor();
   assert.equal(snapshot.moves.at(-1), 'Nf3');
   await game.locator('#history-first').click();
   assert.equal(await game.locator('[data-square=e2] img').count(), 1);

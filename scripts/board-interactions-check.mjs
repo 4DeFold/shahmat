@@ -44,7 +44,7 @@ try {
  await page.goto(`${base}/pages/bot-game.html`);await page.locator('#bot-play:not([disabled])').waitFor();await page.locator('#bot-play').click();await page.locator('#bot-app[data-phase=playing]').waitFor();
  await annotations(page);await page.locator('[data-square=e2]').click();await page.locator('[data-square=e2]').click();await page.locator('[data-square=e4]').click();
  await page.locator('[data-square=e4]').click();await page.locator('[data-square=d5]').click();assert.equal(await page.locator('[data-square=d5].premove').count(),1);
- await page.waitForFunction(()=>document.querySelector('[data-square=d5] img')?.getAttribute('src')?.includes('wP'),null,{timeout:6000});
+ await page.waitForFunction(()=>document.querySelector('[data-square=d5] img')?.getAttribute('src')?.includes('wP') && !document.querySelector('#board .premove'),null,{timeout:6000});
  assert.equal(await page.locator('#board .premove').count(),0);await page.close();
  // Black online board is rotated via CSS, unlike the guest board's reordered cells.
  const online=await browser.newPage({viewport:{width:1200,height:850},reducedMotion:'reduce'});await online.addInitScript(value=>localStorage.setItem('sb-eswyxbyddkajysogtglp-auth-token',JSON.stringify(value)),session);

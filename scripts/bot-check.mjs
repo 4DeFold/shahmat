@@ -22,7 +22,7 @@ try {
    return route.fulfill({json:{game:null}});
   });
   await page.goto(`${base}/bot`); await page.locator('#page-bot').waitFor({state:'visible'});
-  const nav=await page.locator('.sidebar-nav [data-page]').evaluateAll(els=>els.map(el=>el.dataset.page)); assert.deepEqual(nav,['game','bot','rating']);
+  const nav=await page.locator('.sidebar-nav [data-page]').evaluateAll(els=>els.map(el=>el.dataset.page)); assert.deepEqual(nav,['game','bot','rating','watch']);
   const frame=page.frameLocator('#bot-game-frame'); await frame.locator('#bot-play:not([disabled])').waitFor({timeout:20000});
   assert.equal(await frame.locator('#orbit-stage .orbit-board').count(),8);
   assert.equal(await frame.locator('.orbit-stage').count(),6);

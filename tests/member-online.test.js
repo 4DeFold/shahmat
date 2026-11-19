@@ -45,7 +45,7 @@ test('board opens at starting position, modes are explicit and a real request st
   assert.deepEqual(calls.at(-1), { action:'search', mode:'rapid' });
   assert.match(app.$('status').textContent, /Ищем/);
   app.$('cancel-search').click(); await flush();
-  assert.equal(calls.at(-1).action, 'cancel'); assert.match(app.$('status').textContent, /отменён/);
+  assert.equal(calls.at(-1).action, 'cancel'); assert.match(app.$('status').textContent, /отменен|отменён|отменена/);
   app.close();
 });
 
@@ -92,7 +92,7 @@ test('leaving waits for an in-flight search before cancelling the server queue',
   app.$('start-search').click(); await flush(); app.ui.hide(); await flush();
   assert.deepEqual(calls, ['current','search']);
   release({ state:'searching' }); await flush();
-  assert.deepEqual(calls, ['current','search','cancel']); assert.match(app.$('status').textContent, /отменён/);
+  assert.deepEqual(calls, ['current','search','cancel']); assert.match(app.$('status').textContent, /отменен|отменён|отменена/);
   app.close();
 });
 
@@ -132,7 +132,7 @@ test('premove is sent only after the other move and can be cancelled', async t =
   await app.ui.open(A); await flush();
   const click = square => app.$('board').querySelector(`[data-square="${square}"]`).click();
   click('g1'); click('f3'); assert.equal(app.$('board').querySelector('[data-square=f3]').classList.contains('premove'), true);
-  click('f3'); assert.equal(app.$('board').querySelector('[data-square=f3]').classList.contains('premove'), false);
+  click('a3'); assert.equal(app.$('board').querySelector('[data-square=f3]').classList.contains('premove'), false);
   click('g1'); click('f3'); assert.equal(moves.length, 0);
   current = game({ moves:['e4','e5'], turn:'w' }); app.ui.hide(); app.ui.show(); await flush();
   assert.equal(moves.length, 1); assert.equal(moves[0].from, 'g1'); assert.equal(moves[0].to, 'f3');
@@ -167,7 +167,7 @@ test('drag submits a legal move and illegal premove is cancelled on the next pos
   assert.ok(board.querySelector('[data-square=e5]').classList.contains('premove'));
   current = game({ moves:['e4','e5'], turn:'w' });
   app.ui.hide(); app.ui.show(); await flush();
-  assert.equal(calls.length, 1); assert.match(app.$('status').textContent, /отменён/);
+  assert.equal(calls.length, 1); assert.match(app.$('status').textContent, /отменен|отменён|отменена/);
 });
 
 test('optimistic move and its confirmation keep squares and pieces stable', async t => {
@@ -539,10 +539,47 @@ test('history keys navigate half-moves and incoming moves do not dislodge a past
   state=game({moves:['e4','e5','Nf3','Nc6'],turn:'w'}); app.ui.hide(); app.ui.show(); await flush();
   assert.equal(app.$('move-list').querySelector('.current').textContent,'e5');
   assert.ok(app.$('board').querySelector('[data-square=b8] img'));
-  key('ArrowRight'); assert.equal(app.$('move-list').querySelector('.current').textContent,'Nf3');
-  key('d'); assert.equal(app.$('move-list').querySelector('.current').textContent,'Nc6');
+  key('ArrowRight'); assert.equal(app.$('move-list').querySelector('.current').textContent,'f3');
+  key('d'); assert.equal(app.$('move-list').querySelector('.current').textContent,'c6');
   key('ArrowLeft'); assert.equal(app.$('move-list').querySelector('.current').getAttribute('aria-current'),'step');
   app.$('move-list').querySelector('[data-history-index="1"]').click(); assert.equal(app.$('move-list').querySelector('.current').textContent,'e4');
   const input=app.$('mode-list').querySelector('input'); input.disabled=false; input.focus(); input.dispatchEvent(new app.dom.window.KeyboardEvent('keydown',{key:'d',bubbles:true}));
   assert.equal(app.$('move-list').querySelector('.current').textContent,'e4');
+});
+
+test('a chain of premoves uses ghost positions, executes one per reply and cancels on empty square',async t=>{
+ let current=game({moves:['e4'],turn:'b'}), sent=[];
+ const app=setup(async body=>{if(body.action==='move'){sent.push(body);current=game({moves:['e4','e5','Nf3'],turn:'b'});}return {game:current};});t.after(()=>app.close());
+ await app.ui.open(A);await flush();const board=app.$('board'), click=s=>board.querySelector(`[data-square=${s}]`).click();
+ click('g1');click('f3'); assert.ok(board.querySelector('[data-square=f3] .premove-ghost'));
+ click('f3');click('g5'); assert.ok(board.querySelector('[data-square=g5] .premove-ghost'));
+ current=game({moves:['e4','e5'],turn:'w'});app.ui.hide();app.ui.show();await flush();
+ assert.equal(sent.length,1);assert.equal(sent[0].to,'f3');assert.ok(board.querySelector('[data-square=g5] .premove-ghost'));
+ click('a3');assert.equal(board.querySelectorAll('.premove-ghost').length,0);assert.ok(board.querySelector('[data-square=f3] .piece'));
+});
+
+test('premove queue is capped at twenty without clearing it',async t=>{
+ const app=setup(async()=>({game:game({moves:['e4'],turn:'b'})}));t.after(()=>app.close());await app.ui.open(A);await flush();
+ const board=app.$('board'),click=s=>board.querySelector(`[data-square=${s}]`).click();
+ for(let i=0;i<20;i++){click(i%2?'f3':'g1');click(i%2?'g1':'f3');}
+ assert.ok(board.querySelector('[data-square=g1] .piece'));click('g1');click('f3');
+ assert.match(app.$('status').textContent,/20/);assert.ok(board.querySelector('[data-square=g1].premove'));assert.equal(board.querySelector('[data-square=f3] .piece'),null);
+ click('a3');assert.equal(board.querySelectorAll('.premove').length,0);
+});
+
+test('successive premoves are submitted only after successive opponent replies',async t=>{
+ let current=game({moves:['e4'],turn:'b'}),sent=[];
+ const app=setup(async body=>{if(body.action==='move'){sent.push(body);const c=new Chess();current.moves.forEach(m=>c.move(m));c.move({from:body.from,to:body.to});current=game({moves:c.history(),turn:c.turn()});}return {game:current};});t.after(()=>app.close());await app.ui.open(A);await flush();
+ const board=app.$('board'),click=s=>board.querySelector(`[data-square=${s}]`).click();click('g1');click('f3');click('f3');click('g5');
+ current=game({moves:['e4','e5'],turn:'w'});app.ui.hide();app.ui.show();await flush();assert.deepEqual(sent.map(x=>x.to),['f3']);
+ current=game({moves:['e4','e5','Nf3','Nc6'],turn:'w'});app.ui.hide();app.ui.show();await flush();assert.deepEqual(sent.map(x=>x.to),['f3','g5']);
+});
+
+test('history navigation animates moved pieces forwards and backwards',async t=>{
+ const dom=new JSDOM(html,{url:'https://example.com/pages/game.html',pretendToBeVisual:true});t.after(()=>dom.window.close());
+ const animations=[];dom.window.HTMLElement.prototype.animate=function(frames){animations.push({square:this.parentElement?.dataset.square,frames});return {finished:Promise.resolve(),cancel(){}};};
+ const board=dom.window.document.querySelector('#board');Object.defineProperty(board,'clientWidth',{value:800});
+ const ui=createMemberGame({document:dom.window.document,api:async()=>({game:game({moves:['e4','e5','Nf3'],turn:'b',status:'finished'})})});t.after(()=>ui.destroy());await ui.open(A);await flush();animations.length=0;
+ dom.window.document.querySelector('#history-prev').click();assert.ok(animations.some(a=>a.square==='g1'&&a.frames[0].translate));animations.length=0;
+ dom.window.document.querySelector('#history-next').click();assert.ok(animations.some(a=>a.square==='f3'&&a.frames[0].translate));
 });

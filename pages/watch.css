@@ -1,0 +1,9 @@
+.watch-title { margin:0 0 26px; font:400 32px/1.1 'Playfair Display',serif; }.watch-title span {color:var(--accent)}
+.watch-list { display:grid; gap:6px; max-height:36vh; overflow:auto; overscroll-behavior:contain; }
+.watch-list button { border:1px solid var(--line); background:var(--surface); color:var(--ink); text-align:left; padding:11px 12px; cursor:pointer; font:inherit; }
+.watch-list button[aria-current=true] { border-color:var(--accent); background:var(--surface-alt); }
+.watch-list strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.watch-list small { display:block; color:var(--muted); margin-top:4px; }
+.watch-more { border:1px solid var(--line); background:transparent; color:inherit; padding:8px; width:100%; cursor:pointer; margin-top:8px; }
+#watch-status { font-size:13px; color:var(--muted); }
+#watch-status:empty {display:none} #watch-app .board .square {cursor:default}
