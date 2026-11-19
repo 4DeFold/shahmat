@@ -1,4 +1,4 @@
-import {applyProfileTheme,isProfileImage} from './profile-theme.js';
+import {applyProfileTheme,isProfileImage,profileAvatarColor} from './profile-theme.js';
 import { Chess } from 'chess.js';
 import { createMemberBoard } from './member-board.js';
 import { createGameSound } from './game-sound.js';
@@ -6,8 +6,8 @@ import { createRollingClock } from './rolling-clock.js';
 import { retryMessage } from './match-api.js';
 import { createClockSync } from './clock-sync.js';
 
-const times = { blitz: 180000, rapid: 600000, classical: 3600000, daily: 86400000 };
-const modeLabels = { blitz:'Блиц · 3 мин', rapid:'Рапид · 10 мин', classical:'Классика · 1 час', daily:'Дневная · 24 часа' };
+const times = { blitz: 180000, rapid: 600000, classical: 3600000 };
+const modeLabels = { blitz:'Блиц · 3 мин', rapid:'Рапид · 10 мин', classical:'Классика · 1 час' };
 const names = { k:'король', q:'ферзь', r:'ладья', b:'слон', n:'конь', p:'пешка' };
 const files = 'abcdefgh';
 const pieceSrc = (color, type) => `/pieces/cburnett/${color}${type.toUpperCase()}.svg`;
@@ -28,10 +28,10 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   let premove = null, historyIndex = null, nameForGame = null, nameTimer = null, drag = null, suppressClick = false, actionPending = false;
   let rankUnit = 'yar', scores = null, ratingsKey = null, ratingsRequest = 0, ratingsRetryAt = 0;
   const format = value => value == null || !Number.isFinite(Number(value)) ? '' : `(${new Intl.NumberFormat('ru-RU', { maximumFractionDigits:0 }).format(Number(value))} ${rankUnit === 'elo' ? 'Эло' : 'ЯР'})`;
-  function setAvatar(who, value) { const img = $(`${who}-avatar-image`); if(!img)return; const custom=typeof value==='string' && /^data:image\/(?:png|jpeg);base64,/.test(value); img.src=custom?value:`/pieces/cburnett/${who==='player'?'wP':'bN'}.svg`; img.classList.toggle('custom-profile-avatar',custom); }
+  function setAvatar(who, value) { const img = $(`${who}-avatar-image`); if(!img)return; const custom=typeof value==='string' && /^data:image\/(?:png|jpeg);base64,/.test(value); img.src=custom?value:`/pieces/cburnett/${who==='player'?'wN':'bN'}.svg`; img.classList.toggle('custom-profile-avatar',custom); }
   function renderRatings() {
     for (const who of ['player','opponent']) {
-      const rating = $(who + '-rating'); if (rating) rating.textContent = format(scores?.[who === 'player' ? 'self' : who]?.[rankUnit]);
+      const data=scores?.[who === 'player' ? 'self' : who]; const rating = $(who + '-rating'); if (rating) rating.textContent = format(data?.[rankUnit]); const badge=$(who+'-top-status'); if(badge){const place=Number(data?.topPlace);badge.hidden=!(place>=1&&place<=5);badge.textContent=badge.hidden?'':`Топ ${place}`;} const img=$(who+'-avatar-image');if(img)img.parentElement.style.backgroundColor=profileAvatarColor(data?.palette);
     }
   }
   function loadRatings(game) {
@@ -166,14 +166,14 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   }
   const profileTrigger = $('opponent-profile-trigger'), profileCard = $('opponent-profile-card');
   let profilePinned = false, opponentProfileName = null;
-  $('opponent-profile-open')?.addEventListener('click',()=>{ if(!opponentProfileName)return; if(win.parent!==win) win.parent.postMessage({type:'shahmat-open-profile',username:opponentProfileName},win.location.origin); else win.location.href=`/profile?player=${encodeURIComponent(opponentProfileName)}`; });
+  function openOpponent(){if(!opponentProfileName)return;if(win.parent!==win)win.parent.postMessage({type:'shahmat-open-profile',username:opponentProfileName},win.location.origin);else win.location.href=`/profile?player=${encodeURIComponent(opponentProfileName)}`;}
   function showProfile(show) { profileCard.hidden = !show; profileTrigger.setAttribute('aria-expanded', String(show)); }
   profileTrigger.addEventListener('pointerenter', event => { if (event.pointerType !== 'touch' && !profileTrigger.disabled) showProfile(true); });
   $('opponent-profile-trigger').parentElement.addEventListener('pointerleave', () => { if (!profilePinned && document.activeElement !== profileTrigger && !profileCard.contains(document.activeElement)) showProfile(false); });
   profileTrigger.addEventListener('focus', () => { if (!profileTrigger.disabled) showProfile(true); });
   profileTrigger.addEventListener('blur', event => { if (!profilePinned && !profileCard.contains(event.relatedTarget)) showProfile(false); });
   profileCard.addEventListener('focusout', event => { if(!profilePinned && !profileCard.contains(event.relatedTarget) && event.relatedTarget!==profileTrigger) showProfile(false); });
-  profileTrigger.addEventListener('click', () => { profilePinned = !profilePinned; showProfile(profilePinned); });
+  profileTrigger.addEventListener('click', openOpponent);
   document.addEventListener('keydown', event => { if (event.key === 'Escape') { profilePinned = false; showProfile(false); } });
   document.addEventListener('pointerdown', event => { if (!profileTrigger.parentElement.contains(event.target)) { profilePinned = false; showProfile(false); } });
   function loadName(game) {
@@ -252,7 +252,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
       else if (phase === 'searching' && response.state === 'searching') setStatus('Ищем соперника с таким же режимом…');
     } catch (error) { if (expected === generation) { pollFailures = Math.min(pollFailures + 1, 5); setStatus(retryMessage(error, 'Не удалось связаться с игровым сервисом. Повторяем попытку…'), true); } }
     // Faster updates while waiting for the opponent, but back off on outages.
-    const delay = pollFailures ? Math.min(10000, 800 * 2 ** (pollFailures - 1)) : phase === 'active' && mode === 'daily' ? 15000 : phase === 'active' && snapshot?.turn !== currentColor() ? 450 : 900;
+    const delay = pollFailures ? Math.min(10000, 800 * 2 ** (pollFailures - 1)) : phase === 'active' && snapshot?.turn !== currentColor() ? 450 : 900;
     if (expected === generation && isVisible() && ['searching','active'].includes(phase)) polling = setTimeout(() => poll(expected), delay);
   }
   async function search() {

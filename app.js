@@ -6,6 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 import './theme.js';
 import './pages/profile.css';
 import { createProfileView } from './pages/profile-view.js';
+import {applyProfileTheme,clearProfileTheme} from './pages/profile-theme.js';
 
 // Preserve the callback type before Supabase consumes and clears the URL fragment.
 const callbackParams = new URLSearchParams(window.location.hash.slice(1));
@@ -263,7 +264,7 @@ const pageLoaders = {
 let pageRequest = 0;
 const viewId = name => name === 'home' ? 'dashboard-home' : `page-${name}`;
 const viewLoads = new Map();
-let frameReady = null, botFrameReady = null, ratingView = null, profileView = null;
+let frameReady = null, botFrameReady = null, ratingView = null, profileView = null, profileReturnPage = 'rating';
 let onlineStop = null, heartbeatStop = null, onlineUser = null, onlineCount = null;
 function sendOnline() { $('member-game-frame')?.contentWindow?.postMessage({ type: 'shahmat-online', count: onlineCount }, window.location.origin); }
 function startOnline(id) {
@@ -284,7 +285,7 @@ async function loadView(name) {
     if (name === 'settings') { applyPalette(selectedPalette); applyRankUnit(rankUnit); }
     if (name === 'profile') {
       updateProfileAppearance();
-      profileView = createProfileView($('page-profile'), supabase, { onBack() { delete $('page-profile').dataset.profileOther; updateProfileAppearance(); void profileView?.show(profile,appearanceUserId); }, onLoaded(updated) { profile = updated; }, onSaved(updated, media) {
+      profileView = createProfileView($('page-profile'), supabase, { onBack() { void showPage(profileReturnPage,{updateHistory:true,focus:true}); }, onTheme(palette,theme) { const sidebar=$('app-sidebar');if(!sidebar)return;if(palette){applyProfileTheme(sidebar,palette,theme);sidebar.style.backgroundColor='var(--surface-raised)';}else clearProfileTheme(sidebar); }, onLoaded(updated) { profile = updated; }, onSaved(updated, media) {
         profile = updated; ratingView?.invalidate?.();
         for (const id of ['member-game-frame','bot-game-frame']) $(id)?.contentWindow?.postMessage({type:'shahmat-profile-updated',username:updated.username,avatar:media.avatar}, window.location.origin);
       } });
@@ -306,6 +307,7 @@ async function loadView(name) {
 }
 async function openOtherProfile(name) {
   if (!name || !profile) return;
+  if(currentPage()!=='profile') profileReturnPage=currentPage();
   await showPage('profile', {updateHistory:true});
   if (currentPage() === 'profile') void profileView?.showOther(name);
 }

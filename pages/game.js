@@ -17,7 +17,7 @@ const ui = createMemberGame({ document, opponentName: async gameId => {
 }, playerRatings: async gameId => {
   const { data, error } = await supabase.rpc('rank_game_players', { p_game:gameId });
   if(error||!Array.isArray(data)) return null;
-  try { const {data:avatars}=await supabase.rpc('profile_avatars',{p_names:data.map(row=>row.username).filter(Boolean)}); const byName=new Map((avatars||[]).map(row=>[row.username,row.avatar])); return data.map(row=>({...row,avatar:byName.get(row.username)||null})); }
+  try { const names=data.map(row=>row.username).filter(Boolean); const [images,themes,ranking]=await Promise.all([supabase.rpc('profile_avatars',{p_names:names}),supabase.rpc('profile_avatar_themes',{p_names:names}),supabase.rpc('rank_leaderboard',{p_mode:'overall'})]); const byName=new Map((Array.isArray(images.data)?images.data:[]).map(row=>[row.username,row.avatar]));const palettes=new Map((Array.isArray(themes.data)?themes.data:[]).map(row=>[row.username,row.palette]));const places=new Map((Array.isArray(ranking.data)?ranking.data:[]).slice(0,5).map((row,i)=>[row.username,i+1])); return data.map(row=>({...row,avatar:byName.get(row.username)||null,palette:palettes.get(row.username),topPlace:places.get(row.username)})); }
   catch { return data; }
 }, api: createMatchApi(supabase) });
 const ownProfileCard=createProfileCard(document.getElementById('member-game'),supabase,name=>{if(window.parent!==window)window.parent.postMessage({type:'shahmat-open-profile',username:name},window.location.origin);else location.href=`/profile?player=${encodeURIComponent(name)}`;});

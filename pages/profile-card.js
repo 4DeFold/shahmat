@@ -1,7 +1,7 @@
 import {applyProfileTheme,isProfileImage} from './profile-theme.js';
 // One lazy card shared by all rows; fetched only when a player is inspected.
 export function createProfileCard(root,client,onOpen=()=>{}){
- const doc=root.ownerDocument,win=doc.defaultView,card=doc.createElement('aside');card.className='player-mini-card';card.hidden=true;card.innerHTML='<div class="player-mini-banner"><img alt="" hidden></div><img class="player-mini-avatar" alt=""><strong class="player-mini-name"></strong><p class="player-mini-bio"></p><button type="button">Открыть профиль ↗</button>';doc.body.append(card);
+ const doc=root.ownerDocument,win=doc.defaultView,card=doc.createElement('aside');card.className='player-mini-card';card.hidden=true;card.innerHTML='<div class="player-mini-banner"><img alt="" hidden></div><img class="player-mini-avatar" alt=""><strong class="player-mini-name"></strong><p class="player-mini-bio"></p>';doc.body.append(card);
  let trigger=null,seq=0,timer=null,pinned=false;
  function hide(){clearTimeout(timer);card.hidden=true;trigger=null;seq++;pinned=false;}
  function later(){clearTimeout(timer);timer=setTimeout(()=>{if(!pinned&&!card.matches(':hover')&&doc.activeElement!==trigger&&!card.contains(doc.activeElement))hide();},180);}
@@ -12,8 +12,9 @@ export function createProfileCard(root,client,onOpen=()=>{}){
  root.addEventListener('pointerover',e=>{const el=e.target.closest('[data-profile-name]');if(el&&!el.contains(e.relatedTarget)&&e.pointerType!=='touch')void show(el);});
  root.addEventListener('pointerout',e=>{const el=e.target.closest('[data-profile-name]');if(el&&!el.contains(e.relatedTarget))later();});
  root.addEventListener('focusin',e=>{const el=e.target.closest('[data-profile-name]');if(el)void show(el);});root.addEventListener('focusout',later);
- root.addEventListener('click',e=>{const el=e.target.closest('[data-profile-name]');if(el){e.preventDefault();if(trigger===el&&!card.hidden)pinned=true;else void show(el,true);}});
- card.addEventListener('pointerenter',()=>clearTimeout(timer));card.addEventListener('pointerleave',later);card.querySelector('button').addEventListener('click',()=>{const name=trigger?.dataset.profileName;hide();if(name)onOpen(name);});
+ root.addEventListener('click',e=>{const el=e.target.closest('[data-profile-name]');if(el){e.preventDefault();const name=el.dataset.profileName;hide();if(name)onOpen(name);}});
+ root.addEventListener('keydown',e=>{const el=e.target.closest('[role=button][data-profile-name]');if(el&&(e.key==='Enter'||e.key===' ')){e.preventDefault();const name=el.dataset.profileName;hide();if(name)onOpen(name);}});
+ card.addEventListener('pointerenter',()=>clearTimeout(timer));card.addEventListener('pointerleave',later);
  doc.addEventListener('pointerdown',e=>{if(!card.hidden&&!card.contains(e.target)&&!trigger?.contains(e.target))hide();});doc.addEventListener('keydown',e=>{if(e.key==='Escape')hide();});
  return {hide,destroy(){hide();card.remove();}};
 }

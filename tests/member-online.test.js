@@ -35,7 +35,7 @@ test('board opens at starting position, modes are explicit and a real request st
   assert.equal(app.$('player-clock').getAttribute('aria-label'), '00:00');
   assert.equal(app.$('opponent-clock').getAttribute('aria-label'), '00:00');
   assert.equal(app.$('board').querySelector('[data-square=e2] img').getAttribute('src'), '/pieces/cburnett/wP.svg');
-  assert.deepEqual([...app.$('mode-list').querySelectorAll('input')].map(input => input.value), ['blitz','rapid','classical','daily']);
+  assert.deepEqual([...app.$('mode-list').querySelectorAll('input')].map(input => input.value), ['blitz','rapid','classical']);
   assert.equal(app.$('start-search').disabled, true); assert.equal(app.$('start-search').hidden, true);
   await app.ui.open(A);
   assert.equal(app.$('player-color').textContent, '');
@@ -300,7 +300,7 @@ test('opponent card is accessible, treats bio as text, and clears between games'
   assert.equal(doc.getElementById('opponent-profile-bio').querySelector('img'), null);
   assert.ok(doc.getElementById('opponent-profile-avatar'));
   doc.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key:'Escape' })); assert.equal(card.hidden, true);
-  trigger.click(); assert.equal(card.hidden, false); trigger.click(); assert.equal(card.hidden, true);
+  assert.equal(doc.getElementById('opponent-profile-open'),null);
   ui.destroy(); dom.window.close();
 });
 

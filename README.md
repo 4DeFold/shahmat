@@ -22,11 +22,11 @@ and «Войти» opening `/login`. The dashboard «Играть» link opens a
 `/game` page inside the persistent dashboard, with the existing sidebar and
 profile controls. The board appears immediately; Supabase Auth is checked in the
 background. The member screen offers match search for blitz (3 minutes), rapid
-(10 minutes), classical (1 hour) and daily (24 hours), per player, without an
+(10 minutes) and classical (1 hour), per player, without an
 increment. Search pairs distinct authenticated users with the same control.
 The Supabase `matchplay` Edge Function validates legal moves with chess.js;
 transactional SQL serializes matching and updates clocks using server time.
-An active match resumes on return. Games are currently unrated, and the
+An active match resumes on return. Online games are rated, and the
 previously requested automatic bot fallback is not implemented: search waits for
 another player. The guest demo remains an independent local bot game; its move
 history is saved in browser localStorage and clearing browser data removes it.

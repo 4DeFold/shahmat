@@ -7,8 +7,9 @@ export const paletteNames={monochrome:'Монохром',gray:'Графит',for
 export function applyProfileTheme(el,palette,theme){
  const name=palettes[palette]?palette:'monochrome', [light,dark,raised,line,boardLight]=palettes[name], isDark=theme==='dark';
  const bg=isDark?dark:light, fg=isDark?light:dark, surface=isDark?raisedDark[name]:light, rail=isDark?raisedDark[name]:raised;
- for(const [key,value] of Object.entries({'--page-background':bg,'--foreground':fg,'--surface':surface,'--surface-raised':rail,'--line':line,'--board-light':boardLight,'--board-dark':line,'--ink':fg,'--accent':fg})) el.style.setProperty(key,value);
+ for(const [key,value] of Object.entries({'--page-background':bg,'--foreground':fg,'--surface':surface,'--surface-raised':rail,'--line':line,'--board-light':boardLight,'--board-dark':line,'--ink':fg,'--accent':fg,'--accent-ink':bg})) el.style.setProperty(key,value);
  el.style.color=fg; el.style.backgroundColor=bg; el.dataset.profilePalette=name; el.dataset.profileTheme=isDark?'dark':'light';
 }
-export function clearProfileTheme(el){for(const key of ['--page-background','--foreground','--surface','--surface-raised','--line','--board-light','--board-dark','--ink','--accent']) el.style.removeProperty(key);el.style.removeProperty('color');el.style.removeProperty('background-color');delete el.dataset.profilePalette;delete el.dataset.profileTheme;}
+export function clearProfileTheme(el){for(const key of ['--page-background','--foreground','--surface','--surface-raised','--line','--board-light','--board-dark','--ink','--accent','--accent-ink']) el.style.removeProperty(key);el.style.removeProperty('color');el.style.removeProperty('background-color');delete el.dataset.profilePalette;delete el.dataset.profileTheme;}
+export function profileAvatarColor(palette){return (palettes[palette]||palettes.monochrome)[3];}
 export const isProfileImage=value=>typeof value==='string' && /^data:image\/(?:png|jpeg);base64,/.test(value);

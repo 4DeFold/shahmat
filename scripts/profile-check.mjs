@@ -18,7 +18,7 @@ try {
    if(path==='/rest/v1/profiles') return route.fulfill({json:currentProfile});
    if(path==='/rest/v1/profile_rewards') return route.fulfill({json:reward});
    if(path==='/rest/v1/rpc/profile_ack_rewards'){acks++;reward={...reward,avatar_seen:true};return route.fulfill({json:null});}
-   if(path==='/rest/v1/rpc/profile_public') return route.fulfill({json:{...currentProfile,palette:'forest',theme:'dark',ratings:{overall:1123.6,blitz:1100.49,rapid:1200.8,classical:1000,daily:1192.3},games:{blitz:2,rapid:3,classical:1,daily:2,bot:4},avatar:savedMedia?.avatar||null,banner:savedMedia?.banner||null}});
+   if(path==='/rest/v1/rpc/profile_public') return route.fulfill({json:{...currentProfile,palette:'forest',theme:'dark',ratings:{overall:1123.6,blitz:1100.49,rapid:1200.8,classical:1000},games:{blitz:2,rapid:3,classical:1,bot:4},avatar:savedMedia?.avatar||null,banner:savedMedia?.banner||null}});
    if(path==='/rest/v1/profile_media') {if(failLoad){return route.fulfill({status:503,json:{message:'unavailable'}});} return route.fulfill({json:savedMedia});}
    if(path==='/rest/v1/rpc/rank_my_position') return route.fulfill({json:[{username:'Alice',yar:1123,place:1}]});
    if(path==='/rest/v1/rpc/profile_my_stats') return route.fulfill({json:[{games:12}]});
@@ -35,7 +35,7 @@ try {
   assert.equal(await page.locator('#profile-display-name').innerText(),'Alice');
   if(viewport.width===280)assert.equal(await page.locator('#profile-display-bio').isHidden(),true);
   await page.waitForTimeout(1000); assert.equal(await page.locator('#profile-yar').textContent(),'1 124');
-  assert.equal(await page.locator('#profile-games').textContent(),'12');
+  assert.equal(await page.locator('#profile-games').textContent(),'10');
   assert.doesNotMatch(await page.locator('#page-profile').innerText(),/ДЕМО|Каждый ход|ЛИЧНАЯ КАРТОЧКА|Рейтинг игрока|Каждая партия|ШАХМАТНЫЙ ПРОФИЛЬ/);
   assert.equal(await page.locator('.profile-portrait-star,.profile-banner-index,.profile-player-tag,.profile-identity-aside').count(),0);
   assert.equal(await page.locator('.profile-reveal').first().evaluate(el=>getComputedStyle(el).animationName),reducedMotion==='reduce'?'none':'profile-reveal');
@@ -62,8 +62,8 @@ try {
    const accordion=await page.evaluate(async()=>{const left=document.querySelector('#profile-yar-open'),right=document.querySelector('#profile-games-open'),panel=document.querySelector('#profile-yar-details');const before={left:left.getBoundingClientRect().top,right:right.getBoundingClientRect().top};left.click();const start=panel.getBoundingClientRect().height;await new Promise(r=>setTimeout(r,100));const middle=panel.getBoundingClientRect().height;await new Promise(r=>setTimeout(r,650));return {before,start,middle,end:panel.getBoundingClientRect().height,after:{left:left.getBoundingClientRect().top,right:right.getBoundingClientRect().top},hidden:panel.getAttribute('aria-hidden')};});
    assert.ok(Math.abs(accordion.before.left-accordion.before.right)<1);assert.ok(Math.abs(accordion.after.right-accordion.before.right)<1,'second card stays in place');assert.ok(accordion.middle>accordion.start&&accordion.middle<accordion.end,'panel grows smoothly'); assert.equal(accordion.hidden,'false');
    if(process.env.PROFILE_SCREENSHOTS) await page.screenshot({path:'/tmp/profile-stats-expanded.png',fullPage:true});
-   await page.waitForTimeout(200);assert.equal(await page.locator('#profile-yar-details .profile-detail-row').count(),5);assert.equal(await page.locator('#profile-yar-details strong').first().textContent(),'1 124');
-   await page.locator('#profile-games-open').click(); assert.equal(await page.locator('#profile-games-details .profile-detail-row').count(),6);
+   await page.waitForTimeout(200);assert.equal(await page.locator('#profile-yar-details .profile-detail-row').count(),4);assert.equal(await page.locator('#profile-yar-details strong').first().textContent(),'1 124');
+   await page.locator('#profile-games-open').click(); assert.equal(await page.locator('#profile-games-details .profile-detail-row').count(),5);
    await page.waitForTimeout(900);assert.ok((await page.evaluate(()=>window.__numbers)).every(n=>!/[,.]\d/.test(n)),'number ticker shows only whole numbers');
    await page.locator('#profile-yar-open').click();assert.equal(await page.locator('#profile-yar-details').getAttribute('aria-hidden'),'true');assert.equal(await page.locator('#profile-yar-details').evaluate(el=>el.inert),true);
    await page.locator('#profile-edit-button').click(); await page.locator('#profile-edit-name').fill('discarded'); await page.locator('#profile-discard').click(); assert.equal(await page.locator('#profile-display-name').innerText(),'Alice_2');

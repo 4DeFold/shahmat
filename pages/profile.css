@@ -115,3 +115,5 @@
 .profile-detail-inner { margin-top:12px; border:1px solid var(--line); padding:8px 20px; }
 .profile-stat-number,.profile-detail-row strong { font-variant-numeric:tabular-nums; }
 @media(prefers-reduced-motion:reduce) { .landing.palette-active .dashboard .profile-stat-details { transition:none; } }
+.landing.palette-active .dashboard :is(.profile-page,.profile-rail,.profile-portrait,.profile-portrait-inner,.profile-banner,.profile-stat-card) { transition:background-color .5s ease,color .5s ease,border-color .5s ease; }
+@media(prefers-reduced-motion:reduce){.landing.palette-active .dashboard :is(.profile-page,.profile-rail,.profile-portrait,.profile-portrait-inner,.profile-banner,.profile-stat-card){transition:none}}

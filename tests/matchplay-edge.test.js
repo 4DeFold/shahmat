@@ -49,3 +49,5 @@ test('edge recognizes checkmate and rejects stale versions without submitting a 
   assert.equal(data.game.result, 'black_win'); assert.equal(data.game.reason, 'checkmate');
   assert.equal(app.calls.find(call => call.name === 'online_commit').args.p_san, 'Qh4#');
 });
+
+test('retired daily matchmaking is rejected before database search', async () => {const app=fixture();assert.equal((await app.request({action:'search',mode:'daily'})).status,400);assert.equal(app.calls.some(c=>c.name==='online_find'),false);});
