@@ -1,5 +1,7 @@
 import {applyProfileTheme,isProfileImage,profileAvatarColor} from './profile-theme.js';
 import { Chess } from 'chess.js';
+import { premoveTargets, validPremove } from './premove.js';
+import { createBoardAnnotations } from './board-annotations.js';
 import { createMemberBoard } from './member-board.js';
 import { createGameSound } from './game-sound.js';
 import { createRollingClock } from './rolling-clock.js';
@@ -56,6 +58,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   const reducedMotion = () => win.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const clocks = { player: createRollingClock($('player-clock'), reducedMotion), opponent: createRollingClock($('opponent-clock'), reducedMotion) };
   const boardView = createMemberBoard({ document, board, reducedMotion });
+  const annotations = createBoardAnnotations({ document, board });
   // Age is provided by the server, then advanced monotonically between snapshots.
   const canResign = () => phase === 'active' && Number.isFinite(snapshot?.game_age_ms) && snapshot.game_age_ms + Math.max(0, now() - receivedAt) >= 60000;
   const playSound = move => sound.play(chess.isCheck() ? 'check' : move?.captured ? 'capture' : 'move');
@@ -137,13 +140,12 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   });
   function showHistory(index) {
     const count = chess.history().length; historyIndex = index >= count ? null : Math.max(0, index);
-    selected = null; renderBoard(); renderHistory();
+    annotations.clear(); selected = null; renderBoard(); renderHistory();
     if (historyIndex !== null) setStatus(`Просмотр позиции: ход ${historyIndex} из ${count}.`); else statusGame();
   }
   function legalFor(square) {
     if (chess.turn() === currentColor()) return chess.moves({ square, verbose:true });
-    // A premove is only a tentative hint; its legality is checked again after the reply.
-    try { const fen = chess.fen().split(' '); fen[1] = currentColor(); fen[3] = '-'; return new Chess(fen.join(' ')).moves({ square, verbose:true }); } catch { return []; }
+    return premoveTargets(chess, square, currentColor());
   }
   function renderBoard(animatedMove = null) {
     const color = currentColor(), shown = displayChess();
@@ -192,7 +194,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   function playQueuedPremove() {
     if (!premove || phase !== 'active' || moving || reconciling || chess.turn() !== currentColor()) return false;
     const move = premove; premove = null;
-    const valid = chess.moves({ square:move.from, verbose:true }).some(m => m.to === move.to && (!m.promotion || m.promotion === move.promotion));
+    const valid = validPremove(chess, move, currentColor());
     if (valid) { void submitMove(move.from, move.to, move.promotion); return true; }
     renderBoard(); setStatus('Предварительный ход отменён: он больше невозможен.'); return false;
   }
@@ -203,7 +205,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     }
     const previous = snapshot, localMoves = chess.history(), selectedPiece = selected ? chess.get(selected) : null;
     const sameGame = previous?.id === game.id;
-    if (!sameGame) { setAvatar('opponent',null); ratingsKey = null; ratingsRetryAt = 0; ratingsRequest++; scores = null; renderRatings(); }
+    if (!sameGame) { premove = null; annotations.clear(); setAvatar('opponent',null); ratingsKey = null; ratingsRetryAt = 0; ratingsRequest++; scores = null; renderRatings(); }
     const alreadyDisplayed = sameGame && localMoves.length === game.moves.length && localMoves.every((move, i) => move === game.moves[i]);
     let next = chess, nextLast = latestMove;
     if (!alreadyDisplayed) {
@@ -222,11 +224,12 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     snapshot = game; receivedAt = now(); clockSync.update(game, receivedAt); chess = next; latestMove = nextLast;
     if (!alreadyDisplayed) { cancelDrag(); const piece = selected && next.get(selected); if (!sameGame || !selectedPiece || !piece || piece.color !== currentColor() || piece.type !== selectedPiece.type || piece.color !== selectedPiece.color) selected = null; pending = null; promotion.hidden = true; }
     phase = game.status === 'active' ? 'active' : 'finished'; mode = game.mode;
+    const clearedPremove = phase === 'finished' && !!premove;
     if (phase === 'finished') premove = null;
     const input = $('mode-list').querySelector(`input[value="${mode}"]`); if (input) input.checked = true;
     loadName(game); loadRatings(game); modeControls();
     // Confirming our optimistic move must not restart its animation or replace pieces.
-    if (!alreadyDisplayed) renderBoard(newMove);
+    if (!alreadyDisplayed || clearedPremove) renderBoard(newMove);
     renderHistory(); drawClocks();
     if (historyIndex !== null) setStatus(`Просмотр позиции: ход ${historyIndex} из ${game.moves.length}.`); else statusGame();
     if (newMove && !moving) playSound(newMove);
@@ -326,17 +329,23 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     if (historyIndex !== null || phase !== 'active' || reconciling || (moving && chess.turn() === currentColor()) || pending || !from || !to) return false;
     const choices = legalFor(from).filter(move => move.to === to);
     if (!choices.length) return false;
-    if (chess.turn() !== currentColor()) {
-      premove = { from, to, ...(choices.some(m => m.promotion) ? { promotion:'q' } : {}) }; selected = null; renderBoard(); setStatus('Предварительный ход готов. Нажмите на него, чтобы отменить.'); return true;
-    }
     if (choices.some(move => move.promotion)) {
-      pending = { from, to }; promotion.hidden = false; options.replaceChildren(); setStatus('Пешка дошла до края. Выберите фигуру.', true);
+      pending = { from, to, premove: chess.turn() !== currentColor() }; promotion.hidden = false; options.replaceChildren(); setStatus('Пешка дошла до края. Выберите фигуру.', true);
       for (const type of ['q','r','b','n']) {
         const button = document.createElement('button'); button.type = 'button'; button.setAttribute('aria-label', names[type]);
         const img = document.createElement('img'); img.src = pieceSrc(currentColor(), type); img.alt = ''; button.append(img);
-        button.addEventListener('click', () => { if (pending) void submitMove(pending.from, pending.to, type); }); options.append(button);
+        button.addEventListener('click', () => {
+          if (!pending) return;
+          const choice = pending; pending = null; promotion.hidden = true;
+          if (choice.premove && chess.turn() !== currentColor()) {
+            premove={from:choice.from,to:choice.to,promotion:type}; selected=null; renderBoard(); setStatus('Предварительный ход готов. Нажмите на него, чтобы отменить.');
+          } else void submitMove(choice.from, choice.to, type);
+        }); options.append(button);
       }
       options.firstChild.focus(); return true;
+    }
+    if (chess.turn() !== currentColor()) {
+      premove = { from, to }; selected = null; renderBoard(); setStatus('Предварительный ход готов. Нажмите на него, чтобы отменить.'); return true;
     }
     void submitMove(from, to, null, animate); return true;
   }
@@ -349,6 +358,9 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   }
   board.addEventListener('click', event => { sound.prime(); if (suppressClick) { suppressClick = false; return; } choose(event.target.closest('[data-square]')?.dataset.square); });
   board.addEventListener('keydown', () => sound.prime());
+  board.addEventListener('pointerdown', event => { if(event.button === 2 && premove) { premove=null; selected=null; renderBoard(); statusGame(); } });
+  const onPremoveKey = event => { if(event.key === 'Escape' && premove) { premove=null; selected=null; renderBoard(); statusGame(); } };
+  document.addEventListener('keydown', onPremoveKey);
   start.addEventListener('pointerdown', () => sound.prime());
   start.addEventListener('keydown', () => sound.prime());
   function moveGhost(d) {
@@ -438,7 +450,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   $('offline-draw').addEventListener('click', () => void finishAction('offline_draw'));
   $('mode-list').addEventListener('change', event => { if (phase === 'idle' && times[event.target.value]) { mode = event.target.value; modeControls(); drawClocks(); if (ready) setStatus('Всё готово к поиску.'); } });
   start.addEventListener('click', () => void search()); cancel.addEventListener('click', () => void cancelSearch());
-  reset.addEventListener('click', () => { cancelTimer(); generation++; snapshot = null; scores = null; ratingsKey = null; ratingsRetryAt = 0; ratingsRequest++; renderRatings(); clockSync.clear(); chess = new Chess(); latestMove = null; phase = 'idle'; mode = null; $('mode-list').querySelectorAll('input').forEach(input => { input.checked = false; }); premove = null; historyIndex = null; nameForGame = null; profileTrigger.disabled = true; profilePinned = false; showProfile(false); clearInterval(nameTimer); $('opponent-name').textContent = 'Соперник'; setAvatar('opponent',null); modeControls(); renderBoard(); renderHistory(); drawClocks(); setStatus('Выбери режим.'); });
+  reset.addEventListener('click', () => { annotations.clear(); cancelTimer(); generation++; snapshot = null; scores = null; ratingsKey = null; ratingsRetryAt = 0; ratingsRequest++; renderRatings(); clockSync.clear(); chess = new Chess(); latestMove = null; phase = 'idle'; mode = null; $('mode-list').querySelectorAll('input').forEach(input => { input.checked = false; }); premove = null; historyIndex = null; nameForGame = null; profileTrigger.disabled = true; profilePinned = false; showProfile(false); clearInterval(nameTimer); $('opponent-name').textContent = 'Соперник'; setAvatar('opponent',null); modeControls(); renderBoard(); renderHistory(); drawClocks(); setStatus('Выбери режим.'); });
   function pause() { cancelDrag(); if (moving) reconciling = true; if (phase === 'searching') void cancelSearch(); else if (phase !== 'cancelling') { generation++; cancelTimer(); } }
   function resume() {
     if (!userId || destroyed) return;
@@ -494,6 +506,6 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     hide() { const wasVisible = isVisible(); viewVisible = false; if (wasVisible) pause(); },
     show() { const wasVisible = isVisible(); const wasShown = viewVisible; viewVisible = true; if (!wasShown) revealPieces(); if (!wasVisible && isVisible()) resume(); },
     browserVisibility(value) { const wasVisible = isVisible(); browserVisible = value; if (wasVisible && !isVisible()) pause(); else if (!wasVisible && isVisible()) resume(); },
-    destroy() { destroyed = true; generation++; cancelDrag(); cancelTimer(); clearInterval(clockInterval); clearInterval(nameTimer); revealAnimations.forEach(animation => animation.cancel()); Object.values(clocks).forEach(clock => clock.destroy()); sound.destroy(); },
+    destroy() { destroyed = true; document.removeEventListener('keydown', onPremoveKey); annotations.destroy(); generation++; cancelDrag(); cancelTimer(); clearInterval(clockInterval); clearInterval(nameTimer); revealAnimations.forEach(animation => animation.cancel()); Object.values(clocks).forEach(clock => clock.destroy()); sound.destroy(); },
   };
 }

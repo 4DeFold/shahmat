@@ -990,3 +990,6 @@ body.startup-ready #landing-screen:not([hidden]) .hero-reveal--tail { animation-
 /* The profile's borrowed theme stays local to the sidebar and transitions back. */
 .landing.palette-active .dashboard .app-sidebar { transition:background-color .5s ease,color .5s ease,border-color .5s ease,transform .25s ease,visibility 0s linear .25s; }
 @media (prefers-reduced-motion:reduce){.landing.palette-active .dashboard .app-sidebar{transition:none}}
+.board-guide { max-width: 620px; margin-top: 36px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-raised); }
+.board-guide h3 { margin: 0 0 12px; font: 400 24px/1.2 'Playfair Display', Georgia, serif; }
+.board-guide p { margin: 10px 0 0; font-size: 14px; line-height: 1.55; }

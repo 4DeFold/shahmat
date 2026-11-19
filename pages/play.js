@@ -1,5 +1,7 @@
 import '../smooth-scroll.js';
 import { Chess } from 'chess.js';
+import { premoveTargets, validPremove } from './premove.js';
+import { createBoardAnnotations } from './board-annotations.js';
 import { chooseBotMove } from './bot.js';
 import './game-theme.js';
 
@@ -13,7 +15,8 @@ const options = document.getElementById('promotion-options');
 const pieceSrc = (color, type) => `/pieces/cburnett/${color}${type.toUpperCase()}.svg`;
 const names = { k:'король', q:'ферзь', r:'ладья', b:'слон', n:'конь', p:'пешка' };
 const files = 'abcdefgh';
-let selected = null, pending = null, botTimer = null, botThinking = false, lastMove = null;
+let selected = null, pending = null, botTimer = null, botThinking = false, lastMove = null, premove = null, drag = null, suppressClick = false;
+const annotations = createBoardAnnotations({ document, board });
 let newGameAt = null, countdownTimer = null;
 const guestWaitMs = 60 * 60 * 1000;
 const memberId = document.body.dataset.gameUser;
@@ -57,7 +60,10 @@ function scheduleBot() {
     if (game.isGameOver() || game.turn() === playerColor) { botThinking = false; botTimer = null; render(); return; }
     const botMove = chooseBotMove(game);
     if (botMove) { lastMove = game.move(botMove); saveGame(); }
-    botThinking = false; botTimer = null; render(lastMove);
+    botThinking = false; botTimer = null; selected = null; if(pending?.premove) { pending=null; promotion.hidden=true; } cancelDrag(); render(lastMove);
+    const queued = premove; premove = null;
+    if (!game.isGameOver() && queued && validPremove(game, queued, playerColor)) { playMove(queued); return; }
+    if (queued) { render(); if (!game.isGameOver()) status.textContent = 'Предварительный ход отменён: он больше невозможен.'; }
   }, 380);
 }
 
@@ -117,7 +123,7 @@ function renderHistory() {
   renderHistory.count = history.length;
 }
 function render(move = null) {
-  const legal = selected ? game.moves({ square: selected, verbose: true }).map(move => move.to) : [];
+  const legal = selected ? (game.turn() === playerColor ? game.moves({ square:selected, verbose:true }) : premoveTargets(game, selected, playerColor)).map(move => move.to) : [];
   const fragment = document.createDocumentFragment();
   const ranks = playerColor === 'w' ? [8,7,6,5,4,3,2,1] : [1,2,3,4,5,6,7,8];
   const columns = playerColor === 'w' ? [...files] : [...files].reverse();
@@ -128,16 +134,17 @@ function render(move = null) {
     cell.type = 'button'; cell.className = `square ${(rank + file) % 2 ? 'dark' : 'light'}`;
     cell.dataset.square = square;
     cell.classList.toggle('selected', selected === square);
+    cell.classList.toggle('premove', !!premove && (premove.from === square || premove.to === square));
     cell.classList.toggle('possible', legal.includes(square));
     cell.classList.toggle('last-move', !!lastMove && (lastMove.from === square || lastMove.to === square));
-    cell.setAttribute('aria-label', `${square}, ${piece ? (piece.color === 'w' ? 'белые, ' : 'чёрные, ') + names[piece.type] : 'пусто'}${legal.includes(square) ? ', возможный ход' : ''}`);
+    cell.setAttribute('aria-label', `${square}, ${piece ? (piece.color === 'w' ? 'белые, ' : 'чёрные, ') + names[piece.type] : 'пусто'}${legal.includes(square) ? ', возможный ход' : ''}${premove && (premove.from === square || premove.to === square) ? ', предварительный ход' : ''}`);
     cell.setAttribute('aria-pressed', String(selected === square));
     if (piece) { const icon = document.createElement('img'); icon.className = 'piece'; icon.src = pieceSrc(piece.color, piece.type); icon.alt = ''; icon.draggable = false; cell.append(icon); }
     if (rank === ranks[7]) { const coord = document.createElement('span'); coord.className = 'coord file'; coord.textContent = files[file]; cell.append(coord); }
     if (column === columns[0]) { const coord = document.createElement('span'); coord.className = 'coord rank'; coord.textContent = rank; cell.append(coord); }
     fragment.append(cell);
   }
-  board.replaceChildren(fragment);
+  board.replaceChildren(fragment); annotations.refresh();
   document.getElementById('player-color').textContent = playerColor === 'w' ? 'Белые' : 'Чёрные';
   document.getElementById('bot-color').textContent = playerColor === 'w' ? 'Чёрные' : 'Белые';
   document.getElementById('player-avatar').src = pieceSrc(playerColor, 'p');
@@ -152,29 +159,53 @@ function playMove(move) {
   scheduleBot();
   render(lastMove);
 }
-board.addEventListener('click', event => {
-  const cell = event.target.closest('[data-square]');
-  if (!cell || botThinking || pending || game.isGameOver() || game.turn() !== playerColor) return;
-  const square = cell.dataset.square, piece = game.get(square);
-  if (selected) {
-    const moves = game.moves({ square: selected, verbose: true }).filter(move => move.to === square);
-    if (moves.length) {
-      if (moves.some(move => move.promotion)) {
-        pending = { from: selected, to: square }; promotion.hidden = false; options.replaceChildren();
-        for (const type of ['q', 'r', 'b', 'n']) {
-          const button = document.createElement('button'); button.type = 'button'; button.setAttribute('aria-label', names[type]);
-          const icon = document.createElement('img'); icon.src = pieceSrc(playerColor, type); icon.alt = ''; button.append(icon);
-          button.addEventListener('click', () => playMove({ ...pending, promotion: type })); options.append(button);
-        }
-        options.firstChild.focus(); return;
-      }
-      playMove({ from: selected, to: square }); return;
+function attempt(from, to) {
+  const moves = (game.turn() === playerColor ? game.moves({square:from,verbose:true}) : premoveTargets(game,from,playerColor)).filter(move => move.to === to);
+  if (!moves.length) return false;
+  if (moves.some(move => move.promotion)) {
+    pending = { from, to, premove:game.turn() !== playerColor }; promotion.hidden = false; options.replaceChildren();
+    for (const type of ['q','r','b','n']) {
+      const button = document.createElement('button'); button.type='button'; button.setAttribute('aria-label',names[type]);
+      const icon=document.createElement('img'); icon.src=pieceSrc(playerColor,type); icon.alt=''; button.append(icon);
+      button.addEventListener('click',()=>{ if(!pending)return; const choice=pending; pending=null; promotion.hidden=true; if(choice.premove && game.turn()!==playerColor) { premove={from:choice.from,to:choice.to,promotion:type}; selected=null; render(); status.textContent='Предварительный ход готов. Нажмите на него, чтобы отменить.'; } else playMove({from:choice.from,to:choice.to,promotion:type}); }); options.append(button);
     }
+    options.firstChild.focus(); return true;
   }
-  selected = piece?.color === playerColor && selected !== square ? square : null;
-  render();
+  if(game.turn()!==playerColor) { premove={from,to}; selected=null; render(); status.textContent='Предварительный ход готов. Нажмите на него, чтобы отменить.'; } else playMove({from,to}); return true;
+}
+board.addEventListener('click', event => {
+  if (suppressClick || pending || game.isGameOver()) return;
+  const square=event.target.closest('[data-square]')?.dataset.square; if(!square) return;
+  if(premove && (premove.from===square || premove.to===square)) { premove=null; selected=null; render(); return; }
+  if(selected && attempt(selected,square)) return;
+  selected=game.get(square)?.color===playerColor && selected!==square ? square : null; render();
   board.querySelector(`[data-square="${square}"]`)?.focus();
 });
+function cancelDrag() { if (!drag) return; drag.ghost?.remove(); drag.cell?.classList.remove('dragging'); drag=null; }
+board.addEventListener('pointerdown', event => {
+  if(event.button===2 && premove) { premove=null; selected=null; render(); }
+  if(event.button!==0 || pending || game.isGameOver()) return;
+  const cell=event.target.closest('[data-square]'); if(cell && game.get(cell.dataset.square)?.color===playerColor) drag={from:cell.dataset.square,x:event.clientX,y:event.clientY,pointer:event.pointerId,cell,ghost:null};
+});
+board.addEventListener('pointermove', event => {
+  if(!drag || drag.pointer!==event.pointerId) return;
+  if(!drag.ghost && Math.hypot(event.clientX-drag.x,event.clientY-drag.y)>5) {
+    board.setPointerCapture?.(event.pointerId); selected=drag.from; render(); drag.cell=board.querySelector(`[data-square="${drag.from}"]`);
+    drag.ghost=document.createElement('img'); drag.ghost.className='drag-ghost'; drag.ghost.src=pieceSrc(playerColor,game.get(drag.from).type); drag.ghost.alt='';
+    drag.ghost.style.setProperty('--drag-size',`${drag.cell.getBoundingClientRect().width}px`); drag.cell.classList.add('dragging'); document.body.append(drag.ghost);
+  }
+  if(drag.ghost) drag.ghost.style.transform=`translate3d(${event.clientX}px,${event.clientY}px,0) translate(-50%,-50%)`;
+});
+function endDrag(event,cancel=false) {
+  if(!drag || drag.pointer!==event.pointerId) return; const d=drag;
+  if(!d.ghost) { drag=null; return; }
+  const target=!cancel && document.elementFromPoint?.(event.clientX,event.clientY)?.closest('[data-square]')?.dataset.square;
+  cancelDrag(); suppressClick=true; setTimeout(()=>{suppressClick=false;},0);
+  if(!target || !attempt(d.from,target)) { selected=null; render(); }
+}
+board.addEventListener('pointerup',event=>endDrag(event));
+board.addEventListener('pointercancel',event=>endDrag(event,true));
+document.addEventListener('keydown',event=>{ if(event.key==='Escape' && premove) { premove=null; selected=null; render(); } });
 // The guest deadline is an absolute time, so closing the page does not pause it.
 function updateCountdown() {
   if (!countdown) return;
@@ -186,7 +217,7 @@ function updateCountdown() {
   }
   const seconds = Math.max(0, Math.ceil((newGameAt - Date.now()) / 1000));
   if (seconds === 0) {
-    newGameAt = null; lastMove = null; selected = null; pending = null;
+    newGameAt = null; lastMove = null; selected = null; pending = null; premove=null; annotations.clear(); cancelDrag();
     promotion.hidden = true; game.reset(); playerColor = randomColor(); saveGame(); scheduleBot(); render();
     updateCountdown();
     return;
@@ -208,7 +239,7 @@ if (!memberId) {
   function syncGuestGame() {
     try { localStorage.getItem(storageKey); } catch { updateCountdown(); return; }
     if (botTimer !== null) clearTimeout(botTimer);
-    botTimer = null; botThinking = false; selected = null; pending = null; lastMove = null; newGameAt = null;
+    botTimer = null; botThinking = false; selected = null; pending = null; lastMove = null; newGameAt = null; premove=null; annotations.clear(); cancelDrag();
     promotion.hidden = true; game.reset(); restoreGame();
     updateCountdown(); scheduleBot(); render();
   }
@@ -221,7 +252,7 @@ if (!memberId) {
 if (memberId) document.getElementById('new-game').addEventListener('click', () => {
   if (game.history().length && !window.confirm('Начать новую партию? Текущая партия будет удалена с этого устройства.')) return;
   if (botTimer !== null) clearTimeout(botTimer);
-  botTimer = null; botThinking = false; selected = null; pending = null; lastMove = null;
+  botTimer = null; botThinking = false; selected = null; pending = null; lastMove = null; premove=null; annotations.clear(); cancelDrag();
   promotion.hidden = true; game.reset(); playerColor = randomColor(); saveGame(); scheduleBot(); render();
 });
 restoreGame();

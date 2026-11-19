@@ -497,3 +497,34 @@ test('player names and game-mode ratings switch between yar and shadow elo', asy
   assert.equal(dom.window.document.getElementById('opponent-rating').textContent.replace(/\s/g,''),'(1150Эло)');
   ui.destroy(); dom.window.close();
 });
+
+test('premove captures an existing opponent piece after their reply', async t => {
+  let current=game({moves:['e4','d5','exd5','Qxd5','Nc3'],turn:'b'}), sent=[];
+  const app=setup(async body=>{if(body.action==='move'){sent.push(body);current=game({moves:['e4','d5','exd5','Qxd5','Nc3','Nf6','Nxd5'],turn:'b'});}return {game:current};});
+  t.after(()=>app.close()); await app.ui.open(A); await flush();
+  const click=s=>app.$('board').querySelector(`[data-square="${s}"]`).click();
+  click('c3');click('d5');assert.ok(app.$('board').querySelector('[data-square=d5]').classList.contains('premove'));
+  current=game({moves:['e4','d5','exd5','Qxd5','Nc3','Nf6'],turn:'w'});app.ui.hide();app.ui.show();await flush();
+  assert.equal(sent.length,1);assert.equal(sent[0].from,'c3');assert.equal(sent[0].to,'d5');
+});
+
+test('premove anticipates en passant and is cancelled if the target never becomes legal',async t=>{
+ let current=game({moves:['e4','a6','e5'],turn:'b'}),sent=[];
+ const app=setup(async body=>{if(body.action==='move'){sent.push(body);current=game({moves:['e4','a6','e5','d5','exd6'],turn:'b'});}return {game:current};});
+ t.after(()=>app.close());await app.ui.open(A);await flush();
+ const click=s=>app.$('board').querySelector(`[data-square="${s}"]`).click();click('e5');click('d6');
+ assert.ok(app.$('board').querySelector('[data-square=d6]').classList.contains('premove'));
+ current=game({moves:['e4','a6','e5','d5'],turn:'w'});app.ui.hide();app.ui.show();await flush();
+ assert.equal(sent.length,1);assert.equal(sent[0].to,'d6');assert.equal(app.$('board').querySelector('[data-square=d5] img'),null);
+});
+
+test('capture premove lets the player select an underpromotion',async t=>{
+ const opening=['a4','h5','a5','h4','a6','h3','axb7'];let current=game({moves:opening,turn:'b'}),sent=[];
+ const app=setup(async body=>{if(body.action==='move'){sent.push(body);current=game({moves:[...opening,'hxg2','bxa8=N'],turn:'b'});}return {game:current};});
+ t.after(()=>app.close());await app.ui.open(A);await flush();
+ const click=s=>app.$('board').querySelector(`[data-square="${s}"]`).click();click('b7');click('a8');
+ assert.equal(app.$('promotion').hidden,false);app.$('promotion-options').querySelector('[aria-label="конь"]').click();
+ assert.equal(app.$('promotion').hidden,true);assert.ok(app.$('board').querySelector('[data-square=a8].premove'));
+ current=game({moves:[...opening,'hxg2'],turn:'w'});app.ui.hide();app.ui.show();await flush();
+ assert.equal(sent.length,1);assert.equal(sent[0].promotion,'n');assert.match(app.$('board').querySelector('[data-square=a8] img').src,/wN.svg/);
+});

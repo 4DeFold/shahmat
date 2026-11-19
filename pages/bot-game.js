@@ -1,4 +1,6 @@
 import { Chess } from 'chess.js';
+import { premoveTargets, validPremove } from './premove.js';
+import { createBoardAnnotations } from './board-annotations.js';
 import { createClient } from '@supabase/supabase-js';
 import { createMemberBoard } from './member-board.js';
 import { createGameSound } from './game-sound.js';
@@ -13,10 +15,11 @@ const shell=$('bot-app'), showcase=$('bot-showcase'), board=$('board');
 const supabase=createClient('https://eswyxbyddkajysogtglp.supabase.co','sb_publishable_w9pinHWr8XK5F9CflsSJmQ_4KFMKzHS');
 const motion=window.matchMedia('(prefers-reduced-motion: reduce)');
 const sound=createGameSound(window), boardView=createMemberBoard({document,board,reducedMotion:()=>motion.matches});
+const annotations=createBoardAnnotations({document,board});
 const names={q:'ферзь',r:'ладья',b:'слон',n:'конь'};
 const piece=(color,type)=>`/pieces/cburnett/${color}${type.toUpperCase()}.svg`;
 let level=0, phase='choose', userId=null, store=null, game=null, chess=new Chess(), selected=null, promotion=null, last=null, engine=null, thinking=false, generation=0;
-let launchDrain=null;
+let launchDrain=null, premove=null;
 let pageVisible=window.parent===window, orbitFrame=null, orbitAngle=0, orbitSpeed=0, lastFrame=0, demoClock=0, carouselPosition=0, carouselVelocity=0, drag=null, suppressClick=false, destroyed=false;
 const status=text=>{ if ($('status').textContent!==text) $('status').textContent=text; };
 function reveal(id, open) { const el=$(id); if (el.classList.contains('is-open')===open) return; el.classList.toggle('is-open',open); el.inert=!open; el.setAttribute('aria-hidden',String(!open)); }
@@ -176,8 +179,8 @@ function setPhase(value) {
   if(inGame || value==='returning') stopOrbit(); else startOrbit();
 }
 function draw(move=null) {
-  const legal=selected?chess.moves({square:selected,verbose:true}).map(m=>m.to):[];
-  boardView.render({shown:chess,selected,legal,last,animatedMove:move});
+  const legal=selected?(chess.turn()==='w'?chess.moves({square:selected,verbose:true}):premoveTargets(chess,selected,'w')).map(m=>m.to):[];
+  boardView.render({shown:chess,selected,legal,last,premove,animatedMove:move});
 }
 function history() {
   const moves=chess.history(), list=$('move-list'); list.replaceChildren();
@@ -192,7 +195,7 @@ function finishIfNeeded() {
   else if(chess.isStalemate()) { game.status='draw'; result='Ничья: пат.'; }
   else if(chess.isDraw() || chess.history().length>=1000) { game.status='draw'; result='Ничья.'; }
   if(!result) return false;
-  thinking=false; setPhase('finished'); reveal('resign-wrap',false); status(result); snapshot(); return true;
+  thinking=false; premove=null; draw(); setPhase('finished'); reveal('resign-wrap',false); status(result); snapshot(); return true;
 }
 function resignAvailable() { return phase==='playing' && game && Date.now()-Date.parse(game.started_at)>=60000; }
 function updateResign() { reveal('resign-wrap',!!resignAvailable()); }
@@ -204,8 +207,14 @@ async function botMove() {
     if(!engine) engine=createStockfish(level);
     const move=await engine.move(chess.fen());
     if(current!==generation || phase!=='playing') return;
-    last=chess.move(move); thinking=false; draw(last); history(); sound.play(chess.isCheck()?'check':last.captured?'capture':'move');
-    if(!finishIfNeeded()) { snapshot(); status(chess.isCheck()?'Шах! Ваш ход.':'Ваш ход.'); }
+    cancelDrag(); selected=null; if(promotion?.premove) { promotion=null; reveal('promotion',false); } last=chess.move(move); thinking=false; draw(last); history(); sound.play(chess.isCheck()?'check':last.captured?'capture':'move');
+    if(!finishIfNeeded()) {
+      snapshot();
+      const queued=premove; premove=null;
+      if(queued && validPremove(chess,queued,'w')) { play(queued); return; }
+      if(queued) draw();
+      status(queued ? 'Предварительный ход отменён: он больше невозможен.' : chess.isCheck()?'Шах! Ваш ход.':'Ваш ход.');
+    }
   } catch (error) {
     if(current!==generation || phase!=='playing') return;
     thinking=false; engine?.destroy(); engine=null; status(`${error.message || 'Не удалось загрузить Stockfish.'} Нажми «Повторить ход».`); reveal('retry-wrap',true);
@@ -218,41 +227,44 @@ function play(move) {
   if(!finishIfNeeded()) { snapshot(); void botMove(); }
 }
 function attempt(from,to) {
-  const moves=chess.moves({square:from,verbose:true}).filter(m=>m.to===to);
+  const moves=(chess.turn()==='w'?chess.moves({square:from,verbose:true}):premoveTargets(chess,from,'w')).filter(m=>m.to===to);
   if(!moves.length) return false;
   if(moves.some(m=>m.promotion)) {
-    promotion={from,to}; reveal('promotion',true); const options=$('promotion-options'); options.replaceChildren();
-    for(const type of ['q','r','b','n']) { const button=document.createElement('button'); button.type='button'; button.setAttribute('aria-label',names[type]); const img=document.createElement('img'); img.src=piece('w',type); img.alt=''; button.append(img); button.addEventListener('click',()=>play({...promotion,promotion:type})); options.append(button); } options.firstElementChild.focus();
-  } else play({from,to});
+    promotion={from,to,premove:chess.turn()!=='w'}; reveal('promotion',true); const options=$('promotion-options'); options.replaceChildren();
+    for(const type of ['q','r','b','n']) { const button=document.createElement('button'); button.type='button'; button.setAttribute('aria-label',names[type]); const img=document.createElement('img'); img.src=piece('w',type); img.alt=''; button.append(img); button.addEventListener('click',()=>{ if(!promotion)return; const choice=promotion; promotion=null; reveal('promotion',false); if(choice.premove && chess.turn()!=='w') { premove={from:choice.from,to:choice.to,promotion:type}; selected=null; draw(); status('Предварительный ход готов. Нажмите на него, чтобы отменить.'); } else play({from:choice.from,to:choice.to,promotion:type}); }); options.append(button); } options.firstElementChild.focus();
+  } else if(chess.turn()!=='w') { premove={from,to}; selected=null; draw(); status('Предварительный ход готов. Нажмите на него, чтобы отменить.'); } else play({from,to});
   return true;
 }
 board.addEventListener('click',event=>{
-  if(suppressClick || thinking || promotion || phase!=='playing' || chess.turn()!=='w') return;
+  if(suppressClick || promotion || phase!=='playing') return;
   const square=event.target.closest('[data-square]')?.dataset.square; if(!square) return;
-  sound.prime(); if(selected && attempt(selected,square)) return;
+  sound.prime(); if(premove && (premove.from===square||premove.to===square)) { premove=null; selected=null; draw(); status(chess.turn()==='w'?'Ваш ход.':'Ход бота.'); return; }
+  if(selected && attempt(selected,square)) return;
   selected=chess.get(square)?.color==='w' && selected!==square?square:null; draw(); boardView.cell(square)?.focus();
 });
-board.addEventListener('pointerdown',event=>{ if(event.button!==0||phase!=='playing'||thinking||promotion||chess.turn()!=='w') return; const cell=event.target.closest('[data-square]'); if(cell && chess.get(cell.dataset.square)?.color==='w') drag={from:cell.dataset.square,x:event.clientX,y:event.clientY,pointer:event.pointerId,ghost:null,cell}; });
+board.addEventListener('pointerdown',event=>{ if(event.button===2 && premove) { premove=null; selected=null; draw(); status('Ход бота.'); } if(event.button!==0||phase!=='playing'||promotion) return; const cell=event.target.closest('[data-square]'); if(cell && chess.get(cell.dataset.square)?.color==='w') drag={from:cell.dataset.square,x:event.clientX,y:event.clientY,pointer:event.pointerId,ghost:null,cell}; });
 board.addEventListener('pointermove',event=>{
   if(!drag||drag.pointer!==event.pointerId) return;
   if(!drag.ghost && Math.hypot(event.clientX-drag.x,event.clientY-drag.y)>5) { board.setPointerCapture?.(event.pointerId); selected=drag.from; draw(); drag.ghost=document.createElement('img'); drag.ghost.className='drag-ghost'; drag.ghost.src=piece('w',chess.get(drag.from).type); drag.ghost.alt=''; drag.ghost.style.setProperty('--drag-size',`${drag.cell.getBoundingClientRect().width}px`); drag.cell.classList.add('dragging'); document.body.append(drag.ghost); }
   if(drag.ghost) drag.ghost.style.transform=`translate3d(${event.clientX}px,${event.clientY}px,0) translate(-50%,-50%)`;
 });
+function cancelDrag() { if(!drag)return; drag.ghost?.remove(); drag.cell.classList.remove('dragging'); drag=null; }
 function endDrag(event,cancel=false) {
   if(!drag || drag.pointer!==event.pointerId) return; const d=drag; drag=null; if(!d.ghost) return;
   d.ghost.remove(); d.cell.classList.remove('dragging'); const target=!cancel && document.elementFromPoint(event.clientX,event.clientY)?.closest('[data-square]')?.dataset.square;
   suppressClick=true; setTimeout(()=>{suppressClick=false;},0); if(!target || !attempt(d.from,target)) { selected=null; draw(); }
 }
 board.addEventListener('pointerup',event=>endDrag(event)); board.addEventListener('pointercancel',event=>endDrag(event,true));
+document.addEventListener('keydown',event=>{ if(event.key==='Escape' && premove) { premove=null; selected=null; draw(); status(chess.turn()==='w'?'Ваш ход.':'Ход бота.'); } });
 $('toggle-moves').addEventListener('click',()=>{ const toggle=$('toggle-moves'), expanded=toggle.getAttribute('aria-expanded')!=='true'; toggle.setAttribute('aria-expanded',String(expanded)); $('history-content').classList.toggle('is-collapsed',!expanded); $('history-content').inert=!expanded; });
 $('resign-button').addEventListener('click',()=>{ if(resignAvailable()) $('resign-dialog').showModal(); });
 $('resign-cancel').addEventListener('click',()=>$('resign-dialog').close());
-$('resign-confirm').addEventListener('click',()=>{ $('resign-dialog').close(); if(!resignAvailable()) return; ++generation; engine?.destroy(); engine=null; thinking=false; game.status='black_win'; snapshot(); setPhase('finished'); status('Вы сдались. ЯР не изменился.'); updateResign(); });
+$('resign-confirm').addEventListener('click',()=>{ $('resign-dialog').close(); if(!resignAvailable()) return; ++generation; engine?.destroy(); engine=null; thinking=false; premove=null; cancelDrag(); draw(); game.status='black_win'; snapshot(); setPhase('finished'); status('Вы сдались. ЯР не изменился.'); updateResign(); });
 $('return-button').addEventListener('click',()=>void returnToSelection());
 async function returnToSelection() {
   if(phase!=='playing' && phase!=='finished') return;
   if(phase==='playing' && !confirm('Вернуться к выбору? Текущая партия будет завершена.')) return;
-  const current=++generation; engine?.destroy(); engine=null; thinking=false;
+  const current=++generation; engine?.destroy(); engine=null; thinking=false; premove=null; cancelDrag(); annotations.clear();
   if(game?.status==='active') { game.status='abandoned'; snapshot(); }
   reveal('promotion',false); reveal('retry-wrap',false); promotion=null;
   const target=$('target-board');
@@ -281,7 +293,7 @@ async function launch() {
   if(phase!=='choose'||!userId||!store) return;
   sound.prime(); const current=++generation;
   game={id:crypto.randomUUID(),level:level+1,moves:[],status:'active',started_at:new Date().toISOString(),updated_at:new Date().toISOString()};
-  chess=new Chess(); selected=null; last=null; draw(); history(); snapshot();
+  chess=new Chess(); selected=null; premove=null; annotations.clear(); last=null; draw(); history(); snapshot();
   fadeEntryIntoLaunch(); setPhase('launching'); status('Готовим доску…');
   if(!motion.matches) {
     const scene=stages[level]; let chosen=null, restoreBoard=null;

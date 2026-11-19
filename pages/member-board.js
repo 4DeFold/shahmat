@@ -60,7 +60,7 @@ export function createMemberBoard({ document, board, reducedMotion }) {
       cell.classList.toggle('last-move', !!last && (last.from === square || last.to === square));
       cell.classList.toggle('premove', !!premove && (premove.from === square || premove.to === square));
       cell.classList.toggle('check', !!piece && piece.type === 'k' && piece.color === turn && checked);
-      const label = `${square}, ${piece ? (piece.color === 'w' ? 'белые, ' : 'чёрные, ') + names[piece.type] : 'пусто'}`;
+      const label = `${square}, ${piece ? (piece.color === 'w' ? 'белые, ' : 'чёрные, ') + names[piece.type] : 'пусто'}${premove && (premove.from === square || premove.to === square) ? ', предварительный ход' : ''}`;
       if (cell.getAttribute('aria-label') !== label) cell.setAttribute('aria-label', label);
       const pressed = String(selected === square);
       if (cell.getAttribute('aria-pressed') !== pressed) cell.setAttribute('aria-pressed', pressed);

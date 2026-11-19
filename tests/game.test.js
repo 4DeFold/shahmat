@@ -4,10 +4,12 @@ import { readFile } from 'node:fs/promises';
 import { JSDOM } from 'jsdom';
 import { Chess } from 'chess.js';
 import { chooseBotMove } from '../pages/bot.js';
+import { premoveTargets, validPremove } from '../pages/premove.js';
+import { createBoardAnnotations } from '../pages/board-annotations.js';
 
 const html = await readFile('pages/play.html', 'utf8');
 const source = (await readFile('pages/play.js', 'utf8')).replace(/^import .*;\n/gm, '') + '\nwindow.testGame = game; window.testRender = render;';
-function setup({ saved = null, storageError = false, memberId = null, now = null, random = 0.1 } = {}) {
+function setup({ saved = null, storageError = false, memberId = null, now = null, random = 0.1, botMove = chooseBotMove } = {}) {
   const dom = new JSDOM(html, { runScripts: 'outside-only', url: 'https://example.com/play', pretendToBeVisual: true });
   if (memberId) {
     dom.window.document.body.dataset.gameUser = memberId; dom.window.confirm = () => true;
@@ -19,7 +21,8 @@ function setup({ saved = null, storageError = false, memberId = null, now = null
   if (now !== null) dom.window.Date.now = () => now.value;
   dom.window.Math.random = () => random;
   dom.window.Chess = Chess;
-  dom.window.chooseBotMove = chooseBotMove;
+  dom.window.chooseBotMove = botMove;
+  Object.assign(dom.window,{premoveTargets,validPremove,createBoardAnnotations});
   dom.window.eval(source);
   const { document } = dom.window;
   const click = square => document.querySelector(`[data-square="${square}"]`).click();
@@ -252,4 +255,15 @@ test('expired game with black side schedules only one opening bot move', async (
   assert.equal(app.game.history().length, 1);
   assert.equal(app.game.turn(), 'b');
   app.window.close();
+});
+
+
+test('guest premove anticipates a pawn capture and executes after the bot reply', async () => {
+ const app=setup({botMove:()=>({from:'d7',to:'d5'})});
+ app.click('e2');app.click('e4');app.click('e4');app.click('d5');
+ assert.ok(app.document.querySelector('[data-square=d5]').classList.contains('premove'));
+ await delay(650);
+ assert.equal(app.game.get('d5').color,'w');assert.equal(app.game.get('d5').type,'p');
+ assert.deepEqual(app.game.history().slice(0,3),['e4','d5','exd5']);
+ app.window.close();
 });
