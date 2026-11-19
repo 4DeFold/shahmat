@@ -2,7 +2,7 @@
 // Move feedback uses board-local coordinates, so it also works on a rotated board.
 const files = 'abcdefgh';
 const names = { k:'король', q:'ферзь', r:'ладья', b:'слон', n:'конь', p:'пешка' };
-const pieceSrc = (color, type) => `/pieces/cburnett/${color}${type.toUpperCase()}.svg`;
+import {pieceSrc} from './piece-theme.js';
 
 export function createMemberBoard({ document, board, reducedMotion }) {
   const cells = new Map(), animations = new WeakMap();

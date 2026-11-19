@@ -236,6 +236,13 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
       void refresh();
     } else if (event.target.closest('.rating-retry')) void refresh({ force:true });
   }
+  function onKey(event) {
+    if (root.hidden || root.inert || root.closest('[hidden],[inert]') || !root.isConnected || event.defaultPrevented || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey || root.ownerDocument.querySelector('dialog[open]') || event.target.closest?.('input,textarea,select,[contenteditable]:not([contenteditable=false])')) return;
+    const delta = event.code === 'KeyA' || event.key === 'ArrowLeft' ? -1 : event.code === 'KeyD' || event.key === 'ArrowRight' ? 1 : 0;
+    if (!delta) return;
+    event.preventDefault(); const index=buttons.findIndex(button=>button.dataset.ratingMode===mode); buttons[(index+delta+buttons.length)%buttons.length].click();
+  }
+  root.ownerDocument.addEventListener('keydown', onKey);
   root.addEventListener('click', onClick);
   return {
     refresh,
@@ -256,7 +263,7 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
     hide() { clearMotion(); profileCard.hide(); },
     destroy() {
       destroyed = true; clearMotion(); sequence++; profileCard.destroy();
-      root.removeEventListener('click', onClick);
+      root.removeEventListener('click', onClick); root.ownerDocument.removeEventListener('keydown', onKey);
       win.removeEventListener('resize', scheduleIndicator);
       motionPreference?.removeEventListener?.('change', onMotionPreferenceChange);
       if (indicatorFrame !== null) win.cancelAnimationFrame(indicatorFrame);

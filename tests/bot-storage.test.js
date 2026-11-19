@@ -25,3 +25,8 @@ test('failed writes survive reload and completed local game is not resurrected',
  let attempts=0; const healthy=clientWith(async()=>{attempts++;return {error:null};},[row('game')]);
  const restored=createBotStorage({client:healthy,userId:'alice',storage}); assert.equal(await restored.restore(),null); await tick(); assert.equal(attempts,1); restored.destroy();
 });
+test('finishing preserves completed bot games and pending offline snapshots',async()=>{
+ const storage=memory(), sent=[];const client=clientWith(async value=>{sent.push(value);return {error:'offline'};},[row('game')]);
+ const store=createBotStorage({client,userId:'alice',storage});store.put(row('game',['f3','e5','g4','Qh4#'],'black_win'));await tick();store.finish('game');
+ assert.equal(await store.restore(),null);const saved=JSON.parse(storage.getItem('shahmat.bot-games.v1.alice'));assert.equal(saved.current,null);assert.equal(saved.pending[0].status,'black_win');assert.equal(saved.pending.some(x=>x._op==='delete'),false);store.destroy();
+});

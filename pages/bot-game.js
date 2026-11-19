@@ -1,5 +1,6 @@
+import {pieceSrc as themedPieceSrc} from './piece-theme.js';
 import { Chess } from 'chess.js';
-import {renderCaptures,renderThreats,bindThreatButtons} from './board-insights.js';
+import {renderCaptures,renderThreats} from './board-insights.js';
 import { premoveTargets, validPremove, normalizePremove, projectPremoves } from './premove.js';
 import { createBoardAnnotations } from './board-annotations.js';
 import { createClient } from '@supabase/supabase-js';
@@ -19,7 +20,7 @@ const motion=window.matchMedia('(prefers-reduced-motion: reduce)');
 const sound=createGameSound(window), boardView=createMemberBoard({document,board,reducedMotion:()=>motion.matches});
 const annotations=createBoardAnnotations({document,board});
 const names={q:'ферзь',r:'ладья',b:'слон',n:'конь'};
-const piece=(color,type)=>`/pieces/cburnett/${color}${type.toUpperCase()}.svg`;
+const piece=(color,type)=>themedPieceSrc(color,type);
 let level=0, phase='choose', userId=null, store=null, game=null, chess=new Chess(), selected=null, promotion=null, last=null, engine=null, thinking=false, generation=0;
 let launchDrain=null, premove=[], historyIndex=null, completedLevels=new Set(), threatKeys=new Set();
 let pageVisible=window.parent===window, orbitFrame=null, orbitAngle=0, orbitSpeed=0, lastFrame=0, demoClock=0, carouselPosition=0, carouselVelocity=0, drag=null, suppressClick=false, destroyed=false;
@@ -174,7 +175,7 @@ function switchLevel(next) {
 }
 $('bot-prev').addEventListener('click',()=>switchLevel(level-1)); $('bot-next').addEventListener('click',()=>switchLevel(level+1));
 function setPhase(value) {
-  phase=value; shell.dataset.phase=value; const inGame=value==='playing'||value==='finished';
+  phase=value; shell.dataset.phase=value; $('return-button').textContent=value==='finished' && game?.status==='black_win' ? 'Завершить' : 'К выбору бота'; const inGame=value==='playing'||value==='finished';
   showcase.inert=inGame||value==='launching'||value==='returning'; showcase.setAttribute('aria-hidden',String(inGame||value==='launching'||value==='returning'));
   $('bot-board-wrap').inert=!inGame; $('bot-board-wrap').setAttribute('aria-hidden',String(!inGame));
   for(const id of ['bot-actions','moves']) { $(id).inert=!inGame; $(id).setAttribute('aria-hidden',String(!inGame)); }
@@ -190,7 +191,7 @@ function draw(move=null,transitions=[]) {
   const actualShown=isLive?chess:shown;renderCaptures(actualShown,'w',$('bot-player-captured'),$('bot-opponent-captured'));renderThreats(actualShown,'w',boardView,threatKeys);
 }
 function setThreat(code,down){if(!['KeyQ','KeyE'].includes(code))return;if(down&&(!pageVisible||!['playing','finished'].includes(phase)))return;if(down)threatKeys.add(code);else threatKeys.delete(code);draw();}
-bindThreatButtons(document,setThreat);for(const type of ['keydown','keyup'])document.addEventListener(type,e=>{if(!['KeyQ','KeyE'].includes(e.code))return;if(type==='keydown'&&(e.ctrlKey||e.metaKey||e.altKey||e.target.closest?.('input,textarea,select,[contenteditable]:not([contenteditable=false])')||document.querySelector('dialog[open]')))return;setThreat(e.code,type==='keydown');});window.addEventListener('blur',()=>{setThreat('KeyQ',false);setThreat('KeyE',false);});
+for(const type of ['keydown','keyup'])document.addEventListener(type,e=>{if(!['KeyQ','KeyE'].includes(e.code))return;if(type==='keydown'&&(e.ctrlKey||e.metaKey||e.altKey||e.target.closest?.('input,textarea,select,[contenteditable]:not([contenteditable=false])')||document.querySelector('dialog[open]')))return;setThreat(e.code,type==='keydown');});window.addEventListener('blur',()=>{setThreat('KeyQ',false);setThreat('KeyE',false);});
 const renderMoves=createMoveHistory({document,list:$('move-list'),count:$('move-count'),onSelect:showHistory});
 function history() { const length=chess.history().length,index=historyIndex??length;renderMoves(chess,historyIndex);$('history-first').disabled=$('history-prev').disabled=index===0;$('history-next').disabled=$('history-last').disabled=index===length; }
 function showHistory(index) {
@@ -290,7 +291,7 @@ async function returnToSelection() {
   if(phase!=='playing' && phase!=='finished') return;
   if(phase==='playing' && !confirm('Вернуться к выбору? Текущая партия будет удалена.')) return;
   const current=++generation; engine?.destroy(); engine=null; thinking=false; premove=[]; cancelDrag(); annotations.clear();
-  const passed=game?.status==='white_win'; if(game) store?.remove(game.id);
+  const passed=game?.status==='white_win'; if(game) { if(phase==='finished') store?.finish(game.id); else store?.remove(game.id); }
   reveal('promotion',false); reveal('retry-wrap',false); promotion=null;
   const target=$('target-board');
   if(!motion.matches && pageVisible && !document.hidden && target.animate) {

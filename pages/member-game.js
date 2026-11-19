@@ -1,6 +1,7 @@
+import {pieceSrc as themedPieceSrc} from './piece-theme.js';
 import {applyProfileTheme,isProfileImage,profileAvatarColor} from './profile-theme.js';
 import { Chess } from 'chess.js';
-import {renderCaptures,renderThreats,bindThreatButtons} from './board-insights.js';
+import {renderCaptures,renderThreats} from './board-insights.js';
 import { premoveTargets, validPremove, normalizePremove, projectPremoves } from './premove.js';
 import { createBoardAnnotations } from './board-annotations.js';
 import { createMemberBoard } from './member-board.js';
@@ -14,7 +15,7 @@ const times = { blitz: 180000, rapid: 600000, classical: 3600000 };
 const modeLabels = { blitz:'Блиц · 3 мин', rapid:'Рапид · 10 мин', classical:'Классика · 1 час' };
 const names = { k:'король', q:'ферзь', r:'ладья', b:'слон', n:'конь', p:'пешка' };
 const files = 'abcdefgh';
-const pieceSrc = (color, type) => `/pieces/cburnett/${color}${type.toUpperCase()}.svg`;
+const pieceSrc = (color, type) => themedPieceSrc(color,type);
 export function formatClock(ms) {
   if (ms == null) return '00:00';
   const seconds = Math.max(0, Math.ceil(ms / 1000));
@@ -354,7 +355,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     if (!delta) return false; showHistory((historyIndex ?? chess.history().length) + delta); return true;
   }
   function setThreat(code,down) { if(!['KeyQ','KeyE'].includes(code))return; if(down && (!isVisible()||!snapshot||!['active','finished'].includes(phase)))return; if(down)threatKeys.add(code);else threatKeys.delete(code);renderBoard(); }
-  bindThreatButtons(document,setThreat);
+
   const onThreatDown = event => { if(event.ctrlKey||event.metaKey||event.altKey||event.target.closest?.('input,textarea,select,[contenteditable]:not([contenteditable=false])')||document.querySelector('dialog[open]'))return;setThreat(event.code,true); };
   const onThreatUp = event => setThreat(event.code,false);
   const clearThreats = () => { if(threatKeys.size){threatKeys.clear();renderBoard();} };

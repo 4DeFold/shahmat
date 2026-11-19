@@ -28,7 +28,6 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.119.0",
     "chess.js": "^1.4.0",
-    "cobe": "^2.0.1",
     "lenis": "^1.3.27",
     "stockfish": "17.1.0"
   },

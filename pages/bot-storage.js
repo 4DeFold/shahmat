@@ -33,6 +33,7 @@ export function createBotStorage({ client, userId, storage, onStatus = () => {} 
     data.pending=data.pending.filter((item,i)=>item.id!==id||(writing&&i===0));
     data.pending.push({_op:'delete',id});saveLocal();void flush();
   }
+  function finish(id) { if(data.current?.id===id){data.current=null;saveLocal();} void flush(); }
   function markWin(level) {
     data.wins=[...new Set([...(data.wins||[]),level])];
     if(!data.pending.some(item=>item._op==='win'&&item.level===level))data.pending.push({_op:'win',level});saveLocal();void flush();
@@ -54,8 +55,8 @@ export function createBotStorage({ client, userId, storage, onStatus = () => {} 
       if (disposed) return null;
       // Locally completed games must never be resurrected by an old server copy.
       const row=rows?.[0];
-      return row && !data.pending.some(item=>item._op==='delete'&&item.id===row.id) && !(data.current?.id===row.id && data.current.status!=='active') ? row : null;
+      return row && !data.pending.some(item=>item.id===row.id && (item._op==='delete' || (!item._op && item.status!=='active'))) && !(data.current?.id===row.id && data.current.status!=='active') ? row : null;
     } catch { if (!disposed) onStatus('Не удалось загрузить сохранённую партию.'); return null; }
   }
-  return { put, remove, markWin, completed, restore, flush, destroy() { disposed=true; if (retry!==null) clearTimeout(retry); } };
+  return { put, remove, finish, markWin, completed, restore, flush, destroy() { disposed=true; if (retry!==null) clearTimeout(retry); } };
 }

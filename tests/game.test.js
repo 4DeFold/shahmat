@@ -20,6 +20,7 @@ function setup({ saved = null, storageError = false, memberId = null, now = null
   if (storageError) Object.defineProperty(dom.window, 'localStorage', { get() { throw new Error('storage blocked'); } });
   if (now !== null) dom.window.Date.now = () => now.value;
   dom.window.Math.random = () => random;
+  dom.window.themedPieceSrc = (color,type) => `/pieces/cburnett/${color}${type.toUpperCase()}.svg`;
   dom.window.Chess = Chess;
   dom.window.chooseBotMove = botMove;
   Object.assign(dom.window,{premoveTargets,validPremove,normalizePremove,projectPremoves,createBoardAnnotations});

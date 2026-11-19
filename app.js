@@ -1,3 +1,5 @@
+import {installPieceTheme,setPieceSet} from './pages/piece-theme.js';
+installPieceTheme();
 import './pages/profile-card.css';
 import { createRatingView } from './pages/rating.js';
 import { startOnlinePresence } from './pages/online-presence.js';
@@ -284,7 +286,7 @@ async function loadView(name) {
     if (!dashboardPreloadEnabled || $('dashboard-screen').hidden || $(viewId(name))) return;
     $('page-content').insertAdjacentHTML('beforeend', html);
     if (name === 'rating') { ratingView = createRatingView($('page-rating'), supabase, { showSelf:true, onOpenProfile:openOtherProfile }); ratingView.setUnit(rankUnit); }
-    if (name === 'settings') { applyPalette(selectedPalette); applyRankUnit(rankUnit); }
+    if (name === 'settings') { applyPalette(selectedPalette); applyRankUnit(rankUnit); window.dispatchEvent(new Event('shahmat-piece-set')); }
     if (name === 'profile') {
       updateProfileAppearance();
       profileView = createProfileView($('page-profile'), supabase, { onBack() { void showPage(profileReturnPage,{updateHistory:true,focus:true}); }, onTheme(palette,theme) { const sidebar=$('app-sidebar');if(!sidebar)return;if(palette){applyProfileTheme(sidebar,palette,theme);sidebar.style.backgroundColor='var(--surface-raised)';}else clearProfileTheme(sidebar); }, onLoaded(updated) { profile = updated; }, onSaved(updated, media) {
@@ -900,3 +902,5 @@ async function initialize() {
   document.body.classList.add('startup-ready');
 }
 export const appReady = initialize();
+
+document.addEventListener('change',event=>{if(event.target.matches?.('input[name=piece-set]'))setPieceSet(event.target.value);});

@@ -1,3 +1,4 @@
+import {pieceSrc as themedPieceSrc} from './piece-theme.js';
 import { Chess } from 'chess.js';
 // Follow stable piece identities through the score, including en passant,
 // castling and promotion, so jumps of any distance can be animated in reverse.
@@ -36,7 +37,7 @@ export function createMoveHistory({document,list,count,onSelect}) {
       const move=score[i]; let row=buttons.at(-1)?.parentElement;
       if(i%2===0){row=document.createElement('li');const n=document.createElement('span');n.className='move-number';n.textContent=`${i/2+1}.`;const times=document.createElement('span');times.className='history-times';times.setAttribute('aria-label','Время ходов не записано');times.innerHTML='<span>—</span><span>—</span>';row.append(n,times);list.append(row);}
       const button=document.createElement('button');button.type='button';button.dataset.historyIndex=String(i+1);button.setAttribute('aria-label',`${Math.floor(i/2)+1}${i%2?'...':'.'} ${move.san}`);
-      if(move.piece!=='p'){const img=document.createElement('img');img.className='history-piece';img.alt='';img.src=`/pieces/cburnett/${move.color}${move.piece.toUpperCase()}.svg`;button.append(img);}
+      if(move.piece!=='p'){const img=document.createElement('img');img.className='history-piece';img.alt='';img.src=themedPieceSrc(move.color,move.piece);button.append(img);}
       const text=document.createElement('span');text.textContent=move.piece==='p'?move.san:move.san.replace(/^[KQRBN]/,'');button.append(text);row.insertBefore(button,row.querySelector('.history-times'));buttons.push(button);moves.push(move.san);
     }
     const active=index??score.length;

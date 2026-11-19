@@ -1,3 +1,4 @@
+import {pieceSrc as themedPieceSrc} from './piece-theme.js';
 import '../smooth-scroll.js';
 import { Chess } from 'chess.js';
 import { premoveTargets, validPremove, normalizePremove, projectPremoves } from './premove.js';
@@ -12,7 +13,7 @@ const board = document.getElementById('board');
 const status = document.getElementById('status');
 const promotion = document.getElementById('promotion');
 const options = document.getElementById('promotion-options');
-const pieceSrc = (color, type) => `/pieces/cburnett/${color}${type.toUpperCase()}.svg`;
+const pieceSrc = (color, type) => themedPieceSrc(color,type);
 const names = { k:'король', q:'ферзь', r:'ладья', b:'слон', n:'конь', p:'пешка' };
 const files = 'abcdefgh';
 let selected = null, pending = null, botTimer = null, botThinking = false, lastMove = null, premove = [], drag = null, suppressClick = false;
