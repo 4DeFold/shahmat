@@ -7,10 +7,13 @@ import { createMemberGame } from './member-game.js';
 import './game-theme.js';
 import { startOnlinePresence, createOnlineCounter } from './online-presence.js';
 import { startMatchHeartbeat } from './match-heartbeat.js';
+import { startSpectatorPresence } from './spectator-presence.js';
 import { createMatchApi } from './match-api.js';
 
 const supabase = createClient('https://eswyxbyddkajysogtglp.supabase.co', 'sb_publishable_w9pinHWr8XK5F9CflsSJmQ_4KFMKzHS');
-const ui = createMemberGame({ document, opponentName: async gameId => {
+let watchingGame=null,stopSpectators=null;
+function updateSpectators(id){if(id===watchingGame)return;stopSpectators?.();stopSpectators=null;watchingGame=id;if(!id)return;stopSpectators=startSpectatorPresence(supabase,id,{onCount:count=>{const el=document.getElementById('spectator-count');const show=Number.isInteger(count)&&count>0;el.classList.toggle('is-visible',show);el.setAttribute('aria-hidden',String(!show));if(show){document.getElementById('spectator-value').textContent=String(count);el.setAttribute('aria-label',`Зрителей: ${count}`);}}});}
+const ui = createMemberGame({ document, onGameChanged:updateSpectators, opponentName: async gameId => {
   const { data, error } = await supabase.functions.invoke('matchplay', { body: { action:'opponent', gameId }, timeout: 8000 });
   if(error||!data?.username) return error ? null : data;
   try { const result=await supabase.rpc('profile_public',{p_name:data.username}); return result.data||data; } catch { return data; }
@@ -39,6 +42,7 @@ ui.browserVisibility(!document.hidden);
 if (window.parent !== window) {
   window.addEventListener('message', event => {
     if (event.origin !== window.location.origin || event.source !== window.parent) return;
+    if (event.data?.type === 'shahmat-threat-key') { ui.setThreat(event.data.code,!!event.data.down); return; }
     if (event.data?.type === 'shahmat-history-key' && typeof event.data.key === 'string') { ui.navigateHistory(event.data.key); return; }
     if (event.data?.type === 'shahmat-profile-updated') { ui.setPlayerName(event.data.username); document.getElementById('player-profile-trigger').dataset.profileName=event.data.username; ui.setPlayerAvatar(event.data.avatar); return; }
     if (event.data?.type === 'shahmat-rank-unit') { ui.setRatingUnit(event.data.value); return; }

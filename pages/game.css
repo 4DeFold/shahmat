@@ -257,3 +257,17 @@ html, body { width: 100%; height: 100%; overflow: hidden; }
 .game-rail #move-list .history-piece { width:25px; height:25px; flex:none; }
 .game-rail #move-list li { grid-template-columns:36px minmax(0,1fr) minmax(0,1fr) 35px; }
 .game-rail #move-list li > .history-times { grid-column:4; grid-row:1; display:flex; flex-direction:column; justify-content:center; align-items:end; padding:2px 7px 2px 0; font:500 11px/1.2 system-ui,sans-serif; opacity:.55; }
+
+.captured-pieces { display:flex;align-items:center;min-height:15px;gap:0;font:600 12px system-ui,sans-serif;opacity:.8; }
+.captured-pieces:empty {display:none}.captured-pieces img {width:20px;height:20px;object-fit:contain;margin-right:-7px}.captured-pieces span {margin-left:9px}
+.board .square.threat-enemy::before,.board .square.threat-own::before {content:"";position:absolute;inset:0;background:#e636365c;pointer-events:none;z-index:1}
+.board .square.threat-own::before {background:#36ad5c60}.board .square.threat-enemy.threat-own::before {background:linear-gradient(135deg,#e636365c 50%,#36ad5c60 50%)}
+.board .square .piece {z-index:2}
+@media(max-width:700px) {
+ #member-game .board-area {padding:0 4px;min-height:0} #member-game .board-wrap {width:100%;max-width:none;gap:0 5px} #member-game .board-frame {width:min(100%,calc(100cqh - 76px));max-width:100%} #member-game .board-wrap .player-row {padding:2px 0} #member-game .board-wrap .avatar {width:25px;height:25px} #member-game .game-rail {padding:4px 8px;max-height:26dvh} #member-game .game-status {margin:2px 0;font-size:11px} #member-game .moves {margin-top:2px} #member-game .moves-header {display:none} #member-game #move-list {display:none} #member-game .history-controls {margin:0} #member-game .history-content {grid-template-rows:1fr!important} #member-game .online-counter {margin-top:3px;padding-top:3px} #member-game .mode-option span {min-height:29px;padding:3px 7px} #member-game .mode-list {gap:3px} #member-game .game-rail .new-game {margin-top:4px;min-height:34px;padding:5px} }
+
+#move-list.has-history-marker {position:relative;isolation:isolate} #move-list .history-marker {position:absolute;left:0;top:0;background:var(--control);pointer-events:none;z-index:0} #move-list li {position:relative} #move-list li>span,#move-list li>button {position:relative;z-index:1} #move-list.has-history-marker button.current {background:transparent;color:var(--control-ink)}
+
+#move-list .history-marker {z-index:1} #move-list li>span,#move-list li>button {z-index:2} .game-rail #move-list.has-history-marker button.current {background:transparent;color:var(--control-ink)}
+
+.spectator-count {position:absolute;bottom:calc(100% + 5px);right:0;display:flex;align-items:center;gap:5px;color:var(--ink);font:600 12px system-ui,sans-serif;opacity:0;transform:translateY(4px);pointer-events:none;transition:opacity .25s ease,transform .25s ease}.spectator-count.is-visible{opacity:1;transform:none}.spectator-count svg{width:18px;height:18px;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}@media(prefers-reduced-motion:reduce){.spectator-count{transition:none}}

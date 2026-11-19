@@ -1,6 +1,6 @@
 /* The profile uses the same rail width as the game; the banner spans the
    entire central column. On narrow screens the rail moves below the content. */
-.landing:has(.dashboard:not([hidden]) #page-profile:not([hidden])) { padding:0 0 0 208px; align-items:stretch; }
+.landing:has(.dashboard:not([hidden]) #page-profile:not([hidden])) { padding:0 0 0 187px; align-items:stretch; }
 .landing:has(.dashboard:not([hidden]) #page-profile:not([hidden])) .dashboard { width:100%; }
 .profile-page:not([hidden]) { display:grid; grid-template-columns:minmax(0,1fr) clamp(250px,23vw,310px); min-height:100dvh; color:var(--foreground); }
 .profile-main { min-width:0; }
@@ -117,3 +117,7 @@
 @media(prefers-reduced-motion:reduce) { .landing.palette-active .dashboard .profile-stat-details { transition:none; } }
 .landing.palette-active .dashboard :is(.profile-page,.profile-rail,.profile-portrait,.profile-portrait-inner,.profile-banner,.profile-stat-card) { transition:background-color .5s ease,color .5s ease,border-color .5s ease; }
 @media(prefers-reduced-motion:reduce){.landing.palette-active .dashboard :is(.profile-page,.profile-rail,.profile-portrait,.profile-portrait-inner,.profile-banner,.profile-stat-card){transition:none}}
+
+@font-face {font-family:'Inclusive Sans';src:url('../fonts/inclusive-sans.ttf') format('truetype');font-style:normal;font-weight:300 700;font-display:swap}
+.profile-stat-value .profile-stat-number,.profile-detail-row strong {font-family:'Inclusive Sans',sans-serif;font-variant-numeric:tabular-nums}
+.profile-stat-value span:not(.profile-stat-number) {font-size:.5em;letter-spacing:0}

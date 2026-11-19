@@ -21,13 +21,14 @@ export function formatClock(ms) {
   return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-export function createMemberGame({ document, api, opponentName = async () => null, playerRatings = async () => null, now = () => performance.now() }) {
+export function createMemberGame({ document, api, opponentName = async () => null, playerRatings = async () => null, onGameChanged = () => {}, now = () => performance.now() }) {
   const $ = id => document.getElementById(id), win = document.defaultView;
   const board = $('board'), start = $('start-search'), cancel = $('cancel-search'), reset = $('new-game');
   const promotion = $('promotion'), options = $('promotion-options');
   let userId = null, ready = false, chess = new Chess(), latestMove = null, mode = null, phase = 'idle', selected = null, pending = null;
   let snapshot = null, receivedAt = 0, polling = null, generation = 0, moving = false, pendingSearch = null, viewVisible = true, browserVisible = true, pollFailures = 0;
   let currentRequest = null, destroyed = false, reconciling = false, cancelPending = false;
+  let threatKeys = new Set();
   let premove = [], historyIndex = null, nameForGame = null, nameTimer = null, drag = null, suppressClick = false, actionPending = false;
   let rankUnit = 'yar', ownScore = null, scores = null, ratingsKey = null, ratingsRequest = 0, ratingsRetryAt = 0;
   const format = value => value == null || !Number.isFinite(Number(value)) ? '' : `(${new Intl.NumberFormat('ru-RU', { maximumFractionDigits:0 }).format(Number(value))} ${rankUnit === 'elo' ? 'Эло' : 'ЯР'})`;
@@ -133,6 +134,12 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     const legal = selected && historyIndex === null ? legalFor(selected).map(move => move.to) : [];
     const last = historyIndex === null ? latestMove : shown.history({ verbose:true }).at(-1);
     boardView.render({ shown, selected, legal, last, premoves: historyIndex === null ? premove : [], actual: historyIndex === null && premove.length ? chess : null, premoveMode: (chess.turn() !== color || premove.length > 0) && historyIndex === null, transitions, animatedMove: historyIndex === null ? animatedMove : null });
+    const attacks=threatKeys.has('KeyQ')||threatKeys.has('KeyE');
+    for(const file of files) for(let rank=1;rank<=8;rank++) { const sq=file+rank,cell=boardView.cell(sq); const foe=color==='w'?'b':'w';cell.classList.toggle('threat-enemy',attacks&&threatKeys.has('KeyQ')&&shown.isAttacked(sq,foe));cell.classList.toggle('threat-own',attacks&&threatKeys.has('KeyE')&&shown.isAttacked(sq,color)); }
+    const captures={w:[],b:[]}, values={p:1,n:3,b:3,r:5,q:9};
+    for(const move of shown.history({verbose:true}))if(move.captured)captures[move.color].push(move.captured);
+    const totals={w:0,b:0};for(const rank of shown.board())for(const piece of rank)if(piece&&piece.type!=='k')totals[piece.color]+=values[piece.type];
+    for(const [who,c] of [['player',color],['opponent',color==='w'?'b':'w']]) { const el=$(who+'-captured');if(!el)continue;const types=[...captures[c]].sort((a,b)=>values[a]-values[b]),diff=totals[c]-totals[c==='w'?'b':'w'];const key=types.join('')+':'+diff;if(el.dataset.captureKey===key)continue;el.dataset.captureKey=key;el.replaceChildren();for(const p of types){const img=document.createElement('img');img.src=pieceSrc(c==='w'?'b':'w',p);img.alt=names[p];el.append(img);}if(diff>0){const count=document.createElement('span');count.textContent='+'+diff;el.append(count);} }
     // Establish initial rotation before the board changes sides.
     if (board.classList.contains('waiting') && snapshot) void board.offsetWidth;
     board.classList.toggle('waiting', !snapshot); board.classList.toggle('black', !!snapshot && color === 'b');
@@ -180,6 +187,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   }
   function applyGame(game) {
     if (!game || !Array.isArray(game.moves) || (snapshot && snapshot.id === game.id && game.version < snapshot.version)) return;
+    onGameChanged(game.status==='active'&&isVisible()?game.id:null);
     if (snapshot && snapshot.id === game.id && game.version === snapshot.version && game.status === snapshot.status && !moving) {
       snapshot = game; receivedAt = now(); clockSync.update(game, receivedAt); loadRatings(game); modeControls(); drawClocks(); playQueuedPremove(); return;
     }
@@ -348,6 +356,11 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     const delta = key === 'ArrowLeft' || key.toLowerCase() === 'a' ? -1 : key === 'ArrowRight' || key.toLowerCase() === 'd' ? 1 : 0;
     if (!delta) return false; showHistory((historyIndex ?? chess.history().length) + delta); return true;
   }
+  function setThreat(code,down) { if(!['KeyQ','KeyE'].includes(code))return; if(down && (!isVisible()||!snapshot||!['active','finished'].includes(phase)))return; if(down)threatKeys.add(code);else threatKeys.delete(code);renderBoard(); }
+  const onThreatDown = event => { if(event.ctrlKey||event.metaKey||event.altKey||event.target.closest?.('input,textarea,select,[contenteditable]:not([contenteditable=false])')||document.querySelector('dialog[open]'))return;setThreat(event.code,true); };
+  const onThreatUp = event => setThreat(event.code,false);
+  const clearThreats = () => { if(threatKeys.size){threatKeys.clear();renderBoard();} };
+  document.addEventListener('keydown',onThreatDown); document.addEventListener('keyup',onThreatUp); win.addEventListener('blur',clearThreats);
   const onHistoryKey = event => {
     if (event.defaultPrevented || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey || event.target.closest?.('input, textarea, select, [contenteditable]:not([contenteditable=false]), [role=textbox]') || document.querySelector('dialog[open]') || pending) return;
     if (navigateHistory(event.code === 'KeyA' ? 'a' : event.code === 'KeyD' ? 'd' : event.key)) event.preventDefault();
@@ -442,7 +455,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   $('offline-draw').addEventListener('click', () => void finishAction('offline_draw'));
   $('mode-list').addEventListener('change', event => { if (phase === 'idle' && times[event.target.value]) { mode = event.target.value; modeControls(); drawClocks(); if (ready) setStatus('Всё готово к поиску.'); } });
   start.addEventListener('click', () => void search()); cancel.addEventListener('click', () => void cancelSearch());
-  reset.addEventListener('click', () => { annotations.clear(); cancelTimer(); generation++; snapshot = null; scores = null; ratingsKey = null; ratingsRetryAt = 0; ratingsRequest++; renderRatings(); clockSync.clear(); chess = new Chess(); latestMove = null; phase = 'idle'; mode = null; $('mode-list').querySelectorAll('input').forEach(input => { input.checked = false; }); premove = []; historyIndex = null; nameForGame = null; profileTrigger.disabled = true; profilePinned = false; showProfile(false); clearInterval(nameTimer); $('opponent-name').textContent = 'Соперник'; setAvatar('opponent',null); modeControls(); renderBoard(); renderHistory(); drawClocks(); setStatus(''); });
+  reset.addEventListener('click', () => { annotations.clear(); onGameChanged(null); cancelTimer(); generation++; snapshot = null; scores = null; ratingsKey = null; ratingsRetryAt = 0; ratingsRequest++; renderRatings(); clockSync.clear(); chess = new Chess(); latestMove = null; phase = 'idle'; mode = null; $('mode-list').querySelectorAll('input').forEach(input => { input.checked = false; }); premove = []; historyIndex = null; nameForGame = null; profileTrigger.disabled = true; profilePinned = false; showProfile(false); clearInterval(nameTimer); $('opponent-name').textContent = 'Соперник'; setAvatar('opponent',null); modeControls(); renderBoard(); renderHistory(); drawClocks(); setStatus(''); });
   function pause() { cancelDrag(); if (moving) reconciling = true; if (phase === 'searching') void cancelSearch(); else if (phase !== 'cancelling') { generation++; cancelTimer(); } }
   function resume() {
     if (!userId || destroyed) return;
@@ -486,7 +499,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   modeControls(); renderBoard(); drawClocks(); board.classList.add('ready');
   if (win.parent === win) revealPieces();
   return {
-    navigateHistory,
+    navigateHistory, setThreat, clearThreats,
     setOwnRating(value) { ownScore = value; renderRatings(); },
     setRatingUnit(value) { rankUnit = value === 'elo' ? 'elo' : 'yar'; renderRatings(); },
     setPlayerAvatar(value) { setAvatar('player',value); },
@@ -497,9 +510,9 @@ export function createMemberGame({ document, api, opponentName = async () => nul
       await checkCurrent();
     },
     online() { if (isVisible()) resume(); },
-    hide() { const wasVisible = isVisible(); viewVisible = false; if (wasVisible) pause(); },
-    show() { const wasVisible = isVisible(); const wasShown = viewVisible; viewVisible = true; if (!wasShown) revealPieces(); if (!wasVisible && isVisible()) resume(); },
-    browserVisibility(value) { const wasVisible = isVisible(); browserVisible = value; if (wasVisible && !isVisible()) pause(); else if (!wasVisible && isVisible()) resume(); },
-    destroy() { destroyed = true; document.removeEventListener('keydown', onPremoveKey); document.removeEventListener('keydown', onHistoryKey); annotations.destroy(); generation++; cancelDrag(); cancelTimer(); clearInterval(clockInterval); clearInterval(nameTimer); revealAnimations.forEach(animation => animation.cancel()); Object.values(clocks).forEach(clock => clock.destroy()); sound.destroy(); },
+    hide() { clearThreats(); onGameChanged(null); const wasVisible = isVisible(); viewVisible = false; if (wasVisible) pause(); },
+    show() { if(snapshot?.status==='active'&&browserVisible)onGameChanged(snapshot.id); const wasVisible = isVisible(); const wasShown = viewVisible; viewVisible = true; if (!wasShown) revealPieces(); if (!wasVisible && isVisible()) resume(); },
+    browserVisibility(value) { if(!value)onGameChanged(null);else if(viewVisible&&snapshot?.status==='active')onGameChanged(snapshot.id); const wasVisible = isVisible(); browserVisible = value; if (wasVisible && !isVisible()) pause(); else if (!wasVisible && isVisible()) resume(); },
+    destroy() { destroyed = true; onGameChanged(null); document.removeEventListener('keydown',onThreatDown); document.removeEventListener('keyup',onThreatUp); win.removeEventListener('blur',clearThreats); document.removeEventListener('keydown', onPremoveKey); document.removeEventListener('keydown', onHistoryKey); annotations.destroy(); generation++; cancelDrag(); cancelTimer(); clearInterval(clockInterval); clearInterval(nameTimer); revealAnimations.forEach(animation => animation.cancel()); Object.values(clocks).forEach(clock => clock.destroy()); sound.destroy(); },
   };
 }

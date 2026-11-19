@@ -68,3 +68,5 @@
 @media (prefers-reduced-motion:reduce) { .orbit-stage::after { transition:none; } }
 /* Child elements run the same entrance choreography on return and on tab entry. */
 .bot-shell[data-phase=choose] .bot-showcase { transition:none; }
+
+.bot-showcase {grid-template-rows:minmax(0,1fr) auto auto auto}.bot-selector{grid-row:2}.bot-completed{grid-row:3;color:var(--accent);font:600 14px system-ui,sans-serif;animation:bot-completed-in .45s ease both}.bot-play{grid-row:4}@keyframes bot-completed-in{from{opacity:0;transform:translateY(7px);filter:blur(3px)}to{opacity:1;transform:none;filter:blur(0)}}@media(prefers-reduced-motion:reduce){.bot-completed{animation:none}}

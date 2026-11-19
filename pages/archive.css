@@ -11,9 +11,15 @@
 .archive-card:focus-visible {outline:2px solid var(--accent);outline-offset:5px}
 .archive-modes {display:grid;gap:8px}.archive-modes button,.archive-back,.archive-more {border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:13px;text-align:left;font:600 14px system-ui,sans-serif;cursor:pointer;transition:background .25s,color .25s,transform .25s}
 .archive-modes button[aria-pressed=true] {background:var(--control);color:var(--control-ink);border-color:var(--control)}
-.archive-back {width:100%}.archive-more {margin-top:24px}.archive-detail {margin:auto; animation:archive-reveal .48s cubic-bezier(.22,1,.36,1) both} .archive-main:has(.archive-detail:not([hidden])) {display:grid;place-items:center}
+.archive-back {width:100%}.archive-more {margin-top:24px}.archive-detail {margin:auto} .archive-main:has(.archive-detail:not([hidden])) {display:grid;place-items:center}
 #archive-status {font-size:13px;color:var(--muted)} #archive-status:empty {display:none} #archive-history .history-times {display:none} #archive-history #move-list li {grid-template-columns:36px minmax(0,1fr) minmax(0,1fr)}
 @keyframes archive-reveal {from{opacity:0;transform:translateY(12px) scale(.98);filter:blur(5px)}to{opacity:1;transform:none;filter:blur(0)}}
 @media(max-width:700px){.archive-main{padding:18px;}.archive-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.archive-modes{grid-template-columns:repeat(4,1fr);gap:4px}.archive-modes button{padding:10px 4px;text-align:center;font-size:12px}.archive-detail{width:min(100%,max(140px,calc(100dvh - 300px)),500px)}}
 @media(prefers-reduced-motion:reduce){.archive-card.is-ready,.archive-detail{animation:none}.archive-mini,.archive-modes button{transition:none}}
 #archive-app .game-rail #move-list .history-times { display:none; }
+
+.archive-main:has(.archive-detail:not([hidden])) {overflow:hidden;container-type:size;padding:8px 16px} .archive-detail {width:min(100%,680px,max(100px,calc(100cqh - 84px)))} .archive-detail .board-frame {transform-origin:0 0} .archive-main .board-annotations {z-index:5}
+
+.archive-card-footer {display:flex;align-items:baseline;justify-content:space-between;gap:8px}.archive-card-footer strong {min-width:0}.archive-result {flex:none;font:600 12px system-ui,sans-serif}.archive-result.win{color:#26894c}.archive-result.loss{color:#d84a4a}.archive-result.draw{color:var(--muted)}
+
+#archive-content {min-height:100%} .archive-main:has(.archive-detail:not([hidden])) #archive-content {height:100%;display:grid;place-items:center} #archive-grid[hidden],#archive-detail[hidden]{display:none}

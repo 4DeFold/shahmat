@@ -425,6 +425,13 @@ document.addEventListener('keydown', event => {
   const key=event.code==='KeyA'?'a':event.code==='KeyD'?'d':event.key;
   if (['ArrowLeft','ArrowRight','a','d'].includes(key) || (key==='Enter' && currentPage()==='bot' && !event.target.closest?.('button,a'))) { event.preventDefault(); $(({game:'member-game-frame',bot:'bot-game-frame',watch:'watch-frame',archive:'archive-frame'})[currentPage()])?.contentWindow?.postMessage({type:'shahmat-history-key',key,code:event.code},window.location.origin); }
 });
+// Forward held physical Q/E keys when the shell, rather than the frame, has focus.
+for (const type of ['keydown','keyup']) document.addEventListener(type,event=>{
+  if(currentPage()!=='game'||$('dashboard-screen').hidden||!['KeyQ','KeyE'].includes(event.code))return;
+  if(type==='keydown'&&(event.ctrlKey||event.metaKey||event.altKey||event.target.closest?.('input,textarea,select,[contenteditable]:not([contenteditable=false])')||document.querySelector('dialog[open]')))return;
+  $('member-game-frame')?.contentWindow?.postMessage({type:'shahmat-threat-key',code:event.code,down:type==='keydown'},window.location.origin);
+});
+window.addEventListener('blur',()=>{for(const code of ['KeyQ','KeyE'])$('member-game-frame')?.contentWindow?.postMessage({type:'shahmat-threat-key',code,down:false},window.location.origin);});
 document.addEventListener('keydown', event => {
   if (event.key !== 'Escape') return;
   if (accountToggle.getAttribute('aria-expanded') === 'true') { closeAccountMenu(); accountToggle.focus(); }

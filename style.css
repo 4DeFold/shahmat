@@ -422,7 +422,7 @@ textarea { resize: vertical; min-height: 92px; }
 
 /* The signed-in area has a persistent left rail; landing and onboarding stay unchanged. */
 .landing:has(.dashboard:not([hidden])) {
-  padding: 40px 40px 40px 248px;
+  padding: 40px 40px 40px 227px;
   align-items: flex-start;
 }
 .dashboard { min-width: 0; }
@@ -430,7 +430,7 @@ textarea { resize: vertical; min-height: 92px; }
   position: fixed;
   z-index: 20;
   inset: 0 auto 0 0;
-  width: 208px;
+  width: 187px;
   min-height: 100vh;
   min-height: 100dvh;
   display: flex;
@@ -715,7 +715,7 @@ textarea { resize: vertical; min-height: 92px; }
 @media (prefers-reduced-motion: reduce) { .palette-scroll { scroll-behavior: auto; } .landing.palette-active .dashboard .settings-palette-list .palette-option { transition: none; } }
 
 /* Game fills the viewport beside the persistent navigation. */
-.landing:has(.dashboard:not([hidden]) :is(#page-game,#page-watch,#page-archive):not([hidden])) { padding: 0 0 0 208px; height: 100dvh; min-height: 0; }
+.landing:has(.dashboard:not([hidden]) :is(#page-game,#page-watch,#page-archive):not([hidden])) { padding: 0 0 0 187px; height: 100dvh; min-height: 0; }
 .landing:has(.dashboard:not([hidden]) :is(#page-game,#page-watch,#page-archive):not([hidden])) .dashboard { width: 100%; height: 100%; }
 .landing:has(.dashboard:not([hidden]) :is(#page-game,#page-watch,#page-archive):not([hidden])) #page-content { height: 100%; }
 :is(#page-game,#page-watch,#page-archive):not([hidden]) { height: 100%; }
@@ -782,8 +782,8 @@ body.startup-ready #landing-screen:not([hidden]) .hero-reveal--tail { animation-
   #auth-submit:hover::after { animation: none; }
 }
 
-/* The wordmark fills roughly 90% of the full 208px desktop rail. */
-.sidebar-brand { width: calc(100% + 28px); margin-inline: -14px; padding-inline: 0; font-size: 36px; }
+/* The wordmark fills roughly 90% of the full desktop rail. */
+.sidebar-brand { width: calc(100% + 28px); margin-inline: -14px; padding-inline: 0; font-size: 32px; }
 
 /* Navigation hit areas and highlights span the rail without shifting their contents. */
 .sidebar-nav > .sidebar-item, .sidebar-account > .sidebar-item {
@@ -947,7 +947,7 @@ body.startup-ready #landing-screen:not([hidden]) .hero-reveal--tail { animation-
 }
 
 /* Bot uses the same full-height frame and rail geometry as online play. */
-.landing:has(.dashboard:not([hidden]) #page-bot:not([hidden])) { padding:0 0 0 208px; height:100dvh; min-height:0; }
+.landing:has(.dashboard:not([hidden]) #page-bot:not([hidden])) { padding:0 0 0 187px; height:100dvh; min-height:0; }
 .landing:has(.dashboard:not([hidden]) #page-bot:not([hidden])) .dashboard,
 .landing:has(.dashboard:not([hidden]) #page-bot:not([hidden])) #page-content,
 #page-bot:not([hidden]), #page-bot:not([hidden]) #bot-game-frame { width:100%; height:100%; min-height:0; }

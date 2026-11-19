@@ -583,3 +583,14 @@ test('history navigation animates moved pieces forwards and backwards',async t=>
  dom.window.document.querySelector('#history-prev').click();assert.ok(animations.some(a=>a.square==='g1'&&a.frames[0].translate));animations.length=0;
  dom.window.document.querySelector('#history-next').click();assert.ok(animations.some(a=>a.square==='f3'&&a.frames[0].translate));
 });
+
+test('captures and held physical attack keys follow the displayed history, including blocked pieces', async t=>{
+ const app=setup(async()=>({game:game({moves:['e4','d5','exd5','Qxd5'],turn:'w'})}));t.after(()=>app.close());await app.ui.open(A);await flush();
+ assert.equal(app.$('player-captured').querySelectorAll('img').length,1);assert.equal(app.$('opponent-captured').querySelectorAll('img').length,1);
+ const key=(type,code)=>app.dom.window.document.dispatchEvent(new app.dom.window.KeyboardEvent(type,{code,key:code==='KeyQ'?'q':'e',bubbles:true}));
+ key('keydown','KeyQ');assert.equal(app.$('board').querySelector('[data-square=d4]').classList.contains('threat-enemy'),true);
+ key('keydown','KeyE');assert.equal(app.$('board').querySelector('[data-square=e2]').classList.contains('threat-own'),true);
+ key('keyup','KeyQ');assert.equal(app.$('board').querySelectorAll('.threat-enemy').length,0);
+ app.$('history-first').click();assert.equal(app.$('player-captured').querySelectorAll('img').length,0);assert.equal(app.$('opponent-captured').querySelectorAll('img').length,0);
+ assert.equal(app.$('board').querySelector('[data-square=a4]').classList.contains('threat-own'),false);key('keyup','KeyE');assert.equal(app.$('board').querySelectorAll('.threat-own').length,0);
+});

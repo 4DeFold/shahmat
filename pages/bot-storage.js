@@ -12,7 +12,7 @@ export function createBotStorage({ client, userId, storage, onStatus = () => {} 
     try {
       while (!disposed && data.pending.length) {
         const snapshot=data.pending[0];
-        const { error } = await client.from('bot_games').upsert(snapshot, { onConflict:'id' });
+        const { error } = snapshot._op==='delete' ? await client.from('bot_games').delete().eq('user_id',userId).eq('id',snapshot.id) : snapshot._op==='win' ? await client.from('bot_progress').upsert({user_id:userId,level:snapshot.level},{onConflict:'user_id,level'}) : await client.from('bot_games').upsert(snapshot, { onConflict:'id' });
         if (error) throw error;
         if (data.pending[0] === snapshot) data.pending.shift();
         saveLocal();
@@ -28,6 +28,20 @@ export function createBotStorage({ client, userId, storage, onStatus = () => {} 
     if (index>=0) data.pending[index]=row; else data.pending.push(row);
     saveLocal(); onStatus('Сохраняем партию…'); void flush();
   }
+  function remove(id) {
+    if(data.current?.id===id)data.current=null;
+    data.pending=data.pending.filter((item,i)=>item.id!==id||(writing&&i===0));
+    data.pending.push({_op:'delete',id});saveLocal();void flush();
+  }
+  function markWin(level) {
+    data.wins=[...new Set([...(data.wins||[]),level])];
+    if(!data.pending.some(item=>item._op==='win'&&item.level===level))data.pending.push({_op:'win',level});saveLocal();void flush();
+  }
+  async function completed() {
+    const wins=new Set(data.wins||[]);void flush();
+    try {let timer;const {data:rows,error}=await Promise.race([client.from('bot_progress').select('level').eq('user_id',userId),new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('timeout')),3000);})]).finally(()=>clearTimeout(timer));if(!error&&Array.isArray(rows))for(const row of rows)if(row.level>=1&&row.level<=6)wins.add(row.level);}catch{/* Offline completion is retained locally. */}
+    data.wins=[...wins];saveLocal();return data.wins;
+  }
   async function restore() {
     if (data.current?.status==='active') { void flush(); return data.current; }
     void flush();
@@ -40,8 +54,8 @@ export function createBotStorage({ client, userId, storage, onStatus = () => {} 
       if (disposed) return null;
       // Locally completed games must never be resurrected by an old server copy.
       const row=rows?.[0];
-      return row && !(data.current?.id===row.id && data.current.status!=='active') ? row : null;
+      return row && !data.pending.some(item=>item._op==='delete'&&item.id===row.id) && !(data.current?.id===row.id && data.current.status!=='active') ? row : null;
     } catch { if (!disposed) onStatus('Не удалось загрузить сохранённую партию.'); return null; }
   }
-  return { put, restore, flush, destroy() { disposed=true; if (retry!==null) clearTimeout(retry); } };
+  return { put, remove, markWin, completed, restore, flush, destroy() { disposed=true; if (retry!==null) clearTimeout(retry); } };
 }

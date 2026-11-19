@@ -83,8 +83,7 @@ try {
   await game.locator('#history-first').click();
   assert.equal(await game.locator('[data-square=e2] img').count(), 1);
   await game.locator('#history-last').click();
-  await game.locator('#toggle-moves').click(); assert.equal(await game.locator('#history-content').getAttribute('aria-hidden'), 'true');
-  assert.equal(await game.locator('#history-content').evaluate(el => el.getBoundingClientRect().height), 0);
+  if(await game.locator('#toggle-moves').isVisible()){await game.locator('#toggle-moves').click(); assert.equal(await game.locator('#history-content').getAttribute('aria-hidden'), 'true'); assert.equal(await game.locator('#history-content').evaluate(el => el.getBoundingClientRect().height), 0);}else {assert.equal(await game.locator('#move-list').isVisible(),false);assert.equal(await game.locator('#history-prev').isVisible(),true);}
 
   for (const size of [{ width:280,height:653 }, { width:390,height:844 }, { width:768,height:1024 }, { width:1440,height:900 }, { width:2560,height:1080 }]) {
     await page.setViewportSize(size);

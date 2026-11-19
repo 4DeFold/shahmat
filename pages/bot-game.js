@@ -20,7 +20,7 @@ const annotations=createBoardAnnotations({document,board});
 const names={q:'ферзь',r:'ладья',b:'слон',n:'конь'};
 const piece=(color,type)=>`/pieces/cburnett/${color}${type.toUpperCase()}.svg`;
 let level=0, phase='choose', userId=null, store=null, game=null, chess=new Chess(), selected=null, promotion=null, last=null, engine=null, thinking=false, generation=0;
-let launchDrain=null, premove=[], historyIndex=null;
+let launchDrain=null, premove=[], historyIndex=null, completedLevels=new Set();
 let pageVisible=window.parent===window, orbitFrame=null, orbitAngle=0, orbitSpeed=0, lastFrame=0, demoClock=0, carouselPosition=0, carouselVelocity=0, drag=null, suppressClick=false, destroyed=false;
 const status=text=>{ if ($('status').textContent!==text) $('status').textContent=text; };
 function reveal(id, open) { const el=$(id); if (el.classList.contains('is-open')===open) return; el.classList.toggle('is-open',open); el.inert=!open; el.setAttribute('aria-hidden',String(!open)); }
@@ -159,7 +159,7 @@ document.addEventListener('visibilitychange',()=>{ if(document.hidden) stopOrbit
 
 function showLevel() {
   const bot=BOT_LEVELS[level];
-  $('bot-name').textContent=bot.name;
+  $('bot-name').textContent=bot.name; $('bot-completed').hidden=!completedLevels.has(level+1);
   $('game-bot-piece').src=piece('b',bot.piece); $('game-bot-name').textContent=bot.name;
   $('bot-prev').disabled=level===0; $('bot-next').disabled=level===BOT_LEVELS.length-1;
 }
@@ -213,6 +213,7 @@ function finishIfNeeded() {
   else if(chess.isStalemate()) { game.status='draw'; result='Ничья: пат.'; }
   else if(chess.isDraw() || chess.history().length>=1000) { game.status='draw'; result='Ничья.'; }
   if(!result) return false;
+  if(game.status==='white_win'){completedLevels.add(level+1);store?.markWin(level+1);}
   thinking=false; premove=[]; draw(); setPhase('finished'); reveal('resign-wrap',false); status(result); snapshot(); return true;
 }
 function resignAvailable() { return phase==='playing' && game && Date.now()-Date.parse(game.started_at)>=60000; }
@@ -283,9 +284,9 @@ $('resign-confirm').addEventListener('click',()=>{ $('resign-dialog').close(); i
 $('return-button').addEventListener('click',()=>void returnToSelection());
 async function returnToSelection() {
   if(phase!=='playing' && phase!=='finished') return;
-  if(phase==='playing' && !confirm('Вернуться к выбору? Текущая партия будет завершена.')) return;
+  if(phase==='playing' && !confirm('Вернуться к выбору? Текущая партия будет удалена.')) return;
   const current=++generation; engine?.destroy(); engine=null; thinking=false; premove=[]; cancelDrag(); annotations.clear();
-  if(game?.status==='active') { game.status='abandoned'; snapshot(); }
+  const passed=game?.status==='white_win'; if(game) store?.remove(game.id);
   reveal('promotion',false); reveal('retry-wrap',false); promotion=null;
   const target=$('target-board');
   if(!motion.matches && pageVisible && !document.hidden && target.animate) {
@@ -305,7 +306,7 @@ async function returnToSelection() {
     animation?.cancel(); flyer.remove(); target.style.visibility='';
     if(current!==generation || destroyed) return;
   }
-  game=null; chess=new Chess(); selected=null; last=null; setPhase('choose'); status('');
+  game=null; chess=new Chess(); selected=null; last=null; setPhase('choose'); status(''); showLevel(); if(passed){await wait(motion.matches?0:650);if(current===generation&&!destroyed)switchLevel(Math.min(BOT_LEVELS.length-1,Math.max(...completedLevels)));}
   if(pageVisible && !document.hidden) animateEntry();
 }
 $('retry-bot').addEventListener('click',()=>{ reveal('retry-wrap',false); void botMove(); });
@@ -365,6 +366,7 @@ async function launch() {
 $('bot-play').addEventListener('click',()=>void launch());
 async function restore(id) {
   userId=id; store=createBotStorage({client:supabase,userId:id,storage:window.localStorage,onStatus:text=>{$('save-status').textContent=/^(Партия сохранена|Сохраняем партию)/.test(text)?'':text;}});
+  const wins=await store.completed();if(destroyed||userId!==id)return;completedLevels=new Set(wins);if(phase==='choose'&&wins.length){level=Math.min(BOT_LEVELS.length-1,Math.max(...wins));carouselPosition=level;carouselVelocity=0;showLevel();positionOrbit();}
   const row=await store.restore(); if(destroyed || userId!==id || phase!=='choose' || !row) return;
   try {
     if(!Number.isInteger(row.level) || row.level<1 || row.level>6 || !Array.isArray(row.moves) || row.moves.length>1000 || !Number.isFinite(Date.parse(row.started_at))) throw Error('invalid save');
