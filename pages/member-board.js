@@ -44,23 +44,25 @@ export function createMemberBoard({ document, board, reducedMotion }) {
       if (animations.get(image) === animation) { animations.delete(image); cell.classList.remove('is-moving'); }
     });
   }
-  function render({ shown, selected, legal = [], premove, last, animatedMove }) {
-    const moves = new Set(legal), checked = shown.isCheck(), turn = shown.turn();
+  function render({ shown, selected, legal = [], premove, premoves = [], actual, last, animatedMove, transitions = [], premoveMode = false }) {
+    const moves = new Set(legal), checked = (actual || shown).isCheck(), turn = (actual || shown).turn();
     let movingImage = null, rookImage = null, rookFrom, rookTo;
     if (animatedMove) {
       movingImage = transfer(animatedMove.from, animatedMove.to);
-      if (animatedMove.flags.includes('k')) { rookFrom = `h${animatedMove.to[1]}`; rookTo = `f${animatedMove.to[1]}`; }
-      if (animatedMove.flags.includes('q')) { rookFrom = `a${animatedMove.to[1]}`; rookTo = `d${animatedMove.to[1]}`; }
+      if (animatedMove.flags.includes('k')) { rookFrom = `${animatedMove.reverse?'f':'h'}${animatedMove.to[1]}`; rookTo = `${animatedMove.reverse?'h':'f'}${animatedMove.to[1]}`; }
+      if (animatedMove.flags.includes('q')) { rookFrom = `${animatedMove.reverse?'d':'a'}${animatedMove.to[1]}`; rookTo = `${animatedMove.reverse?'a':'d'}${animatedMove.to[1]}`; }
       if (rookFrom) rookImage = transfer(rookFrom, rookTo);
     }
     for (const [square, cell] of cells) {
       const piece = shown.get(square);
       cell.classList.toggle('selected', selected === square);
       cell.classList.toggle('possible', moves.has(square));
+      cell.classList.toggle('premove-dest', premoveMode && moves.has(square));
       cell.classList.toggle('last-move', !!last && (last.from === square || last.to === square));
-      cell.classList.toggle('premove', !!premove && (premove.from === square || premove.to === square));
+      const queued = premoves.some(move => move.from === square || move.to === square) || !!premove && (premove.from === square || premove.to === square);
+      cell.classList.toggle('premove', queued);
       cell.classList.toggle('check', !!piece && piece.type === 'k' && piece.color === turn && checked);
-      const label = `${square}, ${piece ? (piece.color === 'w' ? 'белые, ' : 'чёрные, ') + names[piece.type] : 'пусто'}`;
+      const label = `${square}, ${piece ? (piece.color === 'w' ? 'белые, ' : 'чёрные, ') + names[piece.type] : 'пусто'}${premove && (premove.from === square || premove.to === square) ? ', предварительный ход' : ''}`;
       if (cell.getAttribute('aria-label') !== label) cell.setAttribute('aria-label', label);
       const pressed = String(selected === square);
       if (cell.getAttribute('aria-pressed') !== pressed) cell.setAttribute('aria-pressed', pressed);
@@ -69,8 +71,10 @@ export function createMemberBoard({ document, board, reducedMotion }) {
       const src = pieceSrc(piece.color, piece.type);
       if (!img) { img = document.createElement('img'); img.className = 'piece'; img.alt = ''; img.draggable = false; cell.prepend(img); }
       if (img.getAttribute('src') !== src) img.setAttribute('src', src);
+      const real=actual?.get(square); img.classList.toggle('premove-ghost', !!actual && (!real || real.color!==piece.color || real.type!==piece.type));
     }
     if (animatedMove) { animate(movingImage, animatedMove.from, animatedMove.to); if (rookImage) animate(rookImage, rookFrom, rookTo); }
+    for (const move of transitions) animate(cells.get(move.to)?.querySelector('.piece'), move.from, move.to);
   }
   return { render, cell: square => cells.get(square) };
 }

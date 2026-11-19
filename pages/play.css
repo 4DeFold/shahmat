@@ -99,3 +99,23 @@ body.demo-page .status-card::before { content: ''; position: absolute; inset: 0;
 .demo-spark { position: fixed; z-index: 1000; width: 6px; height: 1.5px; background: var(--ink); pointer-events: none; }
 
 .avatar img.custom-profile-avatar { width:100%; height:100%; object-fit:cover; border-radius:inherit; }
+
+/* Local analysis marks: never intercept clicks or obscure dragging. */
+.board { position: relative; }
+.board-annotations { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 5; pointer-events: none; overflow: hidden; }
+.annotation-item { animation: annotation-in .16s ease-out both; transform-origin: center; }
+.annotation-preview { opacity: .72; }
+@keyframes annotation-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .annotation-item { animation: none; } }
+.demo-page .square.premove { box-shadow: inset 0 0 0 4px #d22f3a, inset 0 0 0 100px #f04e4e88; }
+.board .square.dragging > .piece { visibility: hidden; }
+.drag-ghost { position: fixed; top: 0; left: 0; z-index: 1000; width: var(--drag-size); height: var(--drag-size); pointer-events: none; filter: drop-shadow(0 5px 8px #0008); will-change: transform; }
+.square.premove::before { content: ''; position: absolute; inset: 0; background: #ff6565; pointer-events: none; animation: premove-flash .3s ease-out both; }
+@keyframes premove-flash { from { opacity: .45; } to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .square.premove::before { animation: none; opacity: 0; } }
+.demo-page .board { touch-action: none; }
+.demo-page .square.premove { box-shadow: inset 0 0 0 100px rgba(20,30,85,.5); }
+.square.premove::before { background:#203085; }
+.square.possible.premove-dest::after { background:rgba(20,30,85,.5); }
+.square.possible.premove-dest:has(.piece)::after { background:transparent; border-color:rgba(20,30,85,.3); }
+.demo-page .piece.premove-ghost { opacity:.52; filter:drop-shadow(0 0 4px #203085); }

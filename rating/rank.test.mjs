@@ -1,34 +1,20 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { probabilities, updateRating, divisionAfter } from './rank.js';
-
-test('Davidson probabilities sum to one and reverse symmetrically', () => {
-  const a = probabilities(1200, 800), b = probabilities(800, 1200);
-  assert.ok(Math.abs(a.win + a.draw + a.loss - 1) < 1e-12);
-  assert.ok(Math.abs(a.win - b.loss) < 1e-12);
-  assert.ok(Math.abs(a.draw - b.draw) < 1e-12);
-  assert.ok(Math.abs(probabilities(1000, 1000).draw - 0.9 / 2.9) < 1e-12);
+import {transfer,updateRatings,overall} from './rank.js';
+test('fixed K, draws, underdogs and no rating clamp', () => {
+ assert.equal(transfer(1000,1000,1),10);
+ assert.ok(transfer(1400,1000,0.5)<0);
+ assert.ok(transfer(1000,1400,1)>transfer(1400,1000,1));
+ assert.equal(transfer(2000,1000,1),0);
+ assert.deepEqual(updateRatings(-100, -100, 0), {white:-110,black:-90,delta:-10});
+ assert.throws(()=>transfer(1000,1000,0.7));
 });
-test('weights, calibration step and draws', () => {
-  assert.equal(updateRating(1000, 1000, 0, 0.5, 'classic'), 1000);
-  assert.equal(updateRating(1000, 1000, 0, 1, 'classic'), 1024);
-  assert.equal(updateRating(1000, 1000, 0, 1, 'bullet'), 1014.4);
-  assert.equal(updateRating(1000, 1000, 0, 1, 'bot'), 1000);
-  assert.equal(updateRating(1000, 1000, 0, 0, 'friendly'), 1000);
-  assert.ok(updateRating(1000, 1000, 100, 1, 'classic') < 1024);
+test('zero sum and integers across 20000 games; no decay after 1000 games',()=>{
+ let white=1000,black=1000;
+ for(let i=0;i<20000;i++) {({white,black}=updateRatings(white,black,[1,0,0.5][i%3]));assert.equal(white+black,2000);assert.ok(Number.isInteger(white)&&Number.isInteger(black));}
+ assert.equal(transfer(1000,1000,1),10);
 });
-test('division hysteresis works in both directions, including multiple levels', () => {
-  assert.equal(divisionAfter(1039, 1), 1);
-  assert.equal(divisionAfter(1040, 1), 2);
-  assert.equal(divisionAfter(920, 2), 2);
-  assert.equal(divisionAfter(919, 2), 1);
-  assert.equal(divisionAfter(2200, 0), 7);
-  assert.equal(divisionAfter(0, 7), 0);
-});
-test('invalid inputs do not silently become ratings', () => {
-  assert.throws(() => probabilities(NaN, 1000));
-  assert.throws(() => updateRating(1000, 1000, -1, 1, 'classic'));
-  assert.throws(() => updateRating(1000, 1000, 0, 0.7, 'classic'));
-  assert.throws(() => updateRating(1000, 1000, 0, 1, 'unknown'));
-  assert.throws(() => divisionAfter(1000, 8));
+test('weighted overall and missing modes',()=>{
+ for(const [b,r,c,score] of [[1100,1000,1000,1017],[1000,1000,1100,1050],[1000,1100,1200,1133],[1200,1100,1000,1067],[1100,1100,1100,1100]]) assert.equal(overall(b,r,c),score);
+ assert.equal(overall(),1000);
 });

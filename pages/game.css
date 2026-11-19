@@ -233,3 +233,27 @@ html, body { width: 100%; height: 100%; overflow: hidden; }
 .opponent-trigger > span:not(.avatar),.player-name-line strong { min-width:0; }
 .player-name-line strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .player-top-status { flex:none; }
+/* History stays independently scrollable and each half-move is a target. */
+.game-rail #move-list { padding:0; overflow-y:auto; overscroll-behavior:contain; }
+.game-rail #move-list li { padding:0; align-items:stretch; grid-template-columns: 40px minmax(0,1fr) minmax(0,1fr); }
+.game-rail #move-list li > span { padding:9px 10px; }
+.game-rail #move-list button { padding:9px 10px; min-width:0; }
+.game-rail #move-list button:hover { background:var(--line); }
+.game-rail #move-list button.current { background:var(--control); color:var(--control-ink); }
+.history-controls button:disabled { opacity:.35; cursor:default; }
+.opponent-profile-card { cursor:pointer; }
+.opponent-profile-card:focus-visible { outline:2px solid currentColor; outline-offset:2px; }
+.board .square.premove { box-shadow: inset 0 0 0 100px rgba(20,30,85,.5); }
+.board .square.possible.premove-dest::after { background:rgba(20,30,85,.5); }
+.board .square.possible.premove-dest:has(.piece)::after { background:transparent; border-color:rgba(20,30,85,.3); }
+.player-rating { white-space:nowrap; }
+.board .piece.premove-ghost { opacity:.52; filter:drop-shadow(0 0 4px #203085); }
+/* Move list follows the compact chess score: alternating rows and separate plies. */
+.game-rail #move-list { max-height:260px; background:var(--surface-alt); margin-top:12px; font:600 15px/1.2 system-ui,sans-serif; }
+.game-rail #move-list li { min-height:38px; grid-template-columns:42px minmax(0,1fr) minmax(0,1fr); }
+.game-rail #move-list li:nth-child(odd) { background:color-mix(in srgb,var(--surface) 65%,var(--surface-alt)); }
+.game-rail #move-list .move-number { color:var(--muted); padding:10px; }
+.game-rail #move-list button { display:flex; align-items:center; gap:5px; font:inherit; padding:5px 8px; }
+.game-rail #move-list .history-piece { width:25px; height:25px; flex:none; }
+.game-rail #move-list li { grid-template-columns:36px minmax(0,1fr) minmax(0,1fr) 35px; }
+.game-rail #move-list li > .history-times { grid-column:4; grid-row:1; display:flex; flex-direction:column; justify-content:center; align-items:end; padding:2px 7px 2px 0; font:500 11px/1.2 system-ui,sans-serif; opacity:.55; }

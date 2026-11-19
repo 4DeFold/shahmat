@@ -2,7 +2,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { PGlite } from '@electric-sql/pglite';
-import { updateRating } from '../rating/rank.js';
+// These tests exercise the historical Davidson migration before v2.
+const updateRating = (rating, opponent, games, score, mode) => {
+  const ratio = 10 ** ((rating - opponent) / 400), draw = 0.9 * Math.sqrt(ratio);
+  const expected = (ratio + 0.5 * draw) / (ratio + 1 + draw);
+  return Math.max(0, Math.min(2600, rating + (mode === 'blitz' ? 0.85 : 1) * (6 + 42 / (1 + games / 8)) * (score - expected)));
+};
 
 const A='00000000-0000-4000-8000-000000000001', B='00000000-0000-4000-8000-000000000002', C='00000000-0000-4000-8000-000000000003';
 test('completed online games update separate mode scores exactly once; average, permissions and daily caps', async () => {

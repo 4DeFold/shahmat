@@ -691,7 +691,7 @@ textarea { resize: vertical; min-height: 92px; }
 
 /* The game is an independent document inside the persistent account shell. */
 .game-view { width: 100%; min-width: 0; }
-#member-game-frame { display: block; width: 100%; height: 1100px; min-height: 500px; border: 0; background: var(--page-background); }
+#member-game-frame, #watch-frame { display: block; width: 100%; height: 1100px; min-height: 500px; border: 0; background: var(--page-background); }
 
 
 /* Settings: equal columns of diagonal colour ribbons in a native scroll strip. */
@@ -715,13 +715,13 @@ textarea { resize: vertical; min-height: 92px; }
 @media (prefers-reduced-motion: reduce) { .palette-scroll { scroll-behavior: auto; } .landing.palette-active .dashboard .settings-palette-list .palette-option { transition: none; } }
 
 /* Game fills the viewport beside the persistent navigation. */
-.landing:has(.dashboard:not([hidden]) #page-game:not([hidden])) { padding: 0 0 0 208px; height: 100dvh; min-height: 0; }
-.landing:has(.dashboard:not([hidden]) #page-game:not([hidden])) .dashboard { width: 100%; height: 100%; }
-.landing:has(.dashboard:not([hidden]) #page-game:not([hidden])) #page-content { height: 100%; }
-#page-game:not([hidden]) { height: 100%; }
-#page-game:not([hidden]) #member-game-frame { height: 100%; min-height: 0; }
+.landing:has(.dashboard:not([hidden]) :is(#page-game,#page-watch):not([hidden])) { padding: 0 0 0 208px; height: 100dvh; min-height: 0; }
+.landing:has(.dashboard:not([hidden]) :is(#page-game,#page-watch):not([hidden])) .dashboard { width: 100%; height: 100%; }
+.landing:has(.dashboard:not([hidden]) :is(#page-game,#page-watch):not([hidden])) #page-content { height: 100%; }
+:is(#page-game,#page-watch):not([hidden]) { height: 100%; }
+#page-game:not([hidden]) #member-game-frame, #page-watch:not([hidden]) #watch-frame { height: 100%; min-height: 0; }
 @media (max-width: 700px), (max-height: 500px) and (pointer: coarse) {
-  .landing:has(.dashboard:not([hidden]) #page-game:not([hidden])) { padding: 68px 0 0; }
+  .landing:has(.dashboard:not([hidden]) :is(#page-game,#page-watch):not([hidden])) { padding: 68px 0 0; }
 }
 
 /* A transformed dashboard becomes a containing block for its fixed sidebar. */
@@ -990,3 +990,6 @@ body.startup-ready #landing-screen:not([hidden]) .hero-reveal--tail { animation-
 /* The profile's borrowed theme stays local to the sidebar and transitions back. */
 .landing.palette-active .dashboard .app-sidebar { transition:background-color .5s ease,color .5s ease,border-color .5s ease,transform .25s ease,visibility 0s linear .25s; }
 @media (prefers-reduced-motion:reduce){.landing.palette-active .dashboard .app-sidebar{transition:none}}
+.board-guide { max-width: 620px; margin-top: 36px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-raised); }
+.board-guide h3 { margin: 0 0 12px; font: 400 24px/1.2 'Playfair Display', Georgia, serif; }
+.board-guide p { margin: 10px 0 0; font-size: 14px; line-height: 1.55; }
