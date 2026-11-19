@@ -9,7 +9,7 @@ const options = {
   ...(process.env.CHROMIUM_EXTRA_ARGS ? { args: process.env.CHROMIUM_EXTRA_ARGS.split(' ') } : {}),
 };
 const id = '12345678-1234-1234-1234-123456789012';
-const remote = { palette: 'forest', palette_theme: 'light' };
+const remote = { palette: 'forest', palette_theme: 'light', palette_effective_theme:'light' };
 let writes = 0, reads = 0;
 const user = () => ({ id, email: 'sync@example.com', aud: 'authenticated', role: 'authenticated', user_metadata: { ...remote } });
 const browsers = [];
@@ -70,12 +70,12 @@ try {
   await desktop.locator('#account-toggle').click();
   await desktop.locator('#account-menu [data-page=help]').click();
   await desktop.locator('#page-help').waitFor({ state: 'visible' });
-  assert.equal(await desktop.locator('#page-help').evaluate(el => getComputedStyle(el).animationName), 'view-entrance');
+  assert.equal(await desktop.locator('#page-help-title').evaluate(el => getComputedStyle(el).animationName), 'support-reveal');
   await phone.locator('#mobile-menu-toggle').click();
   await phone.locator('#account-toggle').click();
   await phone.locator('#account-menu [data-page=help]').click();
   await phone.locator('#page-help').waitFor({ state: 'visible' });
-  assert.equal(await phone.locator('#page-help').evaluate(el => getComputedStyle(el).animationName), 'none');
+  assert.equal(await phone.locator('#page-help-title').evaluate(el => getComputedStyle(el).animationName), 'none');
   await phone.emulateMedia({ reducedMotion: 'no-preference' });
   await phone.locator('#mobile-menu-toggle').click();
   const drawerTransition = await phone.locator('#app-sidebar').evaluate(el => getComputedStyle(el).transitionDuration);

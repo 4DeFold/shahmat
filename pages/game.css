@@ -198,3 +198,38 @@ html, body { width: 100%; height: 100%; overflow: hidden; }
 }
 .player-rating { font-size: .85em; opacity: .8; }
 #player-name, #opponent-name { display:inline; }
+
+.opponent-profile-card { background:var(--page-background,var(--surface-alt)); color:var(--foreground,var(--ink)); }
+.opponent-card-banner { height:72px; margin:-14px -14px 0; background:linear-gradient(120deg,var(--page-background),var(--board-dark)); }
+.opponent-card-banner img { width:100%; height:100%; object-fit:cover; }
+.opponent-card-avatar { display:block; width:52px; height:52px; object-fit:contain; border:3px solid var(--page-background); background:var(--board-light); border-radius:50%; margin-top:-26px; position:relative; }
+.opponent-card-avatar.custom { object-fit:cover; }.opponent-profile-card .bio-label { color:inherit; opacity:.65; }.opponent-profile-card button { color:inherit; background:transparent; border:1px solid var(--line); padding:7px 10px; margin-top:12px; }
+.opponent-profile-card { animation:player-profile-enter .55s cubic-bezier(.22,1,.36,1) both; }
+.opponent-profile-card .bio-label[hidden],.opponent-profile-card p[hidden] { display:none; }
+@keyframes player-profile-enter { from {opacity:0;transform:translateY(10px);filter:blur(3px)} to {opacity:1;transform:translateY(0);filter:blur(0)} }
+@media(prefers-reduced-motion:reduce) { .opponent-profile-card { animation:none; } }
+@media (max-width:700px) {
+  .board-wrap { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; column-gap:8px; }
+  .board-wrap > .player-row { min-width:0; grid-column:1; grid-row:1; }
+  .board-wrap > .player-row:not(.opponent-row) { grid-row:3; }
+  .board-with-clocks,.clock-pair { display:contents; }
+  .board-frame { grid-column:1 / -1; grid-row:2; }
+  #opponent-clock-card { grid-column:2; grid-row:1; }
+  #player-clock-card { grid-column:2; grid-row:3; }
+  .clock { width:clamp(74px,24vw,112px); }
+  .opponent-trigger { min-width:0; }
+  .promotion { grid-column:1 / -1; }
+}
+.player-name-line { display:flex; align-items:baseline; flex-wrap:wrap; gap:5px; min-width:0; }
+.player-top-status { font:600 10px/1.1 Arial,sans-serif; padding:3px 5px; border:1px solid currentColor; white-space:nowrap; }
+@media (max-width:700px) {
+  /* Size the board from the space actually left by the scrollable controls. */
+  .board-area { container-type:size; }
+  .board-wrap { width:100%; }
+  .board-frame { width:min(100%, max(90px, calc(100cqh - 165px)), 500px); justify-self:center; }
+  .game-rail { max-height:38dvh; }
+}
+.player-name-line { flex-wrap:nowrap; }
+.opponent-trigger > span:not(.avatar),.player-name-line strong { min-width:0; }
+.player-name-line strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.player-top-status { flex:none; }

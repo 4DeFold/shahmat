@@ -1,8 +1,12 @@
+import './pages/profile-card.css';
 import { createRatingView } from './pages/rating.js';
 import { startOnlinePresence } from './pages/online-presence.js';
 import { startMatchHeartbeat } from './pages/match-heartbeat.js';
 import { createClient } from '@supabase/supabase-js';
 import './theme.js';
+import './pages/profile.css';
+import { createProfileView } from './pages/profile-view.js';
+import {applyProfileTheme,clearProfileTheme} from './pages/profile-theme.js';
 
 // Preserve the callback type before Supabase consumes and clears the URL fragment.
 const callbackParams = new URLSearchParams(window.location.hash.slice(1));
@@ -32,14 +36,22 @@ function applyRankUnit(value) {
   ratingView?.setUnit(rankUnit);
   $('member-game-frame')?.contentWindow?.postMessage({ type:'shahmat-rank-unit', value:rankUnit }, window.location.origin);
 }
+const paletteNames = { monochrome:'Монохром', gray:'Графит', forest:'Лес', atelier:'Шахматный кабинет', wood:'Тёплое дерево', earth:'Сосновый бор', ocean:'Морская глубина', amber:'Янтарь', lavender:'Лаванда', sand:'Песчаный' };
+function updateProfileAppearance() {
+  if ($('page-profile')?.dataset.profileOther === 'true') return;
+  if ($('profile-palette-name')) $('profile-palette-name').textContent = paletteNames[selectedPalette];
+  if ($('profile-palette-swatch')) $('profile-palette-swatch').className = `palette-swatch ${selectedPalette}`;
+}
 function applyTheme(value) {
   selectedTheme = value === 'dark' || value === 'light' ? value : null;
   landing.dataset.paletteTheme = selectedTheme || (systemTheme.matches ? 'dark' : 'light');
+  updateProfileAppearance();
 }
-systemTheme.addEventListener('change', () => { if (!selectedTheme) applyTheme(null); });
+systemTheme.addEventListener('change', () => { if (!selectedTheme) { applyTheme(null); recordAppearance(); } });
 function applyPalette(value) {
   selectedPalette = palettes.has(value) ? value : 'monochrome';
   landing.dataset.palette = selectedPalette;
+  updateProfileAppearance();
   document.querySelectorAll('.palette-list input').forEach(input => {
     input.checked = input.value === selectedPalette;
   });
@@ -96,7 +108,7 @@ async function syncAppearance() {
     if (sessionError) throw sessionError;
     if (appearanceUserId !== id) return;
     if (!data.session || data.session.user.id !== id) throw new Error('Session unavailable');
-    const { error } = await supabase.auth.updateUser({ data: { palette: pending.palette, palette_theme: pending.theme, rank_unit: pending.rankUnit || rankUnit } });
+    const { error } = await supabase.auth.updateUser({ data: { palette: pending.palette, palette_theme: pending.theme, palette_effective_theme: pending.theme || (systemTheme.matches ? 'dark' : 'light'), rank_unit: pending.rankUnit || rankUnit } });
     if (error) throw error;
     const latest = readAppearance(id);
     if (latest?.version === pending.version) writeAppearance(id, { ...latest, dirty: false });
@@ -155,7 +167,8 @@ function restoreAppearance(user) {
     applyPalette(remote.palette); applyTheme(remote.palette_theme); applyRankUnit(remote.rank_unit);
     writeAppearance(user.id, { palette: selectedPalette, theme: selectedTheme, rankUnit, dirty: false, version: local?.version || 0 });
   }
-  void syncAppearance();
+  if (!local?.dirty && remote.palette_effective_theme !== (selectedTheme || (systemTheme.matches ? 'dark' : 'light'))) recordAppearance();
+  else void syncAppearance();
   startAppearancePolling();
 }
 window.addEventListener('online', () => {
@@ -251,7 +264,7 @@ const pageLoaders = {
 let pageRequest = 0;
 const viewId = name => name === 'home' ? 'dashboard-home' : `page-${name}`;
 const viewLoads = new Map();
-let frameReady = null, botFrameReady = null, ratingView = null;
+let frameReady = null, botFrameReady = null, ratingView = null, profileView = null, profileReturnPage = 'rating';
 let onlineStop = null, heartbeatStop = null, onlineUser = null, onlineCount = null;
 function sendOnline() { $('member-game-frame')?.contentWindow?.postMessage({ type: 'shahmat-online', count: onlineCount }, window.location.origin); }
 function startOnline(id) {
@@ -268,8 +281,15 @@ async function loadView(name) {
     const { default: html } = await pageLoaders[name]();
     if (!dashboardPreloadEnabled || $('dashboard-screen').hidden || $(viewId(name))) return;
     $('page-content').insertAdjacentHTML('beforeend', html);
-    if (name === 'rating') { ratingView = createRatingView($('page-rating'), supabase, { showSelf:true }); ratingView.setUnit(rankUnit); }
+    if (name === 'rating') { ratingView = createRatingView($('page-rating'), supabase, { showSelf:true, onOpenProfile:openOtherProfile }); ratingView.setUnit(rankUnit); }
     if (name === 'settings') { applyPalette(selectedPalette); applyRankUnit(rankUnit); }
+    if (name === 'profile') {
+      updateProfileAppearance();
+      profileView = createProfileView($('page-profile'), supabase, { onBack() { void showPage(profileReturnPage,{updateHistory:true,focus:true}); }, onTheme(palette,theme) { const sidebar=$('app-sidebar');if(!sidebar)return;if(palette){applyProfileTheme(sidebar,palette,theme);sidebar.style.backgroundColor='var(--surface-raised)';}else clearProfileTheme(sidebar); }, onLoaded(updated) { profile = updated; }, onSaved(updated, media) {
+        profile = updated; ratingView?.invalidate?.();
+        for (const id of ['member-game-frame','bot-game-frame']) $(id)?.contentWindow?.postMessage({type:'shahmat-profile-updated',username:updated.username,avatar:media.avatar}, window.location.origin);
+      } });
+    }
     if (name === 'game' || name === 'bot') {
       const frame = $(name === 'game' ? 'member-game-frame' : 'bot-game-frame');
       const ready = new Promise((resolve, reject) => {
@@ -285,6 +305,16 @@ async function loadView(name) {
   viewLoads.set(name, pending);
   try { await pending; } finally { viewLoads.delete(name); }
 }
+async function openOtherProfile(name) {
+  if (!name || !profile) return;
+  if(currentPage()!=='profile') profileReturnPage=currentPage();
+  await showPage('profile', {updateHistory:true});
+  if (currentPage() === 'profile') void profileView?.showOther(name);
+}
+window.addEventListener('message', event => {
+  if (event.origin !== window.location.origin || event.source !== $('member-game-frame')?.contentWindow) return;
+  if (event.data?.type === 'shahmat-open-profile' && typeof event.data.username === 'string') void openOtherProfile(event.data.username);
+});
 function preloadDashboard() {
   for (const name of ['game', 'profile', 'settings', 'help']) void loadView(name).catch(() => {});
 }
@@ -309,15 +339,26 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
     $('page-loading')?.remove();
     $('member-game-frame')?.contentWindow?.postMessage({ type: name === 'game' ? 'shahmat-game-shown' : 'shahmat-game-hidden' }, window.location.origin);
     $('bot-game-frame')?.contentWindow?.postMessage({ type: name === 'bot' ? 'shahmat-bot-shown' : 'shahmat-bot-hidden' }, window.location.origin);
+    const profileWasHidden = $('page-profile')?.hidden;
     document.querySelectorAll('#dashboard-screen [data-view]').forEach(view => {
       const active = view.dataset.view === name;
       const changed = active && view.hidden;
       view.hidden = !active;
       view.inert = sidebarOpen;
+      if (changed && view.dataset.view === 'profile') {
+        view.classList.remove('profile-enter'); void view.offsetWidth;
+        if (!reducedMotion.matches) view.classList.add('profile-enter');
+      }
+      if (changed && (view.dataset.view === 'settings' || view.dataset.view === 'help')) {
+        view.classList.remove('support-enter'); void view.offsetWidth;
+        if (!reducedMotion.matches) view.classList.add('support-enter');
+      }
       if (changed && focus && !reducedMotion.matches) {
         view.classList.remove('page-enter'); void view.offsetWidth; view.classList.add('page-enter');
       }
     });
+    if (name === 'profile' && profileWasHidden) { delete $('page-profile').dataset.profileOther; const requested=new URLSearchParams(window.location.search).get('player'); if(requested) {history.replaceState(null,'',window.location.pathname); void profileView?.showOther(requested);} else { updateProfileAppearance(); void profileView?.show(profile, appearanceUserId); } }
+    else if (name !== 'profile') profileView?.hide();
     if (name === 'rating') ratingView?.show(); else ratingView?.hide();
     if (name !== 'settings') { clearTimeout(rankInfoTimer); rankInfoPinned = false; showRankInfo(false); }
     document.querySelectorAll('#dashboard-screen [data-page]').forEach(link => {
@@ -361,6 +402,7 @@ $('dashboard-screen').querySelectorAll('[data-page]').forEach(link => link.addEv
   if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
   event.preventDefault();
   setSidebarOpen(false);
+  if(link.dataset.page === 'profile' && $('page-profile')?.dataset.profileOther === 'true' && currentPage()==='profile') { delete $('page-profile').dataset.profileOther; updateProfileAppearance(); void profileView?.show(profile,appearanceUserId); }
   void showPage(link.dataset.page, { updateHistory: true, focus: true });
 }));
 accountToggle.addEventListener('click', () => {
@@ -807,6 +849,7 @@ document.querySelectorAll('.signout').forEach(button => button.addEventListener(
     // Discard account-specific views on logout.
     $('page-game')?.remove(); frameReady = null; $('page-bot')?.remove(); botFrameReady = null;
     ratingView?.destroy(); $('page-rating')?.remove(); ratingView = null;
+    profileView?.destroy(); $('page-profile')?.remove(); profileView = null;
     profile = null; applyPalette('monochrome'); applyTheme(null); applyRankUnit('yar'); $('auth-form').reset(); setMode('login');
     window.history.replaceState(null, '', '/');
     await show('auth-screen');

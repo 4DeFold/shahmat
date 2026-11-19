@@ -43,7 +43,7 @@ try {
     assert.equal(animated,reducedMotion === 'no-preference');
     await page.waitForTimeout(700);
     const before = await page.locator('#player-clock-card').boundingBox();
-    await page.locator('label:has(input[value=daily])').click();
+    await page.locator('label:has(input[value=classical])').click();
     await page.waitForTimeout(60);
     const middle = await page.locator('#player-clock-card').boundingBox();
     const sizing = await page.locator('#player-clock-card').evaluate(el => el.getAnimations().some(a => a.effect.getTiming().duration === 350));
@@ -54,7 +54,7 @@ try {
     if (reducedMotion === 'no-preference') assert.ok(middle.height < before.height && middle.height > after.height, `card height changes gradually: ${before.height} ${middle.height} ${after.height}`);
     for (const viewport of [{width:280,height:653},{width:390,height:844},{width:768,height:1024},{width:1440,height:900},{width:2560,height:1080}]) {
       await page.setViewportSize(viewport);
-      for (const [mode, time] of [['daily','24:00:00'],['blitz','03:00']]) {
+      for (const [mode, time] of [['classical','1:00:00'],['blitz','03:00']]) {
         await page.locator(`label:has(input[value=${mode}])`).click();
         assert.equal(await page.locator('#player-clock').getAttribute('aria-label'),time);
         const fit = await page.locator('#player-clock').evaluate(async el => {

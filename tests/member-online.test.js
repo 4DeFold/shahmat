@@ -35,7 +35,7 @@ test('board opens at starting position, modes are explicit and a real request st
   assert.equal(app.$('player-clock').getAttribute('aria-label'), '00:00');
   assert.equal(app.$('opponent-clock').getAttribute('aria-label'), '00:00');
   assert.equal(app.$('board').querySelector('[data-square=e2] img').getAttribute('src'), '/pieces/cburnett/wP.svg');
-  assert.deepEqual([...app.$('mode-list').querySelectorAll('input')].map(input => input.value), ['blitz','rapid','classical','daily']);
+  assert.deepEqual([...app.$('mode-list').querySelectorAll('input')].map(input => input.value), ['blitz','rapid','classical']);
   assert.equal(app.$('start-search').disabled, true); assert.equal(app.$('start-search').hidden, true);
   await app.ui.open(A);
   assert.equal(app.$('player-color').textContent, '');
@@ -297,10 +297,21 @@ test('opponent card is accessible, treats bio as text, and clears between games'
   trigger.focus(); assert.equal(card.hidden, false); assert.equal(trigger.getAttribute('aria-expanded'), 'true');
   assert.equal(doc.getElementById('opponent-profile-name').textContent, 'Friend');
   assert.equal(doc.getElementById('opponent-profile-bio').textContent, '<img src=x onerror=alert(1)>');
-  assert.equal(card.querySelector('img'), null);
+  assert.equal(doc.getElementById('opponent-profile-bio').querySelector('img'), null);
+  assert.ok(doc.getElementById('opponent-profile-avatar'));
   doc.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key:'Escape' })); assert.equal(card.hidden, true);
-  trigger.click(); assert.equal(card.hidden, false); trigger.click(); assert.equal(card.hidden, true);
+  assert.equal(doc.getElementById('opponent-profile-open'),null);
   ui.destroy(); dom.window.close();
+});
+
+test('empty opponent bio is absent rather than a placeholder', async t => {
+  const dom = new JSDOM(html, { url:'https://example.com/pages/game.html' });
+  const ui=createMemberGame({document:dom.window.document,api:async()=>({game:game()}),opponentName:async()=>({username:'Friend',bio:'  '})});
+  t.after(()=>{ui.destroy();dom.window.close();});
+  await ui.open(A); await flush();
+  assert.equal(dom.window.document.getElementById('opponent-profile-bio').hidden,true);
+  assert.equal(dom.window.document.getElementById('opponent-profile-bio-label').hidden,true);
+  assert.equal(dom.window.document.getElementById('opponent-profile-bio').textContent,'');
 });
 
 test('piece reveal is restarted on show but not on a move or visibility change', async () => {
@@ -477,7 +488,7 @@ test('selection survives an opponent move but clears when the selected piece is 
 test('player names and game-mode ratings switch between yar and shadow elo', async () => {
   const dom = new JSDOM(html, { url:'https://example.com/pages/game.html', pretendToBeVisual:true });
   dom.window.matchMedia=()=>({matches:true,addEventListener(){},removeEventListener(){}});
-  const ui=createMemberGame({document:dom.window.document, api:async body=>({game:body.action==='current'?game():null}), playerRatings:async()=>[{player:'self',username:'Alice',yar:1200,elo:1050},{player:'opponent',username:'Bob',yar:1100,elo:1150}],opponentName:async()=>({username:'Bob'})});
+  const ui=createMemberGame({document:dom.window.document, api:async body=>({game:body.action==='current'?game():null}), playerRatings:async()=>[{player:'self',username:'Alice',yar:1200.4,elo:1050.3},{player:'opponent',username:'Bob',yar:1100.4,elo:1150.4}],opponentName:async()=>({username:'Bob'})});
   await ui.open(A); await flush();
   assert.equal(dom.window.document.getElementById('player-name').textContent,'Alice');
   assert.equal(dom.window.document.getElementById('opponent-rating').textContent.replace(/\s/g,''),'(1100ЯР)');

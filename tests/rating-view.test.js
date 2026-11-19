@@ -7,7 +7,7 @@ const html = await readFile('pages/rating.html','utf8');
 const tick = () => new Promise(resolve => setTimeout(resolve,0));
 test('rating switches modes, escapes names, and ignores stale requests', async () => {
   const dom=new JSDOM(html); const root=dom.window.document.querySelector('section');
-  const requests=[]; const client={rpc:(fn,args)=>new Promise(resolve=>requests.push({fn,args,resolve}))};
+  const requests=[]; const client={rpc:(fn,args)=>(fn==='profile_avatars'||fn==='profile_avatar_themes')?Promise.resolve({data:[]}):new Promise(resolve=>requests.push({fn,args,resolve}))};
   const view=createRatingView(root,client); const first=view.refresh();
   root.querySelector('[data-rating-mode="rapid"]').click();
   await Promise.resolve();
@@ -17,6 +17,8 @@ test('rating switches modes, escapes names, and ignores stale requests', async (
   assert.equal(root.querySelector('[data-rating-mode="rapid"]').getAttribute('aria-pressed'),'true');
   assert.equal(root.querySelector('.rating-player').textContent,'<b>Player</b>');
   assert.equal(root.querySelector('.rating-player b'),null);
+  assert.equal(root.querySelector('.rating-score').textContent.replace(/\s/g,''),'1235');
+  assert.equal(root.querySelector('.rating-avatar').getAttribute('src'),'/pieces/cburnett/wN.svg');
   assert.equal(root.querySelectorAll('.rating-row')[1].querySelector('.rating-place').textContent,'2');
   assert.equal(root.querySelector('.rating-board').getAttribute('aria-busy'),'false');
   root.querySelector('[data-rating-mode="blitz"]').click(); await Promise.resolve(); requests[2].resolve({error:'unavailable'}); await tick();
@@ -28,7 +30,7 @@ test('rating switches modes, escapes names, and ignores stale requests', async (
 
 test('fresh cached modes avoid duplicate requests and pending requests are shared', async () => {
   const dom=new JSDOM(html); const root=dom.window.document.querySelector('section');
-  const requests=[]; const client={rpc:(fn,args)=>new Promise(resolve=>requests.push({fn,args,resolve}))};
+  const requests=[]; const client={rpc:(fn,args)=>(fn==='profile_avatars'||fn==='profile_avatar_themes')?Promise.resolve({data:[]}):new Promise(resolve=>requests.push({fn,args,resolve}))};
   const view=createRatingView(root,client);
   const first=view.refresh(); const duplicate=view.refresh(); await Promise.resolve();
   assert.equal(requests.length,1);
@@ -56,7 +58,7 @@ test('synchronous errors can be retried; destroying ignores an outstanding resul
 
 test('personal position stays visible outside the top 100 and stale mode replies are ignored', async () => {
   const dom=new JSDOM(html); const root=dom.window.document.querySelector('section');
-  const requests=[]; const client={rpc:(fn,args)=>new Promise(resolve=>requests.push({fn,args,resolve}))};
+  const requests=[]; const client={rpc:(fn,args)=>(fn==='profile_avatars'||fn==='profile_avatar_themes')?Promise.resolve({data:[]}):new Promise(resolve=>requests.push({fn,args,resolve}))};
   const view=createRatingView(root,client,{showSelf:true});
   const first=view.refresh(); await tick();
   root.querySelector('[data-rating-mode="rapid"]').click(); await tick();
@@ -74,7 +76,7 @@ test('personal position stays visible outside the top 100 and stale mode replies
 
 test('switching display units changes scores without changing ЯР ordering or refetching', async () => {
   const dom = new JSDOM(html), root = dom.window.document.querySelector('section'); let calls=0;
-  const client = {rpc:async fn => {calls++; return {data:fn==='rank_my_position' ? [{username:'Alice',yar:1200,elo:980,ranked:true,place:1}] : [{username:'Alice',yar:1200,elo:980,ranked:true},{username:'Bob',yar:1100,elo:1300,ranked:true}]};}};
+  const client = {rpc:async fn => {if((fn==='profile_avatars'||fn==='profile_avatar_themes'))return {data:[]}; calls++; return {data:fn==='rank_my_position' ? [{username:'Alice',yar:1200,elo:980,ranked:true,place:1}] : [{username:'Alice',yar:1200,elo:980,ranked:true},{username:'Bob',yar:1100,elo:1300,ranked:true}]};}};
   const view = createRatingView(root,client,{showSelf:true}); await view.refresh(); await tick();
   view.setUnit('elo');
   assert.deepEqual([...root.querySelectorAll('.rating-player')].map(el=>el.textContent),['Alice','Bob']);

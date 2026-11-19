@@ -8,6 +8,7 @@ const browser = await chromium.launch({ headless: true,
   ...(process.env.CHROMIUM_EXTRA_ARGS ? { args: process.env.CHROMIUM_EXTRA_ARGS.split(' ') } : {}),
 });
 const user = { id:'12345678-1234-1234-1234-123456789012', email:'test@example.com', aud:'authenticated', role:'authenticated', user_metadata:{} };
+const avatar='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aS/8AAAAASUVORK5CYII=';
 let snapshot = null;
 try {
   const page = await browser.newPage({ viewport:{ width:390, height:844 }, reducedMotion:'reduce' });
@@ -19,6 +20,11 @@ try {
     }
     if (path === '/auth/v1/user') return route.fulfill({ json:user });
     if (path === '/rest/v1/profiles') return route.fulfill({ json:{ username:'Player', bio:'', palette:'monochrome' } });
+    if (path === '/rest/v1/rpc/rank_game_players') return route.fulfill({json:[{player:'self',username:'Player',yar:1000},{player:'opponent',username:'Friend',yar:1000}]});
+    if (path === '/rest/v1/rpc/profile_public') return route.fulfill({json:{username:'Friend',bio:'Bio',palette:'forest',theme:'dark',avatar,banner:avatar,ratings:{overall:1000},games:{}}});
+    if (path === '/rest/v1/rpc/profile_avatar_themes') return route.fulfill({json:[{username:'Player',palette:'amber'},{username:'Friend',palette:'forest'}]});
+    if (path === '/rest/v1/rpc/rank_leaderboard') return route.fulfill({json:[{username:'Friend',yar:1200},{username:'Player',yar:1100}]});
+    if (path === '/rest/v1/rpc/profile_avatars') return route.fulfill({json:[{username:'Player',avatar},{username:'Friend',avatar}]});
     if (path === '/functions/v1/matchplay') {
       const body = JSON.parse(request.postData());
       if (body.action === 'heartbeat') return route.fulfill({json:{ok:true}});
@@ -55,6 +61,10 @@ try {
   assert.equal(await game.locator('#player-clock').getAttribute('aria-label'), '03:00');
   await game.locator('#start-search').click();
   await game.locator('#status').filter({ hasText:'Ваш ход' }).waitFor();
+  await game.locator('#player-avatar-image.custom-profile-avatar').waitFor(); await game.locator('#opponent-avatar-image.custom-profile-avatar').waitFor();
+  assert.equal(await game.locator('#opponent-top-status').textContent(),'Топ 1');assert.equal(await game.locator('#player-top-status').textContent(),'Топ 2');assert.equal(await game.locator('#mode-list input').count(),3);
+  assert.equal(await game.locator('#player-avatar-image').getAttribute('src'),avatar); assert.equal(await game.locator('#opponent-avatar-image').getAttribute('src'),avatar);
+  if(process.env.GAME_SCREENSHOT) await page.screenshot({path:'/tmp/member-game-three-modes.png'});
   assert.equal(await game.locator('#mode-picker').getAttribute('aria-hidden'), 'true');
   assert.equal(await game.locator('#mode-picker').evaluate(el => el.getBoundingClientRect().height), 0);
   assert.equal(await game.locator('#mode-summary').innerText(), 'Блиц · 3 мин');
@@ -86,11 +96,13 @@ try {
       const rect = document.getElementById('board').getBoundingClientRect();
       return { narrow:matchMedia('(max-width:700px)').matches, clockLeft: own.getBoundingClientRect().left, boardRight:rect.right, boardTop:rect.top, boardBottom:rect.bottom, ownRight:own.getBoundingClientRect().right, opponentRight:opponent.getBoundingClientRect().right,
         ownBackground: getComputedStyle(own).backgroundColor, opponentBackground: getComputedStyle(opponent).backgroundColor,
-        numberSize: parseFloat(getComputedStyle(own.querySelector('strong')).fontSize), ownTop:own.getBoundingClientRect().top, ownBottom:own.getBoundingClientRect().bottom, opponentTop:opponent.getBoundingClientRect().top, opponentBottom:opponent.getBoundingClientRect().bottom, ownCenter:(own.getBoundingClientRect().top + own.getBoundingClientRect().bottom) / 2, opponentCenter:(opponent.getBoundingClientRect().top + opponent.getBoundingClientRect().bottom) / 2, boardMiddle: (document.getElementById('board').getBoundingClientRect().top + document.getElementById('board').getBoundingClientRect().bottom) / 2 };
+        numberSize: parseFloat(getComputedStyle(own.querySelector('strong')).fontSize), ownTop:own.getBoundingClientRect().top, ownBottom:own.getBoundingClientRect().bottom, opponentTop:opponent.getBoundingClientRect().top, opponentBottom:opponent.getBoundingClientRect().bottom, railTop:document.querySelector('.game-rail').getBoundingClientRect().top,playerRowBottom:document.querySelector('.board-wrap > .player-row:not(.opponent-row)').getBoundingClientRect().bottom,opponentRowCenter:(document.querySelector('.opponent-row').getBoundingClientRect().top+document.querySelector('.opponent-row').getBoundingClientRect().bottom)/2,playerRowCenter:(document.querySelector('.board-wrap > .player-row:not(.opponent-row)').getBoundingClientRect().top+document.querySelector('.board-wrap > .player-row:not(.opponent-row)').getBoundingClientRect().bottom)/2,ownCenter:(own.getBoundingClientRect().top + own.getBoundingClientRect().bottom) / 2, opponentCenter:(opponent.getBoundingClientRect().top + opponent.getBoundingClientRect().bottom) / 2, boardMiddle: (document.getElementById('board').getBoundingClientRect().top + document.getElementById('board').getBoundingClientRect().bottom) / 2 };
     });
     if (clocks.narrow) {
+      assert.ok(clocks.playerRowBottom<=clocks.railTop+1, `player row never overlaps the controls at ${size.width}: ${JSON.stringify(clocks)}`);
+      assert.ok(Math.abs(clocks.opponentCenter-clocks.opponentRowCenter)<2 && Math.abs(clocks.ownCenter-clocks.playerRowCenter)<2, 'clock aligns with nickname');
       assert.ok(clocks.opponentBottom <= clocks.boardTop && clocks.ownTop >= clocks.boardBottom, 'clocks are above and below the board');
-      assert.ok(Math.abs(clocks.ownRight-clocks.boardRight) <= 6 && Math.abs(clocks.opponentRight-clocks.boardRight) <= 6, 'clocks align right');
+      assert.ok(Math.abs(clocks.ownRight-clocks.opponentRight) <= 1, 'clocks align with each other');
     } else assert.ok(clocks.clockLeft >= clocks.boardRight, 'clocks are next to the board');
     assert.ok(clocks.ownTop >= clocks.opponentBottom, 'player clock is below opponent');
     assert.ok(clocks.ownCenter >= clocks.boardMiddle && clocks.opponentCenter <= clocks.boardMiddle, 'clocks are in the correct halves');
@@ -122,6 +134,7 @@ try {
   await page.locator('#nav-play').click();
   await page.frameLocator('#member-game-frame').locator('#status').filter({hasText:'Ход соперника'}).waitFor();
   assert.deepEqual(snapshot.moves, ['e4','e5','Nf3'], 'leaving must not end the game');
+  await game.locator('#opponent-profile-trigger').click();await page.locator('#page-profile').waitFor({state:'visible'});await page.locator('#profile-display-name').filter({hasText:'Friend'}).waitFor();await page.locator('#profile-back').click();await page.locator('#page-game').waitFor({state:'visible'});assert.equal(new URL(page.url()).pathname,'/game');
   await game.locator('#resign-button').click(); assert.equal(await game.locator('#resign-dialog').evaluate(el => el.open),true);
   await game.locator('#resign-cancel').click(); assert.equal(snapshot.status,'active');
   await game.locator('#resign-button').click(); await game.locator('#resign-confirm').click();
@@ -129,5 +142,5 @@ try {
   assert.equal(new URL(page.url()).pathname,'/game');
   assert.match(await game.locator('#player-clock').evaluate(el => getComputedStyle(el).fontFamily), /Geist/);
 
-  console.log('✓ Viewport game, four controls, mocked search and legal move');
+  console.log('✓ Responsive game, three controls, profiles, top badges and mocked legal move');
 } finally { await browser.close(); }

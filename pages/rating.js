@@ -1,6 +1,9 @@
+import {createProfileCard} from './profile-card.js';
+import {profileAvatarColor} from './profile-theme.js';
 // Animata's Fluid Tabs, adapted to native buttons without React or animation dependencies.
 // Only nicknames and scores are returned; player text is never interpolated as HTML.
-export function createRatingView(root, client, { showSelf = false } = {}) {
+export function createRatingView(root, client, { showSelf = false, onOpenProfile = () => {} } = {}) {
+  const profileCard = createProfileCard(root,client,onOpenProfile);
   const list = root.querySelector('.rating-list');
   const board = root.querySelector('.rating-board');
   const status = root.querySelector('.rating-status');
@@ -11,7 +14,7 @@ export function createRatingView(root, client, { showSelf = false } = {}) {
   const self = root.querySelector('.rating-self');
   let ownName = null, ownPlayer = null, selfMode = null, displayedMode = null, unit = 'yar', displayed = null;
   const win = root.ownerDocument.defaultView;
-  const number = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 });
+  const number = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 });
   const motionPreference = win.matchMedia?.('(prefers-reduced-motion: reduce)');
   const cache = new Map(), pending = new Map();
   const freshness = 15000;
@@ -93,18 +96,35 @@ export function createRatingView(root, client, { showSelf = false } = {}) {
     displayed = data;
     const fragment = root.ownerDocument.createDocumentFragment(), animated = [];
     for (const [index, player] of data.slice(0,100).entries()) {
-      const row = root.ownerDocument.createElement('li'); row.className = 'rating-row';
+      const row = root.ownerDocument.createElement('li'); row.className = 'rating-row'; row.dataset.profileNoHover=''; row.dataset.profileName=String(player.username ?? '');
       if (ownName && player.username === ownName) row.classList.add('rating-row-self');
       const place = root.ownerDocument.createElement('span'); place.className='rating-place'; place.textContent = String(index + 1);
-      const name = root.ownerDocument.createElement('span'); name.className='rating-player'; name.textContent = String(player.username ?? '');
+      const person = root.ownerDocument.createElement('button'); person.type='button'; person.className='rating-person rating-profile-trigger'; person.dataset.profileName=String(player.username ?? '');
+      const avatar = root.ownerDocument.createElement('img'); avatar.className='rating-avatar'; avatar.alt=''; avatar.src='/pieces/cburnett/wN.svg';
+      const name = root.ownerDocument.createElement('span'); name.className='rating-player'; name.textContent = String(player.username ?? ''); person.append(avatar,name);
       const score = root.ownerDocument.createElement('span'); score.className='rating-score'; score.textContent = formatScore(player);
-      row.append(place,name,score); fragment.append(row);
+      row.append(place,person,score); fragment.append(row);
       if (animate) { animated.push({el:name,type:'name',value:player.username ?? ''}, {el:score,type:'score',value:player[unit]}); }
     }
     list.replaceChildren(fragment);
     if (animate) animateItems(animated);
+    void loadAvatars(data);
     status.hidden = data.length > 0;
     status.textContent = data.length ? '' : 'Пока нет игроков';
+  }
+
+  let avatarRequest = 0;
+  async function loadAvatars(data) {
+    const request=++avatarRequest, names=[...new Set(data.map(p=>p.username).filter(name=>typeof name==='string'))].slice(0,100);
+    if (!names.length) return;
+    try {
+      const [{data:avatars,error},{data:themes}]=await Promise.all([client.rpc('profile_avatars',{p_names:names}),Promise.resolve(client.rpc('profile_avatar_themes',{p_names:names})).catch(()=>({data:[]}))]);
+      if(error||!Array.isArray(avatars)||destroyed||request!==avatarRequest) return;
+      const colors=new Map((Array.isArray(themes)?themes:[]).map(p=>[p.username,profileAvatarColor(p.palette)]));
+      const images=new Map(avatars.filter(a=>typeof a.avatar==='string'&&/^data:image\/(?:png|jpeg);base64,/.test(a.avatar)).map(a=>[a.username,a.avatar]));
+      for(const row of list.children) { const name=row.querySelector('.rating-player')?.textContent, img=row.querySelector('.rating-avatar'); if(img){img.style.backgroundColor=colors.get(name)||profileAvatarColor('monochrome');if(images.has(name)){img.src=images.get(name);img.classList.add('has-custom-avatar');}} }
+      const own=self?.querySelector('.rating-avatar'); if(own)own.style.backgroundColor=colors.get(ownName)||profileAvatarColor('monochrome'); if(own&&images.has(ownName)) {own.src=images.get(ownName);own.classList.add('has-custom-avatar');}
+    } catch { /* Ranking remains available if images cannot load. */ }
   }
 
   function formatScore(player) { return player?.[unit] == null ? '—' : number.format(Number(player[unit])); }
@@ -140,11 +160,14 @@ export function createRatingView(root, client, { showSelf = false } = {}) {
       const { data, error } = await client.rpc('rank_my_position', { p_mode:requestedMode });
       if (destroyed || request !== sequence) return;
       if (error || !Array.isArray(data) || !data[0]) { if (selfMode !== requestedMode) self.hidden = true; return; }
-      const player = data[0]; ownName = player.username; ownPlayer = player; selfMode = requestedMode;
+      const player = data[0]; ownName = player.username; self.dataset.profileName=String(player.username ?? ''); self.querySelector('.rating-person').dataset.profileName=String(player.username ?? ''); ownPlayer = player; selfMode = requestedMode;
       self.querySelector('.rating-self-place').textContent = player.place != null ? String(player.place) : '—';
       self.querySelector('.rating-self-name').textContent = String(player.username ?? '');
       self.querySelector('.rating-self-score').textContent = formatScore(player);
       self.hidden = false;
+      {
+        void Promise.all([client.rpc('profile_avatars',{p_names:[ownName]}),client.rpc('profile_avatar_themes',{p_names:[ownName]})]).then(([images,themes])=>{if(destroyed||request!==sequence)return;const image=self.querySelector('.rating-avatar');if(!image)return;image.style.backgroundColor=profileAvatarColor(themes.data?.[0]?.palette);const avatar=images.data?.[0]?.avatar;if(/^data:image\/(?:png|jpeg);base64,/.test(avatar||'')){image.src=avatar;image.classList.add('has-custom-avatar');}else {image.src='/pieces/cburnett/wN.svg';image.classList.remove('has-custom-avatar');}}).catch(()=>{});
+      }
       animateItems([{el:self.querySelector('.rating-self-name'),type:'name',value:player.username ?? ''}, {el:self.querySelector('.rating-self-score'),type:'score',value:player[unit]}]);
       for (const row of list.children) row.classList.toggle('rating-row-self', row.querySelector('.rating-player')?.textContent === ownName);
     } catch { if (!destroyed && request === sequence && selfMode !== requestedMode) self.hidden = true; }
@@ -195,6 +218,7 @@ export function createRatingView(root, client, { showSelf = false } = {}) {
   root.addEventListener('click', onClick);
   return {
     refresh,
+    invalidate() { cache.clear(); avatarRequest++; },
     setUnit(value) {
       const next = value === 'elo' ? 'elo' : 'yar';
       if (unit === next) return;
@@ -208,9 +232,9 @@ export function createRatingView(root, client, { showSelf = false } = {}) {
       scheduleIndicator();
       void refresh();
     },
-    hide() { clearMotion(); },
+    hide() { clearMotion(); profileCard.hide(); },
     destroy() {
-      destroyed = true; clearMotion(); sequence++;
+      destroyed = true; clearMotion(); sequence++; profileCard.destroy();
       root.removeEventListener('click', onClick);
       win.removeEventListener('resize', scheduleIndicator);
       motionPreference?.removeEventListener?.('change', onMotionPreferenceChange);

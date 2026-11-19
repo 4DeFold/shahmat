@@ -55,8 +55,8 @@ test('upgrade preserves existing games and old RPC compatibility without changin
     await db.exec('create role anon; create role authenticated; create role service_role; create schema auth; create table auth.users(id uuid primary key);');
     for (const file of ['20261116121744_online_matchplay.sql','20261116121912_online_match_clock_after_lock.sql']) await db.exec(await readFile(`supabase/migrations/${file}`, 'utf8'));
     await db.query('insert into auth.users values ($1),($2)', [A,B]);
-    await db.query('select public.online_find($1,$2)', [A,'daily']);
-    const id = (await db.query('select public.online_find($1,$2) as result', [B,'daily'])).rows[0].result.game_id;
+    await db.query('select public.online_find($1,$2)', [A,'rapid']);
+    const id = (await db.query('select public.online_find($1,$2) as result', [B,'rapid'])).rows[0].result.game_id;
     const chess = new Chess(); chess.move('e4');
     await db.query('select public.online_commit($1,$2,$3,$4,$5,$6,$7,$8)', [A,id,0,'e4',chess.fen(),'b',null,null]);
     const rowBefore = (await db.query('select * from public.online_games where id=$1',[id])).rows[0];

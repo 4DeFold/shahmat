@@ -1,3 +1,4 @@
+import {applyProfileTheme,isProfileImage,profileAvatarColor} from './profile-theme.js';
 import { Chess } from 'chess.js';
 import { createMemberBoard } from './member-board.js';
 import { createGameSound } from './game-sound.js';
@@ -5,8 +6,8 @@ import { createRollingClock } from './rolling-clock.js';
 import { retryMessage } from './match-api.js';
 import { createClockSync } from './clock-sync.js';
 
-const times = { blitz: 180000, rapid: 600000, classical: 3600000, daily: 86400000 };
-const modeLabels = { blitz:'Блиц · 3 мин', rapid:'Рапид · 10 мин', classical:'Классика · 1 час', daily:'Дневная · 24 часа' };
+const times = { blitz: 180000, rapid: 600000, classical: 3600000 };
+const modeLabels = { blitz:'Блиц · 3 мин', rapid:'Рапид · 10 мин', classical:'Классика · 1 час' };
 const names = { k:'король', q:'ферзь', r:'ладья', b:'слон', n:'конь', p:'пешка' };
 const files = 'abcdefgh';
 const pieceSrc = (color, type) => `/pieces/cburnett/${color}${type.toUpperCase()}.svg`;
@@ -26,10 +27,11 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   let currentRequest = null, destroyed = false, reconciling = false, cancelPending = false;
   let premove = null, historyIndex = null, nameForGame = null, nameTimer = null, drag = null, suppressClick = false, actionPending = false;
   let rankUnit = 'yar', scores = null, ratingsKey = null, ratingsRequest = 0, ratingsRetryAt = 0;
-  const format = value => value == null || !Number.isFinite(Number(value)) ? '' : `(${new Intl.NumberFormat('ru-RU', { maximumFractionDigits:1 }).format(Number(value))} ${rankUnit === 'elo' ? 'Эло' : 'ЯР'})`;
+  const format = value => value == null || !Number.isFinite(Number(value)) ? '' : `(${new Intl.NumberFormat('ru-RU', { maximumFractionDigits:0 }).format(Number(value))} ${rankUnit === 'elo' ? 'Эло' : 'ЯР'})`;
+  function setAvatar(who, value) { const img = $(`${who}-avatar-image`); if(!img)return; const custom=typeof value==='string' && /^data:image\/(?:png|jpeg);base64,/.test(value); img.src=custom?value:`/pieces/cburnett/${who==='player'?'wN':'bN'}.svg`; img.classList.toggle('custom-profile-avatar',custom); }
   function renderRatings() {
     for (const who of ['player','opponent']) {
-      const rating = $(who + '-rating'); if (rating) rating.textContent = format(scores?.[who === 'player' ? 'self' : who]?.[rankUnit]);
+      const data=scores?.[who === 'player' ? 'self' : who]; const rating = $(who + '-rating'); if (rating) rating.textContent = format(data?.[rankUnit]); const badge=$(who+'-top-status'); if(badge){const place=Number(data?.topPlace);badge.hidden=!(place>=1&&place<=5);badge.textContent=badge.hidden?'':`Топ ${place}`;} const img=$(who+'-avatar-image');if(img)img.parentElement.style.backgroundColor=profileAvatarColor(data?.palette);
     }
   }
   function loadRatings(game) {
@@ -42,6 +44,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
       if (!Array.isArray(rows)) throw new Error('missing ratings');
       scores = Object.fromEntries(rows.filter(row => row.player === 'self' || row.player === 'opponent').map(row => [row.player,row]));
       const name = scores.self?.username; if (typeof name === 'string' && name && $('player-name')) $('player-name').textContent = name;
+      setAvatar('player',scores.self?.avatar); setAvatar('opponent',scores.opponent?.avatar);
       renderRatings();
     }).catch(() => { if (request === ratingsRequest) { ratingsKey = null; ratingsRetryAt = now() + 8000; } });
   }
@@ -162,24 +165,28 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     nameTimer = setInterval(() => { step++; el.textContent = [...text].map((c, i) => c === ' ' || step > 5 + i ? c : letters[Math.floor(Math.random() * letters.length)]).join(''); if (step > text.length + 5) { clearInterval(nameTimer); el.textContent = text; } }, 24);
   }
   const profileTrigger = $('opponent-profile-trigger'), profileCard = $('opponent-profile-card');
-  let profilePinned = false;
+  let profilePinned = false, opponentProfileName = null;
+  function openOpponent(){if(!opponentProfileName)return;if(win.parent!==win)win.parent.postMessage({type:'shahmat-open-profile',username:opponentProfileName},win.location.origin);else win.location.href=`/profile?player=${encodeURIComponent(opponentProfileName)}`;}
   function showProfile(show) { profileCard.hidden = !show; profileTrigger.setAttribute('aria-expanded', String(show)); }
   profileTrigger.addEventListener('pointerenter', event => { if (event.pointerType !== 'touch' && !profileTrigger.disabled) showProfile(true); });
-  $('opponent-profile-trigger').parentElement.addEventListener('pointerleave', () => { if (!profilePinned && document.activeElement !== profileTrigger) showProfile(false); });
+  $('opponent-profile-trigger').parentElement.addEventListener('pointerleave', () => { if (!profilePinned && document.activeElement !== profileTrigger && !profileCard.contains(document.activeElement)) showProfile(false); });
   profileTrigger.addEventListener('focus', () => { if (!profileTrigger.disabled) showProfile(true); });
-  profileTrigger.addEventListener('blur', () => { if (!profilePinned) showProfile(false); });
-  profileTrigger.addEventListener('click', () => { profilePinned = !profilePinned; showProfile(profilePinned); });
+  profileTrigger.addEventListener('blur', event => { if (!profilePinned && !profileCard.contains(event.relatedTarget)) showProfile(false); });
+  profileCard.addEventListener('focusout', event => { if(!profilePinned && !profileCard.contains(event.relatedTarget) && event.relatedTarget!==profileTrigger) showProfile(false); });
+  profileTrigger.addEventListener('click', openOpponent);
   document.addEventListener('keydown', event => { if (event.key === 'Escape') { profilePinned = false; showProfile(false); } });
   document.addEventListener('pointerdown', event => { if (!profileTrigger.parentElement.contains(event.target)) { profilePinned = false; showProfile(false); } });
   function loadName(game) {
     if (nameForGame === game.id) return;
-    nameForGame = game.id; profilePinned = false; showProfile(false); profileTrigger.disabled = false;
-    $('opponent-profile-name').textContent = 'Соперник'; $('opponent-profile-bio').textContent = 'Информация пока недоступна.';
+    nameForGame = game.id; opponentProfileName=null; profilePinned = false; showProfile(false); profileTrigger.disabled = false;
+    $('opponent-profile-name').textContent = 'Соперник'; $('opponent-profile-bio').textContent = ''; $('opponent-profile-bio').hidden=true; if($('opponent-profile-bio-label')) $('opponent-profile-bio-label').hidden=true; applyProfileTheme(profileCard,'monochrome','light'); if($('opponent-profile-banner')) $('opponent-profile-banner').hidden=true; if($('opponent-profile-avatar')) { $('opponent-profile-avatar').src='/pieces/cburnett/bN.svg'; $('opponent-profile-avatar').classList.remove('custom'); }
     Promise.resolve(opponentName(game.id)).then(profile => {
       if (nameForGame !== game.id || !profile) return;
       const name = typeof profile === 'string' ? profile : profile.username;
-      if (typeof name === 'string' && name) { revealName(name); $('opponent-profile-name').textContent = name; }
-      if (typeof profile === 'object' && 'bio' in profile) $('opponent-profile-bio').textContent = profile.bio?.trim() || 'Био пока нет.';
+      if (typeof name === 'string' && name) { opponentProfileName=name; revealName(name); $('opponent-profile-name').textContent = name; }
+      if (typeof profile === 'object' && 'bio' in profile) { const bio=profile.bio?.trim()||''; $('opponent-profile-bio').textContent=bio; $('opponent-profile-bio').hidden=!bio; if($('opponent-profile-bio-label')) $('opponent-profile-bio-label').hidden=!bio; }
+      if(typeof profile === 'object') { applyProfileTheme(profileCard,profile.palette,profile.theme); const avatar=$('opponent-profile-avatar'),banner=$('opponent-profile-banner'); if(avatar){avatar.src=isProfileImage(profile.avatar)?profile.avatar:'/pieces/cburnett/bN.svg';avatar.classList.toggle('custom',isProfileImage(profile.avatar));} if(banner){banner.hidden=!isProfileImage(profile.banner);if(!banner.hidden)banner.src=profile.banner;} }
+
     }).catch(() => {});
   }
   function playQueuedPremove() {
@@ -196,7 +203,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     }
     const previous = snapshot, localMoves = chess.history(), selectedPiece = selected ? chess.get(selected) : null;
     const sameGame = previous?.id === game.id;
-    if (!sameGame) { ratingsKey = null; ratingsRetryAt = 0; ratingsRequest++; scores = null; renderRatings(); }
+    if (!sameGame) { setAvatar('opponent',null); ratingsKey = null; ratingsRetryAt = 0; ratingsRequest++; scores = null; renderRatings(); }
     const alreadyDisplayed = sameGame && localMoves.length === game.moves.length && localMoves.every((move, i) => move === game.moves[i]);
     let next = chess, nextLast = latestMove;
     if (!alreadyDisplayed) {
@@ -245,7 +252,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
       else if (phase === 'searching' && response.state === 'searching') setStatus('Ищем соперника с таким же режимом…');
     } catch (error) { if (expected === generation) { pollFailures = Math.min(pollFailures + 1, 5); setStatus(retryMessage(error, 'Не удалось связаться с игровым сервисом. Повторяем попытку…'), true); } }
     // Faster updates while waiting for the opponent, but back off on outages.
-    const delay = pollFailures ? Math.min(10000, 800 * 2 ** (pollFailures - 1)) : phase === 'active' && mode === 'daily' ? 15000 : phase === 'active' && snapshot?.turn !== currentColor() ? 450 : 900;
+    const delay = pollFailures ? Math.min(10000, 800 * 2 ** (pollFailures - 1)) : phase === 'active' && snapshot?.turn !== currentColor() ? 450 : 900;
     if (expected === generation && isVisible() && ['searching','active'].includes(phase)) polling = setTimeout(() => poll(expected), delay);
   }
   async function search() {
@@ -431,7 +438,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   $('offline-draw').addEventListener('click', () => void finishAction('offline_draw'));
   $('mode-list').addEventListener('change', event => { if (phase === 'idle' && times[event.target.value]) { mode = event.target.value; modeControls(); drawClocks(); if (ready) setStatus('Всё готово к поиску.'); } });
   start.addEventListener('click', () => void search()); cancel.addEventListener('click', () => void cancelSearch());
-  reset.addEventListener('click', () => { cancelTimer(); generation++; snapshot = null; scores = null; ratingsKey = null; ratingsRetryAt = 0; ratingsRequest++; renderRatings(); clockSync.clear(); chess = new Chess(); latestMove = null; phase = 'idle'; mode = null; $('mode-list').querySelectorAll('input').forEach(input => { input.checked = false; }); premove = null; historyIndex = null; nameForGame = null; profileTrigger.disabled = true; profilePinned = false; showProfile(false); clearInterval(nameTimer); $('opponent-name').textContent = 'Соперник'; modeControls(); renderBoard(); renderHistory(); drawClocks(); setStatus('Выбери режим.'); });
+  reset.addEventListener('click', () => { cancelTimer(); generation++; snapshot = null; scores = null; ratingsKey = null; ratingsRetryAt = 0; ratingsRequest++; renderRatings(); clockSync.clear(); chess = new Chess(); latestMove = null; phase = 'idle'; mode = null; $('mode-list').querySelectorAll('input').forEach(input => { input.checked = false; }); premove = null; historyIndex = null; nameForGame = null; profileTrigger.disabled = true; profilePinned = false; showProfile(false); clearInterval(nameTimer); $('opponent-name').textContent = 'Соперник'; setAvatar('opponent',null); modeControls(); renderBoard(); renderHistory(); drawClocks(); setStatus('Выбери режим.'); });
   function pause() { cancelDrag(); if (moving) reconciling = true; if (phase === 'searching') void cancelSearch(); else if (phase !== 'cancelling') { generation++; cancelTimer(); } }
   function resume() {
     if (!userId || destroyed) return;
@@ -476,6 +483,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   if (win.parent === win) revealPieces();
   return {
     setRatingUnit(value) { rankUnit = value === 'elo' ? 'elo' : 'yar'; renderRatings(); },
+    setPlayerAvatar(value) { setAvatar('player',value); },
     setPlayerName(value) { if (typeof value === 'string' && value && $('player-name')) $('player-name').textContent = value; },
     async open(id) {
       if (userId === id || destroyed) return;
