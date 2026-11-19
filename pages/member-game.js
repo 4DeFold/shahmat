@@ -1,5 +1,6 @@
 import {applyProfileTheme,isProfileImage,profileAvatarColor} from './profile-theme.js';
 import { Chess } from 'chess.js';
+import {renderCaptures,renderThreats,bindThreatButtons} from './board-insights.js';
 import { premoveTargets, validPremove, normalizePremove, projectPremoves } from './premove.js';
 import { createBoardAnnotations } from './board-annotations.js';
 import { createMemberBoard } from './member-board.js';
@@ -134,12 +135,8 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     const legal = selected && historyIndex === null ? legalFor(selected).map(move => move.to) : [];
     const last = historyIndex === null ? latestMove : shown.history({ verbose:true }).at(-1);
     boardView.render({ shown, selected, legal, last, premoves: historyIndex === null ? premove : [], actual: historyIndex === null && premove.length ? chess : null, premoveMode: (chess.turn() !== color || premove.length > 0) && historyIndex === null, transitions, animatedMove: historyIndex === null ? animatedMove : null });
-    const attacks=threatKeys.has('KeyQ')||threatKeys.has('KeyE');
-    for(const file of files) for(let rank=1;rank<=8;rank++) { const sq=file+rank,cell=boardView.cell(sq); const foe=color==='w'?'b':'w';cell.classList.toggle('threat-enemy',attacks&&threatKeys.has('KeyQ')&&shown.isAttacked(sq,foe));cell.classList.toggle('threat-own',attacks&&threatKeys.has('KeyE')&&shown.isAttacked(sq,color)); }
-    const captures={w:[],b:[]}, values={p:1,n:3,b:3,r:5,q:9};
-    for(const move of shown.history({verbose:true}))if(move.captured)captures[move.color].push(move.captured);
-    const totals={w:0,b:0};for(const rank of shown.board())for(const piece of rank)if(piece&&piece.type!=='k')totals[piece.color]+=values[piece.type];
-    for(const [who,c] of [['player',color],['opponent',color==='w'?'b':'w']]) { const el=$(who+'-captured');if(!el)continue;const types=[...captures[c]].sort((a,b)=>values[a]-values[b]),diff=totals[c]-totals[c==='w'?'b':'w'];const key=types.join('')+':'+diff;if(el.dataset.captureKey===key)continue;el.dataset.captureKey=key;el.replaceChildren();for(const p of types){const img=document.createElement('img');img.src=pieceSrc(c==='w'?'b':'w',p);img.alt=names[p];el.append(img);}if(diff>0){const count=document.createElement('span');count.textContent='+'+diff;el.append(count);} }
+    const actualShown=historyIndex===null?chess:shown;
+    renderThreats(actualShown,color,boardView,threatKeys);renderCaptures(actualShown,color,$('player-captured'),$('opponent-captured'));
     // Establish initial rotation before the board changes sides.
     if (board.classList.contains('waiting') && snapshot) void board.offsetWidth;
     board.classList.toggle('waiting', !snapshot); board.classList.toggle('black', !!snapshot && color === 'b');
@@ -357,6 +354,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     if (!delta) return false; showHistory((historyIndex ?? chess.history().length) + delta); return true;
   }
   function setThreat(code,down) { if(!['KeyQ','KeyE'].includes(code))return; if(down && (!isVisible()||!snapshot||!['active','finished'].includes(phase)))return; if(down)threatKeys.add(code);else threatKeys.delete(code);renderBoard(); }
+  bindThreatButtons(document,setThreat);
   const onThreatDown = event => { if(event.ctrlKey||event.metaKey||event.altKey||event.target.closest?.('input,textarea,select,[contenteditable]:not([contenteditable=false])')||document.querySelector('dialog[open]'))return;setThreat(event.code,true); };
   const onThreatUp = event => setThreat(event.code,false);
   const clearThreats = () => { if(threatKeys.size){threatKeys.clear();renderBoard();} };

@@ -1,4 +1,5 @@
 import { Chess } from 'chess.js';
+import {renderCaptures,renderThreats,bindThreatButtons} from './board-insights.js';
 import { premoveTargets, validPremove, normalizePremove, projectPremoves } from './premove.js';
 import { createBoardAnnotations } from './board-annotations.js';
 import { createClient } from '@supabase/supabase-js';
@@ -20,7 +21,7 @@ const annotations=createBoardAnnotations({document,board});
 const names={q:'ферзь',r:'ладья',b:'слон',n:'конь'};
 const piece=(color,type)=>`/pieces/cburnett/${color}${type.toUpperCase()}.svg`;
 let level=0, phase='choose', userId=null, store=null, game=null, chess=new Chess(), selected=null, promotion=null, last=null, engine=null, thinking=false, generation=0;
-let launchDrain=null, premove=[], historyIndex=null, completedLevels=new Set();
+let launchDrain=null, premove=[], historyIndex=null, completedLevels=new Set(), threatKeys=new Set();
 let pageVisible=window.parent===window, orbitFrame=null, orbitAngle=0, orbitSpeed=0, lastFrame=0, demoClock=0, carouselPosition=0, carouselVelocity=0, drag=null, suppressClick=false, destroyed=false;
 const status=text=>{ if ($('status').textContent!==text) $('status').textContent=text; };
 function reveal(id, open) { const el=$(id); if (el.classList.contains('is-open')===open) return; el.classList.toggle('is-open',open); el.inert=!open; el.setAttribute('aria-hidden',String(!open)); }
@@ -186,7 +187,10 @@ function draw(move=null,transitions=[]) {
   const legal=selected&&isLive?(chess.turn()==='w'&&!premove.length?chess.moves({square:selected,verbose:true}):premoveTargets(shown,selected,'w')).map(m=>m.to):[];
   const displayedLast=isLive?last:shown.history({verbose:true}).at(-1);
   boardView.render({shown,selected,legal,last:displayedLast,premoves:isLive?premove:[],actual:isLive&&premove.length?chess:null,premoveMode:chess.turn()!=='w'||premove.length>0,animatedMove:isLive?move:null,transitions});
+  const actualShown=isLive?chess:shown;renderCaptures(actualShown,'w',$('bot-player-captured'),$('bot-opponent-captured'));renderThreats(actualShown,'w',boardView,threatKeys);
 }
+function setThreat(code,down){if(!['KeyQ','KeyE'].includes(code))return;if(down&&(!pageVisible||!['playing','finished'].includes(phase)))return;if(down)threatKeys.add(code);else threatKeys.delete(code);draw();}
+bindThreatButtons(document,setThreat);for(const type of ['keydown','keyup'])document.addEventListener(type,e=>{if(!['KeyQ','KeyE'].includes(e.code))return;if(type==='keydown'&&(e.ctrlKey||e.metaKey||e.altKey||e.target.closest?.('input,textarea,select,[contenteditable]:not([contenteditable=false])')||document.querySelector('dialog[open]')))return;setThreat(e.code,type==='keydown');});window.addEventListener('blur',()=>{setThreat('KeyQ',false);setThreat('KeyE',false);});
 const renderMoves=createMoveHistory({document,list:$('move-list'),count:$('move-count'),onSelect:showHistory});
 function history() { const length=chess.history().length,index=historyIndex??length;renderMoves(chess,historyIndex);$('history-first').disabled=$('history-prev').disabled=index===0;$('history-next').disabled=$('history-last').disabled=index===length; }
 function showHistory(index) {
@@ -410,9 +414,10 @@ function animateEntry() {
 }
 window.addEventListener('message',event=>{
   if(event.origin!==location.origin || event.source!==window.parent) return;
+  if(event.data?.type==='shahmat-threat-key'){setThreat(event.data.code,!!event.data.down);return;}
   if(event.data?.type==='shahmat-history-key' && typeof event.data.key==='string') { handleNavigation(event.data.key,event.data.code); return; }
   if(event.data?.type==='shahmat-profile-updated') { setPlayerAvatar(event.data.avatar); return; }
-  if(event.data?.type==='shahmat-bot-hidden') { pageVisible=false; stopOrbit(); return; }
+  if(event.data?.type==='shahmat-bot-hidden') { pageVisible=false;setThreat('KeyQ',false);setThreat('KeyE',false); stopOrbit(); return; }
   if(event.data?.type==='shahmat-bot-shown') { const wasHidden=!pageVisible; pageVisible=true; startOrbit(); if(wasHidden) animateEntry(); return; }
   if(event.data?.type!=='shahmat-appearance') return;
   const targets={'--page-background':'--bg','--foreground':'--ink','--surface':'--surface','--surface-raised':'--surface-alt','--line':'--line','--button-background':'--control','--button-text':'--control-ink','--accent':'--accent','--board-light':'--board-light','--board-dark':'--board-dark'};

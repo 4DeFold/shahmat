@@ -1000,3 +1000,5 @@ body.startup-ready #landing-screen:not([hidden]) .hero-reveal--tail { animation-
 @media (prefers-reduced-motion:reduce) { .support-enter > .board-guide { animation:none; } }
 
 @media (min-width:701px) { .landing:has(.dashboard:not([hidden]) #page-rating:not([hidden])) { padding-top:13px; } }
+
+.landing .rating-score,.landing .rating-self-score {font-family:'Inclusive Sans',sans-serif;font-variant-numeric:tabular-nums}
