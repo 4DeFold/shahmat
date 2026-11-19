@@ -7,7 +7,7 @@ test('three-mode migration preserves data, computes overall, enforces boundaries
  const db=await PGlite.create();try{
   await db.exec("create role anon;create role authenticated;create role service_role;create schema auth;create table auth.users(id uuid primary key,raw_user_meta_data jsonb default '{}');create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;");
   const files=(await readdir('supabase/migrations')).filter(f=>f.endsWith('.sql')).sort();
-  for(const file of files.filter(f=>!f.includes('three_modes'))) await db.exec(await readFile('supabase/migrations/'+file,'utf8'));
+  for(const file of files.filter(f=>f < files.find(x=>x.includes('three_modes')))) await db.exec(await readFile('supabase/migrations/'+file,'utf8'));
   await db.query("insert into auth.users(id,raw_user_meta_data) values($1,'{\"palette\":\"amber\"}'),($2,'{}')",[A,B]);
   await db.query("insert into public.profiles(id,username) values($1,'Alice'),($2,'Bobby')",[A,B]);
   await db.query("insert into public.yar_mode_ratings(user_id,mode,yar,elo_shadow,games) values($1,'blitz',1300,1150,10)",[A]);
