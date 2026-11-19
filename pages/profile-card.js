@@ -9,8 +9,8 @@ export function createProfileCard(root,client,onOpen=()=>{}){
   try{const {data,error}=await client.rpc('profile_public',{p_name:name});if(seq!==n)return;if(error||!data)throw error||Error();applyProfileTheme(card,data.palette,data.theme);card.querySelector('.player-mini-name').textContent=data.username;const bio=card.querySelector('.player-mini-bio');bio.textContent=data.bio?.trim()||'';bio.hidden=!bio.textContent;const avatar=card.querySelector('.player-mini-avatar'),banner=card.querySelector('.player-mini-banner img');avatar.src=isProfileImage(data.avatar)?data.avatar:'/pieces/cburnett/wN.svg';avatar.classList.toggle('custom',isProfileImage(data.avatar));banner.hidden=!isProfileImage(data.banner);if(!banner.hidden)banner.src=data.banner;}
   catch{if(seq===n){const bio=card.querySelector('.player-mini-bio');bio.textContent='Не удалось загрузить профиль.';bio.hidden=false;}}
  }
- root.addEventListener('pointerover',e=>{const el=e.target.closest('[data-profile-name]');if(el&&!el.contains(e.relatedTarget)&&e.pointerType!=='touch')void show(el);});
- root.addEventListener('pointerout',e=>{const el=e.target.closest('[data-profile-name]');if(el&&!el.contains(e.relatedTarget))later();});
+ root.addEventListener('pointerover',e=>{const el=e.target.closest('[data-profile-name]');if(el&&!el.hasAttribute('data-profile-no-hover')&&!el.contains(e.relatedTarget)&&e.pointerType!=='touch')void show(el);});
+ root.addEventListener('pointerout',e=>{const el=e.target.closest('[data-profile-name]');if(el&&!el.hasAttribute('data-profile-no-hover')&&!el.contains(e.relatedTarget))later();});
  root.addEventListener('focusin',e=>{const el=e.target.closest('[data-profile-name]');if(el)void show(el);});root.addEventListener('focusout',later);
  root.addEventListener('click',e=>{const el=e.target.closest('[data-profile-name]');if(el){e.preventDefault();const name=el.dataset.profileName;hide();if(name)onOpen(name);}});
  root.addEventListener('keydown',e=>{const el=e.target.closest('[role=button][data-profile-name]');if(el&&(e.key==='Enter'||e.key===' ')){e.preventDefault();const name=el.dataset.profileName;hide();if(name)onOpen(name);}});

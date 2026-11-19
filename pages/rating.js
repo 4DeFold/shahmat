@@ -96,7 +96,7 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
     displayed = data;
     const fragment = root.ownerDocument.createDocumentFragment(), animated = [];
     for (const [index, player] of data.slice(0,100).entries()) {
-      const row = root.ownerDocument.createElement('li'); row.className = 'rating-row'; row.dataset.profileName=String(player.username ?? '');
+      const row = root.ownerDocument.createElement('li'); row.className = 'rating-row'; row.dataset.profileNoHover=''; row.dataset.profileName=String(player.username ?? '');
       if (ownName && player.username === ownName) row.classList.add('rating-row-self');
       const place = root.ownerDocument.createElement('span'); place.className='rating-place'; place.textContent = String(index + 1);
       const person = root.ownerDocument.createElement('button'); person.type='button'; person.className='rating-person rating-profile-trigger'; person.dataset.profileName=String(player.username ?? '');
@@ -160,7 +160,7 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
       const { data, error } = await client.rpc('rank_my_position', { p_mode:requestedMode });
       if (destroyed || request !== sequence) return;
       if (error || !Array.isArray(data) || !data[0]) { if (selfMode !== requestedMode) self.hidden = true; return; }
-      const player = data[0]; ownName = player.username; self.dataset.profileName=String(player.username ?? ''); ownPlayer = player; selfMode = requestedMode;
+      const player = data[0]; ownName = player.username; self.dataset.profileName=String(player.username ?? ''); self.querySelector('.rating-person').dataset.profileName=String(player.username ?? ''); ownPlayer = player; selfMode = requestedMode;
       self.querySelector('.rating-self-place').textContent = player.place != null ? String(player.place) : '—';
       self.querySelector('.rating-self-name').textContent = String(player.username ?? '');
       self.querySelector('.rating-self-score').textContent = formatScore(player);

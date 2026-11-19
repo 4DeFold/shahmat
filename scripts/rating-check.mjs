@@ -20,6 +20,7 @@ try {
         if (path==='/rest/v1/rpc/profile_public') { const who=route.request().postDataJSON().p_name; return route.fulfill({json:{username:who,bio:who==='Player_One'?'Привет':'',palette:'forest',theme:'dark',avatar,banner:avatar,ratings:{overall:1100,blitz:1100,rapid:1000,classical:1000},games:{blitz:2,rapid:0,classical:0,bot:1}}}); }
         if (path==='/rest/v1/rpc/profile_avatar_themes') return route.fulfill({json:[{username:'LongestName_123456789012',palette:'amber'}]});
         if (path==='/rest/v1/rpc/profile_avatars') return route.fulfill({json:[{username:'Player_One',avatar}]});
+        if (path==='/rest/v1/rpc/rank_my_position') return route.fulfill({json:[{username:'Player',yar:1000,elo:1000,ranked:true,place:3}]});
         if (path==='/rest/v1/rpc/rank_leaderboard') {
           const mode=route.request().postDataJSON().p_mode; modes.push(mode);
           return route.fulfill({json:[{username:'Player_One',yar:mode==='rapid'?1250.4:1100.8,ranked:true},{username:'LongestName_123456789012',yar:1000,ranked:false}]});
@@ -35,7 +36,16 @@ try {
       await page.locator('.rating-row .rating-avatar.has-custom-avatar').first().waitFor();
       assert.equal(await page.locator('.rating-row .rating-avatar').first().getAttribute('src'),avatar);
       assert.equal(await page.locator('.rating-avatar').nth(1).getAttribute('src'),'/pieces/cburnett/wN.svg');await page.waitForFunction(()=>document.querySelectorAll('.rating-avatar')[1]?.style.backgroundColor==='rgb(153, 88, 42)');
-      if(viewport.width===1440 && reducedMotion==='no-preference'){await page.locator('.rating-profile-trigger').first().hover(); await page.locator('.player-mini-card').waitFor({state:'visible'});assert.equal(await page.locator('.player-mini-card').evaluate(el=>getComputedStyle(el).animationName),'player-card-enter');await page.mouse.move(0,0);await page.waitForTimeout(250);}
+      if(viewport.width===1440 && reducedMotion==='no-preference'){
+        const card=page.locator('.player-mini-card');
+        await page.locator('.rating-place').first().hover();await page.waitForTimeout(220);assert.equal(await card.isHidden(),true,'place must not trigger profile card');
+        await page.locator('.rating-score').first().hover();await page.waitForTimeout(220);assert.equal(await card.isHidden(),true,'score must not trigger profile card');
+        await page.locator('.rating-profile-trigger').first().hover();await card.waitFor({state:'visible'});assert.equal(await card.evaluate(el=>getComputedStyle(el).animationName),'player-card-enter');
+        await page.locator('.rating-score').first().hover();await card.waitFor({state:'hidden'});
+        await page.locator('.rating-self-score').hover();await page.waitForTimeout(220);assert.equal(await card.isHidden(),true,'own score must not trigger profile card');
+        await page.locator('.rating-self .rating-person').hover();await card.waitFor({state:'visible'});await page.locator('.rating-self-score').hover();await card.waitFor({state:'hidden'});
+        await page.mouse.move(0,0);
+      }
       const nameBox=await page.locator('.rating-player').nth(1).evaluate(el=>{const r=document.createRange();r.selectNodeContents(el);return {rects:[...r.getClientRects()].map(r=>({top:r.top,bottom:r.bottom})),whiteSpace:getComputedStyle(el).whiteSpace,width:el.getBoundingClientRect().width,scrollWidth:el.scrollWidth,parentWidth:el.parentElement.getBoundingClientRect().width,avatarWidth:el.parentElement.querySelector('img').getBoundingClientRect().width,gap:parseFloat(getComputedStyle(el.parentElement).gap)};});assert.equal(nameBox.whiteSpace,'nowrap');assert.ok(nameBox.rects.every(r=>Math.abs(r.top-nameBox.rects[0].top)<1),'nickname stays on one line');assert.ok(nameBox.width>0);assert.ok(Math.abs(nameBox.width-(nameBox.parentWidth-nameBox.avatarWidth-nameBox.gap))<2,'nickname fills available width');if(viewport.width===1440)assert.ok(nameBox.scrollWidth<=nameBox.width+1,'long nickname fits available desktop width');
       assert.equal(new URL(page.url()).pathname,'/rating');
       assert.equal(await page.locator('.rating-score').first().innerText(),'1 101');
