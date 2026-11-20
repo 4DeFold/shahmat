@@ -130,7 +130,8 @@ try {
   if(reducedMotion==='no-preference') { await frame.locator('#bot-app[data-phase=returning]').waitFor(); await frame.locator('.fly-board .board').waitFor(); assert.equal(await frame.locator('#target-board').evaluate(el=>getComputedStyle(el).visibility),'hidden'); }
   await frame.locator('#bot-app[data-phase=choose]').waitFor({timeout:10000});
   if(reducedMotion==='no-preference') { const samples=await frame.locator('#bot-app').evaluate(()=>window.returnSamples); assert.ok(samples.length>0); assert.ok(samples.every(s=>s.fly && s.orbit==='none'),'only the departing board is shown during return'); assert.ok(samples.at(-1).width<samples[0].width*.3,'board shrinks during exit'); assert.ok(samples.at(-1).top<samples[0].top,'board moves upward'); assert.notEqual(samples.at(-1).transform,samples[0].transform,'board rotates during exit'); assert.ok(samples.every(s=>s.body===1),'no full-page opacity flash during return'); }
-  await page.waitForFunction(()=>JSON.parse(localStorage.getItem('shahmat.bot-games.v1.12345678-1234-1234-1234-123456789012')).current.status==='abandoned');
+  await page.waitForFunction(()=>JSON.parse(localStorage.getItem('shahmat.bot-games.v1.12345678-1234-1234-1234-123456789012'))?.current===null);
+  assert.ok(writes.includes(null),'unfinished game was deleted when returning to selection');
   assert.deepEqual(errors,[]); await page.close();
  }
  // The ceiling gradient follows the actual active palette and light/dark mode.

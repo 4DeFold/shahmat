@@ -68,7 +68,7 @@ try {
   assert.equal(await page.locator('.rating-top').count(),0);
   if(reducedMotion==='no-preference') {
     await page.locator('.rating-player.rating-animating').first().waitFor();
-    const count=await page.locator('.rating-score').first().getAttribute('data-animated'); assert.notEqual(count,null);
+    const count=await page.locator('.rating-score').first().getAttribute('data-animated'); assert.equal(count,null,'initial score must not count from zero');
     const frames=await page.evaluate(async ()=>{
       const score=document.querySelector('.rating-score'), name=document.querySelectorAll('.rating-player')[1];
       const scores=[],names=[],colors=[],heights=[];
@@ -79,7 +79,7 @@ try {
         heights.push(score.closest('.rating-row').getBoundingClientRect().height);
       } return {scores,names,colors,heights};
     });
-    assert.ok(new Set(frames.scores.filter(Boolean)).size>15, 'ticker updates at frame rate');
+    assert.equal(frames.scores.filter(Boolean).length,0,'initial score stays at its actual value');
     assert.ok(new Set(frames.names.filter(Boolean)).size>10, 'Cyrillic name scrambles at frame rate');
     assert.ok(frames.colors.some(x=>!x.active), 'animation completes');
     assert.ok(frames.colors.filter(x=>!x.active).every(x=>!x.color.includes('rgba') || !x.color.endsWith(', 0)')), 'no invisible/fading final score');

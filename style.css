@@ -1013,3 +1013,15 @@ body.startup-ready #landing-screen:not([hidden]) .hero-reveal--tail { animation-
 .piece-full-cell.dark { background:var(--board-dark); }
 .piece-full-cell img { display:block; width:92%; height:92%; object-fit:contain; user-select:none; }
 @media(max-width:700px) { .piece-full-board { width:min(100%, 500px); } }
+
+/* The piece picker and attribution enter with the rest of settings. */
+.support-enter .piece-settings > h3,.support-enter .piece-settings > p,.support-enter .piece-options > label,.support-enter .piece-full-section:not([hidden]) { animation:support-reveal .75s cubic-bezier(.22,1,.36,1) both; }
+.support-enter .piece-settings > h3 { animation-delay:140ms; }
+.support-enter .piece-settings > p:first-of-type { animation-delay:200ms; }
+.support-enter .piece-options > label { animation-delay:260ms; }
+.support-enter .piece-options > label:nth-of-type(5n+2) { animation-delay:300ms; }
+.support-enter .piece-options > label:nth-of-type(5n+3) { animation-delay:340ms; }
+.support-enter .piece-options > label:nth-of-type(5n+4) { animation-delay:380ms; }
+.support-enter .piece-options > label:nth-of-type(5n) { animation-delay:420ms; }
+.support-enter .piece-settings > .piece-credits { animation-delay:460ms; }
+@media(prefers-reduced-motion:reduce) { .support-enter .piece-settings > h3,.support-enter .piece-settings > p,.support-enter .piece-options > label,.support-enter .piece-full-section:not([hidden]) { animation:none; } }

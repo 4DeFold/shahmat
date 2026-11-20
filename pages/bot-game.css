@@ -70,3 +70,23 @@
 .bot-shell[data-phase=choose] .bot-showcase { transition:none; }
 
 .bot-showcase {grid-template-rows:minmax(0,1fr) auto auto auto}.bot-selector{grid-row:2}.bot-completed{grid-row:3;color:var(--accent);font:600 14px system-ui,sans-serif;animation:bot-completed-in .45s ease both}.bot-play{grid-row:4}@keyframes bot-completed-in{from{opacity:0;transform:translateY(7px);filter:blur(3px)}to{opacity:1;transform:none;filter:blur(0)}}@media(prefers-reduced-motion:reduce){.bot-completed{animation:none}}
+
+/* Give the game board the available width on phones, as in rated play. */
+@media (max-width:700px) {
+  #bot-app .bot-stage { container-type:size; padding:0 4px; min-height:0; }
+  #bot-app .bot-board-wrap { width:100%; max-width:none; display:grid; grid-template-columns:minmax(0,1fr); align-content:center; }
+  #bot-app .bot-board-wrap .board-frame { grid-column:1; grid-row:2; width:min(100%,max(90px,calc(100cqh - 76px))); max-width:100%; justify-self:center; }
+  #bot-app .bot-board-wrap > .player-row { grid-column:1; padding:2px 0; }
+  #bot-app .bot-board-wrap > .opponent-row { grid-row:1; }
+  #bot-app .bot-board-wrap > .player-row:not(.opponent-row) { grid-row:3; }
+  #bot-app .bot-board-wrap .avatar { width:25px; height:25px; }
+  #bot-app .bot-rail { padding:4px 8px; max-height:26dvh; }
+  #bot-app .game-status { margin:2px 0; font-size:11px; }
+  #bot-app .bot-actions-inner { display:flex; gap:6px; }
+  #bot-app .bot-actions-inner > * { flex:1; min-width:0; }
+  #bot-app .bot-actions button { width:100%; min-height:32px; padding:5px; }
+  #bot-app .bot-moves { margin-top:2px; }
+  #bot-app .moves-header,#bot-app #move-list { display:none; }
+  #bot-app .history-content { grid-template-rows:1fr!important; }
+  #bot-app .history-controls { margin:0; }
+}

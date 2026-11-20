@@ -37,6 +37,7 @@ test('board opens at starting position, modes are explicit and a real request st
   assert.equal(app.$('board').querySelector('[data-square=e2] img').getAttribute('src'), '/pieces/cburnett/wP.svg');
   assert.deepEqual([...app.$('mode-list').querySelectorAll('input')].map(input => input.value), ['blitz','rapid','classical']);
   assert.equal(app.$('start-search').disabled, true); assert.equal(app.$('start-search').hidden, true);
+  assert.equal(app.$('search-loader').hidden, true);
   await app.ui.open(A);
   assert.equal(app.$('player-color'), null);
   const rapid = app.$('mode-list').querySelector('[value=rapid]'); rapid.checked = true; rapid.dispatchEvent(new app.dom.window.Event('change', { bubbles:true }));
@@ -44,8 +45,10 @@ test('board opens at starting position, modes are explicit and a real request st
   app.$('start-search').click(); await flush();
   assert.deepEqual(calls.at(-1), { action:'search', mode:'rapid' });
   assert.match(app.$('status').textContent, /Ищем/);
+  assert.equal(app.$('search-loader').hidden, false);
   app.$('cancel-search').click(); await flush();
   assert.equal(calls.at(-1).action, 'cancel'); assert.match(app.$('status').textContent, /отменен|отменён|отменена/);
+  assert.equal(app.$('search-loader').hidden, true);
   app.close();
 });
 

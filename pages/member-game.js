@@ -79,6 +79,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     for (const id of ['resign-button','resign-confirm','offline-win','offline-draw']) $(id).disabled = actionPending || moving;
     if (phase !== 'active') closeResign();
     start.hidden = phase !== 'idle' || !mode; start.disabled = !userId || !ready || !mode;
+    $('search-loader').hidden = phase !== 'searching';
     cancel.hidden = phase !== 'searching' && phase !== 'cancelling'; cancel.disabled = phase === 'cancelling'; reset.hidden = phase !== 'finished';
     $('moves').hidden = phase !== 'active' && phase !== 'finished';
   }
