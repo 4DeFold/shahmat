@@ -1,3 +1,5 @@
+import { installInteractionSounds } from './pages/interaction-sounds.js';
+installInteractionSounds(document);
 import './smooth-scroll.js';
 import './theme.js';
 import './landing-effects.js';

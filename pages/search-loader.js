@@ -21,12 +21,12 @@ export function createSearchLoader(element, win) {
     if (trailCanvas.width!==pixels||trailCanvas.height!==pixels) {trailCanvas.width=pixels;trailCanvas.height=pixels;}
     ctx.setTransform(pixels/8,0,0,pixels/8,0,0);ctx.clearRect(0,0,8,8);
     const styles=win.getComputedStyle(element), color=styles.getPropertyValue('--accent').trim()||'#333', contrast=styles.getPropertyValue('--surface').trim()||'#fff';
-    const progress=reduced()?0:(time-started)/1000*7.5, trail=3.5;
+    const progress=reduced()?0:(time-started)/1000*15, trail=14;
     trailCtx.setTransform(pixels/8,0,0,pixels/8,0,0);trailCtx.clearRect(0,0,8,8);
     trailCtx.lineWidth=.085;trailCtx.lineCap='butt';
     const opacity=distance=>.8*Math.pow(Math.max(0,1-distance/trail),1.6);
-    for(let dot=0;dot<3;dot++) {
-      const head=progress+dot*(64/3), tail=head-trail;
+    {
+      const head=progress, tail=head-trail;
       // Each straight knight-tour edge has its own continuous alpha gradient.
       // Circular joins at the corners keep the path seamless without bead-like overlaps.
       let start=tail;
@@ -48,8 +48,8 @@ export function createSearchLoader(element, win) {
     // Tint the alpha mask once, so the gradient follows the path around corners.
     trailCtx.globalCompositeOperation='source-in';trailCtx.fillStyle=color;trailCtx.fillRect(0,0,8,8);trailCtx.globalCompositeOperation='source-over';
     ctx.shadowColor=contrast;ctx.shadowBlur=Math.min(5,pixels*.012);ctx.drawImage(trailCanvas,0,0,8,8);ctx.shadowBlur=0;
-    for(let dot=0;dot<3;dot++) {
-      const p=tourPoint(progress+dot*(64/3));ctx.globalAlpha=.38;ctx.shadowColor=contrast;ctx.shadowBlur=Math.min(6,pixels*.015);ctx.fillStyle=contrast;ctx.beginPath();ctx.arc(p.x,p.y,.13,0,Math.PI*2);ctx.fill();
+    {
+      const p=tourPoint(progress);ctx.globalAlpha=.38;ctx.shadowColor=contrast;ctx.shadowBlur=Math.min(6,pixels*.015);ctx.fillStyle=contrast;ctx.beginPath();ctx.arc(p.x,p.y,.13,0,Math.PI*2);ctx.fill();
       ctx.shadowBlur=0;ctx.globalAlpha=1;ctx.fillStyle=color;ctx.beginPath();ctx.arc(p.x,p.y,.095,0,Math.PI*2);ctx.fill();
     }
     ctx.globalAlpha=1;

@@ -13,17 +13,20 @@ export function createGameSound(win) {
       try {const audio=new win.Audio(src);audio.preload='auto';cache[name]=audio;audio.load();} catch {/* Audio is optional. */}
     }
   }
-  function play(move={}) {
+  function strike(profile, boost=1) {
     if(destroyed)return;prime();
-    const profile=profiles[move?.piece]||profiles.p, base=cache[profile.file];
+    const base=cache[profile.file];
     if(!base)return;
     try {
       const audio=base.cloneNode(true);audio.preservesPitch=false;audio.playbackRate=profile.rate;
       // A single, slightly stronger impact keeps captures distinct without an echo.
-      audio.volume=Math.min(1,profile.volume*(move?.captured?1.16:1));
+      audio.volume=Math.min(1,profile.volume*boost);
       playing.add(audio);audio.addEventListener('ended',()=>playing.delete(audio),{once:true});
       const promise=audio.play();if(promise?.catch)promise.catch(()=>playing.delete(audio));
     } catch {/* Browser autoplay policy or audio support. */}
   }
-  return {prime,play,destroy(){destroyed=true;for(const audio of playing)audio.pause();playing.clear();for(const audio of Object.values(cache))audio.pause();}};
+  function play(move={}) { strike(profiles[move?.piece]||profiles.p,move?.captured?1.16:1); }
+  const effects={click:{file:'light',rate:1.2,volume:.12}, select:{file:'medium',rate:1.2,volume:.15}, start:{file:'heavy',rate:1.1,volume:.22}};
+  function effect(name) { if(effects[name])strike(effects[name]); }
+  return {prime,play,effect,destroy(){destroyed=true;for(const audio of playing)audio.pause();playing.clear();for(const audio of Object.values(cache))audio.pause();}};
 }

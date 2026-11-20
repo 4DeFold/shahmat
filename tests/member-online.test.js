@@ -597,3 +597,11 @@ test('captures and held physical attack keys follow the displayed history, inclu
  app.$('history-first').click();assert.equal(app.$('player-captured').querySelectorAll('img').length,0);assert.equal(app.$('opponent-captured').querySelectorAll('img').length,0);
  assert.equal(app.$('board').querySelector('[data-square=a4]').classList.contains('threat-own'),false);key('keyup','KeyE');assert.equal(app.$('board').querySelectorAll('.threat-own').length,0);
 });
+
+test('newly matched game plays one quiet start effect, not on restored snapshots',async t=>{
+ const app=setup(async body=>body.action==='current'?{game:null}: {game:game()});t.after(()=>app.close());const plays=[];
+ app.dom.window.Audio=class {constructor(src){this.src=src;}load(){}pause(){}addEventListener(){}cloneNode(){return new this.constructor(this.src);}play(){plays.push({src:this.src,volume:this.volume});return Promise.resolve();}};
+ await app.ui.open(A);const blitz=app.$('mode-list').querySelector('[value=blitz]');blitz.checked=true;blitz.dispatchEvent(new app.dom.window.Event('change',{bubbles:true}));app.$('start-search').click();await flush();
+ assert.equal(plays.length,1);assert.match(plays[0].src,/ceramic-heavy/);assert.ok(plays[0].volume<=.22);
+ const restored=setup(async()=>({game:game()}));t.after(()=>restored.close());restored.dom.window.Audio=app.dom.window.Audio;await restored.ui.open(A);await flush();assert.equal(plays.length,1,'restoring a game is silent');
+});

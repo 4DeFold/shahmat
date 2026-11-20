@@ -22,3 +22,10 @@ test('short ceramic recordings vary by piece; capture is one dry impact', async 
     assert.equal(wav.toString('ascii',0,4),'RIFF');assert.ok(wav.readUInt32LE(40)/wav.readUInt32LE(28)<.12,'short recording with no lingering echo');
   }
 });
+
+test('interface and start effects are short, quiet recorded hits',()=>{
+  const played=[];
+  class Audio {constructor(src){this.src=src} load(){} pause(){} addEventListener(){} cloneNode(){return new Audio(this.src)} play(){played.push({src:this.src,volume:this.volume});return Promise.resolve()}}
+  const sound=createGameSound({Audio});sound.effect('click');sound.effect('select');sound.effect('start');sound.effect('unknown');
+  assert.equal(played.length,3);assert.ok(played.every(x=>x.volume<=.22));assert.match(played[2].src,/ceramic-heavy/);sound.destroy();
+});

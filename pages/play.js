@@ -1,3 +1,7 @@
+import { installInteractionSounds } from './interaction-sounds.js';
+installInteractionSounds(document);
+import {createGameSound} from './game-sound.js';
+const sound=createGameSound(window);
 import {pieceSrc as themedPieceSrc} from './piece-theme.js';
 import '../smooth-scroll.js';
 import { Chess } from 'chess.js';
@@ -60,7 +64,7 @@ function scheduleBot() {
   botTimer = setTimeout(() => {
     if (game.isGameOver() || game.turn() === playerColor) { botThinking = false; botTimer = null; render(); return; }
     const botMove = chooseBotMove(game);
-    if (botMove) { lastMove = game.move(botMove); saveGame(); }
+    if (botMove) { lastMove = game.move(botMove); sound.play(lastMove); saveGame(); }
     botThinking = false; botTimer = null; selected = null; if(pending?.premove) { pending=null; promotion.hidden=true; } cancelDrag(); render(lastMove);
     const queued = premove.shift();
     if (!game.isGameOver() && queued && validPremove(game, queued, playerColor)) { playMove(normalizePremove(game,queued)); return; }
@@ -158,7 +162,7 @@ function render(move = null) {
   renderHistory();
 }
 function playMove(move) {
-  lastMove = game.move(move); selected = null; pending = null; promotion.hidden = true;
+  lastMove = game.move(move); sound.play(lastMove); selected = null; pending = null; promotion.hidden = true;
   if (game.isGameOver()) premove = [];
   saveGame();
   scheduleBot();
@@ -183,6 +187,7 @@ board.addEventListener('click', event => {
   if (suppressClick || pending || game.isGameOver()) return;
   const square=event.target.closest('[data-square]')?.dataset.square; if(!square) return;
   if(selected && attempt(selected,square)) return;
+  sound.effect('click');
   if(premove.length && !projected().get(square)) { premove=[]; selected=null; render(); return; }
   selected=projected().get(square)?.color===playerColor && selected!==square ? square : null; render();
   board.querySelector(`[data-square="${square}"]`)?.focus();

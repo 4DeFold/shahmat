@@ -1,3 +1,5 @@
+import { installInteractionSounds } from './interaction-sounds.js';
+installInteractionSounds(document);
 import {pieceSrc as themedPieceSrc} from './piece-theme.js';
 import { Chess } from 'chess.js';
 import {renderCaptures,renderThreats} from './board-insights.js';
@@ -5,7 +7,7 @@ import { premoveTargets, validPremove, normalizePremove, projectPremoves } from 
 import { createBoardAnnotations } from './board-annotations.js';
 import { createClient } from '@supabase/supabase-js';
 import { createMemberBoard } from './member-board.js';
-import { createMoveHistory, historyTransition, historyKeyTarget } from './move-history.js';
+import { createMoveHistory, historyTransition, historyKeyTarget, historySoundMove } from './move-history.js';
 import { createGameSound } from './game-sound.js';
 import { createStockfish, BOT_LEVELS } from './stockfish-engine.js';
 import { createBotStorage } from './bot-storage.js';
@@ -195,7 +197,7 @@ for(const type of ['keydown','keyup'])document.addEventListener(type,e=>{if(!['K
 const renderMoves=createMoveHistory({document,list:$('move-list'),count:$('move-count'),onSelect:showHistory});
 function history() { const length=chess.history().length,index=historyIndex??length;renderMoves(chess,historyIndex);$('history-first').disabled=$('history-prev').disabled=index===0;$('history-next').disabled=$('history-last').disabled=index===length; }
 function showHistory(index) {
- const length=chess.history().length,old=historyIndex??length; historyIndex=index>=length?null:Math.max(0,index); selected=null; annotations.clear();draw(null,historyTransition(chess,old,historyIndex??length));history();
+ const length=chess.history().length,old=historyIndex??length; historyIndex=index>=length?null:Math.max(0,index); selected=null; annotations.clear();draw(null,historyTransition(chess,old,historyIndex??length));history();const move=historySoundMove(chess,old,historyIndex??length);if(move)sound.play(move);
  status(historyIndex!==null?`Просмотр позиции: ход ${historyIndex} из ${length}.`:phase==='finished'?'Партия завершена.':chess.turn()==='w'?'Ваш ход.':'Ход бота.');
 }
 function navigateHistory(key,code='') { if(!pageVisible || !['playing','finished'].includes(phase) || promotion || document.querySelector('dialog[open]'))return false;const length=chess.history().length,target=historyKeyTarget(key,code,historyIndex??length,length);if(target===null)return false;showHistory(target);return true; }
@@ -231,7 +233,7 @@ async function botMove() {
     if(!engine) engine=createStockfish(level);
     const [move]=await Promise.all([engine.move(chess.fen()),wait(500)]);
     if(current!==generation || phase!=='playing') return;
-    cancelDrag(); selected=null; if(promotion?.premove) { promotion=null; reveal('promotion',false); } last=chess.move(move); thinking=false; draw(last); history(); sound.play(last);
+    cancelDrag(); selected=null; if(promotion?.premove) { promotion=null; reveal('promotion',false); } last=chess.move(move); thinking=false; draw(last); history(); if(pageVisible && !document.hidden) sound.play(last);
     if(!finishIfNeeded()) {
       snapshot();
       const queued=premove.shift();
@@ -265,6 +267,7 @@ board.addEventListener('click',event=>{
   const square=event.target.closest('[data-square]')?.dataset.square; if(!square) return;
   sound.prime();
   if(selected && attempt(selected,square)) return;
+  sound.effect('click');
   if(premove.length && !projected().get(square)) { premove=[]; selected=null; draw(); status(chess.turn()==='w'?'Ваш ход.':'Ход бота.'); return; }
   selected=projected().get(square)?.color==='w' && selected!==square?square:null; draw(); boardView.cell(square)?.focus();
 });
@@ -367,6 +370,7 @@ async function launch() {
     if(current!==generation || destroyed) return;
     setPhase('playing'); updateResign(); status('Ваш ход. Вы играете белыми.');
   }
+  if(current===generation && !destroyed && pageVisible && !document.hidden) sound.effect('start');
 }
 $('bot-play').addEventListener('click',()=>void launch());
 async function restore(id) {

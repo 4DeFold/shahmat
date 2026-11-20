@@ -1,3 +1,5 @@
+import { installInteractionSounds } from './interaction-sounds.js';
+installInteractionSounds(document);
 import './profile-card.css';
 import '../smooth-scroll.js';
 import {createProfileCard} from './profile-card.js';

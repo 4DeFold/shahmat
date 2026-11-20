@@ -33,7 +33,7 @@ test('trails use smooth gradients along the tour and particles move faster',()=>
  dom.window.document.createElement=(name)=>{const node=create(name);if(name==='canvas')node.getContext=()=>mask;return node;};
  let next;const win={matchMedia:()=>({matches:false}),devicePixelRatio:1,getComputedStyle:()=>({getPropertyValue:()=>''}),requestAnimationFrame:fn=>(next=fn,1),cancelAnimationFrame(){},setTimeout(){},clearTimeout(){}};
  const loader=createSearchLoader(el,win);loader.setVisible(true);next(0);next(1000);
- assert.deepEqual(dots[0],tourPoint(0));assert.deepEqual(dots[3],tourPoint(7.5));
- assert.ok(gradients.length>0);assert.ok(gradients.every(stops=>stops.length===9));
+ assert.deepEqual(dots[0],tourPoint(0));assert.equal(dots.length,2);assert.deepEqual(dots[1],tourPoint(15));
+ assert.equal(gradients.length,28);assert.ok(gradients.every(stops=>stops.length===9));
  loader.destroy();
 });

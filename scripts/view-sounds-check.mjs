@@ -1,0 +1,32 @@
+import assert from 'node:assert/strict';
+import {chromium} from 'playwright';
+import {Chess} from 'chess.js';
+const base=process.env.RESPONSIVE_BASE_URL||'http://127.0.0.1:4270';
+const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE_PATH,args:['--no-sandbox']});
+const id='12345678-1234-1234-1234-123456789012',user={id,aud:'authenticated',role:'authenticated',user_metadata:{}},token=['e30',Buffer.from(JSON.stringify({sub:id,exp:Math.floor(Date.now()/1000)+3600,role:'authenticated'})).toString('base64url'),'x'].join('.'),session={access_token:token,token_type:'bearer',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,refresh_token:'mock',user};
+let moves=['e4','d5','exd5'];
+const row=()=>{const chess=new Chess();moves.forEach(m=>chess.move(m));return {id:'watch1',white_name:'Alice',black_name:'Bob',white_yar:1000,black_yar:1000,mode:'blitz',moves:[...moves],fen:chess.fen(),version:moves.length,move_count:moves.length,status:'active',turn:chess.turn(),white_ms:180000,black_ms:180000};};
+try{
+ let releaseArchive,releaseWatch;const archiveGate=new Promise(resolve=>releaseArchive=resolve),watchGate=new Promise(resolve=>releaseWatch=resolve);
+ const page=await browser.newPage({reducedMotion:'reduce'}),errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.addInitScript(s=>{localStorage.setItem('sb-eswyxbyddkajysogtglp-auth-token',JSON.stringify(s));window.sounds=[];window.Audio=class {constructor(src){this.src=src}load(){}pause(){}addEventListener(){}cloneNode(){return new Audio(this.src)}play(){window.sounds.push({src:this.src,volume:this.volume});return Promise.resolve()}}},session);
+ await page.route('https://eswyxbyddkajysogtglp.supabase.co/**',async route=>{const p=new URL(route.request().url()).pathname;
+ if(p==='/auth/v1/user')return route.fulfill({json:user});if(p==='/rest/v1/profiles')return route.fulfill({json:{username:'Alice'}});
+ if(p.endsWith('/my_archive_all')){await archiveGate;return route.fulfill({json:[{...row(),my_color:'w',result:'white_win'}]});}if(p.endsWith('/my_archive_ratings'))return route.fulfill({json:[]});
+ if(p.endsWith('/spectator_modes')){await watchGate;return route.fulfill({json:[{mode:'blitz',game_count:1}]});}if(p.endsWith('/spectator_games_sorted'))return route.fulfill({json:[row()]});if(p.endsWith('/spectator_game'))return route.fulfill({json:row()});return route.fulfill({json:[]});});
+ await page.goto(base+'/pages/archive.html');await page.locator('#archive-status.is-loading').waitFor();releaseArchive();await page.locator('.archive-card').first().click();await page.locator('#history-prev').waitFor();
+ await page.evaluate(()=>window.sounds=[]);await page.locator('#history-prev').click();assert.equal(await page.evaluate(()=>window.sounds.length),1);assert.ok(await page.evaluate(()=>window.sounds[0].volume>.5));
+ await page.locator('#history-next').click();assert.equal(await page.evaluate(()=>window.sounds.length),2);
+ await page.locator('#history-last').evaluate(el=>el.click());assert.equal(await page.evaluate(()=>window.sounds.length),2,'no sound for unchanged position');
+ await page.goto(base+'/pages/watch.html');await page.locator('#watch-status.is-loading').waitFor();releaseWatch();await page.locator('[data-game-id=watch1]').click();await page.locator('#history-prev').waitFor({state:'visible'});await page.waitForTimeout(500);
+ await page.evaluate(()=>window.sounds=[]);await page.locator('#history-prev').click();assert.equal(await page.evaluate(()=>window.sounds.length),1);await page.locator('#history-next').click();assert.equal(await page.evaluate(()=>window.sounds.length),2);
+ await page.evaluate(()=>window.sounds=[]);moves.push('Qxd5');await page.locator('[data-history-index=\"4\"]').waitFor({timeout:6000});
+ assert.equal(await page.evaluate(()=>window.sounds.length),1,'a live move plays once');assert.match(await page.evaluate(()=>window.sounds[0].src),/ceramic-heavy/);
+ await page.waitForTimeout(1300);assert.equal(await page.evaluate(()=>window.sounds.length),1,'polls do not repeat the sound');
+ await page.locator('#history-prev').click();await page.evaluate(()=>window.sounds=[]);moves.push('Nc3');await page.waitForTimeout(1600);assert.equal(await page.evaluate(()=>window.sounds.length),0,'live moves do not sound while examining history');
+ await page.goto(base+'/pages/bot-game.html');await page.locator('#bot-play:not([disabled])').waitFor({timeout:10000});
+ await page.evaluate(()=>window.sounds=[]);await page.locator('#bot-play').click();await page.locator('#bot-app[data-phase=playing]').waitFor();
+ const startSounds=await page.evaluate(()=>window.sounds);assert.equal(startSounds.length,2);assert.ok(startSounds.every(x=>x.volume<=.22));assert.match(startSounds[1].src,/ceramic-heavy/);
+ await page.evaluate(()=>window.sounds=[]);await page.locator('[data-square=e2]').click();assert.ok(await page.evaluate(()=>window.sounds[0].volume<=.15));
+ assert.deepEqual(errors,[]);console.log('✓ Quiet bot start and selection; archive and spectator history, live moves, no duplicate polling or hidden-history sounds');
+}finally{await browser.close();}

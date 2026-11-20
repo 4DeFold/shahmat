@@ -5,7 +5,7 @@ import {renderCaptures,renderThreats} from './board-insights.js';
 import { premoveTargets, validPremove, normalizePremove, projectPremoves } from './premove.js';
 import { createBoardAnnotations } from './board-annotations.js';
 import { createMemberBoard } from './member-board.js';
-import { createMoveHistory, historyTransition, historyKeyTarget } from './move-history.js';
+import { createMoveHistory, historyTransition, historyKeyTarget, historySoundMove } from './move-history.js';
 import { createGameSound } from './game-sound.js';
 import { createSearchLoader } from './search-loader.js';
 import { createRollingClock } from './rolling-clock.js';
@@ -127,6 +127,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     historyIndex=index>=count?null:Math.max(0,index);
     const target=historyIndex??count, transitions=historyTransition(chess,old,target);
     annotations.clear(); selected=null; renderBoard(null,transitions); renderHistory();
+    const move=historySoundMove(chess,old,target); if(move) sound.play(move);
     if(historyIndex!==null)setStatus(`Просмотр позиции: ход ${historyIndex} из ${count}.`);else statusGame();
   }
   function projected() { return premove.length ? projectPremoves(chess,premove,currentColor()) : chess; }
@@ -213,7 +214,9 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     snapshot = game; receivedAt = now(); clockSync.update(game, receivedAt); chess = next; latestMove = nextLast;
     if (historyIndex !== null && historyIndex >= game.moves.length) historyIndex = game.moves.length ? null : 0;
     if (!alreadyDisplayed) { cancelDrag(); const piece = selected && next.get(selected); if (!sameGame || !selectedPiece || !piece || piece.color !== currentColor() || piece.type !== selectedPiece.type || piece.color !== selectedPiece.color) selected = null; pending = null; promotion.hidden = true; }
+    const starting=(phase==='searching'||phase==='cancelling') && game.status==='active' && !sameGame;
     phase = game.status === 'active' ? 'active' : 'finished'; mode = game.mode;
+    if(starting && isVisible()) sound.effect('start');
     const clearedPremove = phase === 'finished' && premove.length > 0;
     if (phase === 'finished') premove = [];
     const input = $('mode-list').querySelector(`input[value="${mode}"]`); if (input) input.checked = true;
@@ -343,6 +346,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   function choose(square) {
     if (!square || phase !== 'active' || reconciling || (moving && chess.turn() === currentColor()) || pending || historyIndex !== null) return;
     if (selected && attempt(selected, square)) return;
+    sound.effect('click');
     const piece = projected().get(square);
     if (premove.length && !piece) { premove=[]; selected=null; renderBoard(); statusGame(); return; } selected = piece?.color === currentColor() && selected !== square ? square : null; renderBoard();
     board.querySelector(`[data-square="${square}"]`)?.focus();
