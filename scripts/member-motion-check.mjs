@@ -10,17 +10,12 @@ try {
   await page.addInitScript(value => {
     localStorage.setItem('sb-eswyxbyddkajysogtglp-auth-token', JSON.stringify(value));
     localStorage.setItem('shahmat.game.sound-muted', 'true');
-    const param = () => ({value:0, setValueAtTime(){}, exponentialRampToValueAtTime(){}});
-    class FakeAudioContext {
-      state = 'running'; currentTime = 0; sampleRate = 44100; destination = {};
-      createBuffer() { return { getChannelData:() => new Float32Array(2426) }; }
-      createOscillator() { return {frequency:param(), connect(){}, start(){ window.soundTaps = (window.soundTaps || 0) + 1; }, stop(){}}; }
-      createGain() { return {gain:param(), connect(){}}; }
-      createBufferSource() { return {connect(){}, start(){}, stop(){}}; }
-      createBiquadFilter() { return {frequency:param(), connect(){}}; }
-      close() { return Promise.resolve(); }
+    class FakeAudio {
+      constructor(src){this.src=src;} load(){} pause(){} addEventListener(){}
+      cloneNode(){return new FakeAudio(this.src);}
+      play(){window.soundTaps=(window.soundTaps||0)+1;return Promise.resolve();}
     }
-    window.AudioContext = FakeAudioContext;
+    window.Audio = FakeAudio;
     const animate = Element.prototype.animate;
     Element.prototype.animate = function(...args) { if (this.classList.contains('piece') && args[1]?.duration === 165) window.pieceAnimations = (window.pieceAnimations || 0) + 1; return animate.apply(this,args); };
   }, session);
@@ -80,7 +75,7 @@ try {
     return {dot:getComputedStyle(dot).backgroundColor, outline:getComputedStyle(running).outlineColor, premove:getComputedStyle(premove).boxShadow};
   });
   assert.equal(palette.dot, 'rgb(61, 90, 64)'); assert.equal(palette.outline, 'rgb(61, 90, 64)');
-  assert.match(palette.premove, /61, 90, 64/);
+  assert.match(palette.premove, /20, 30, 85/); // Premove uses its fixed board highlight, not the theme accent.
   assert.equal(await page.locator('#player-clock-card').evaluate(el => getComputedStyle(el, '::after').content), 'none');
   assert.equal(await page.locator('#player-clock').evaluate(el => getComputedStyle(el).textDecorationLine), 'none');
   console.log('✓ Chromium: move sound ignores old mute, smooth history and clean game controls');

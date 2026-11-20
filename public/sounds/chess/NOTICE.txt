@@ -1,0 +1,14 @@
+Chess move recordings — CC0 1.0 Universal
+
+mh2o-alabaster.wav: "chess_move_on_alabaster.wav" by mh2o, recorded with an
+alabaster chess piece and board. https://freesound.org/people/mh2o/sounds/351518/
+
+elboss-piece-placement.mp3: "Piece Placement.mp3" by el_boss, recorded with a
+chess piece on a wooden board. https://freesound.org/people/el_boss/sounds/546119/
+
+Both original files were obtained from:
+https://github.com/luvkesh/Chess/tree/27e77052378f6a5c3b5af122b297abdf91c4551c/apps/web-prototype/sfx/sources
+
+No audio files have been altered. Playback rate and volume are adjusted in the
+app for different pieces; captures play two recorded sounds in succession.
+CC0 text: https://creativecommons.org/publicdomain/zero/1.0/legalcode

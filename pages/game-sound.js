@@ -1,41 +1,34 @@
-// Original synthesized chess-piece clicks, made with oscillators and noise.
-// No Lichess recordings or samples are used.
+// Real CC0 recordings: a chess piece on alabaster and a piece placed on wood.
+// Per-piece playback rates and a two-hit capture add variety without synthesis.
+const profiles={
+  p:{file:'wood',rate:1.08,volume:.62}, n:{file:'stone',rate:1.09,volume:.67},
+  b:{file:'stone',rate:1.02,volume:.68}, r:{file:'stone',rate:.96,volume:.72},
+  q:{file:'stone',rate:.88,volume:.76}, k:{file:'stone',rate:.91,volume:.76},
+};
+const sources={wood:'/sounds/chess/elboss-piece-placement.mp3',stone:'/sounds/chess/mh2o-alabaster.wav'};
 export function createGameSound(win) {
-  let context = null, noise = null;
+  const cache={},playing=new Set(),timers=new Set();let destroyed=false;
   function prime() {
-    try {
-      const AudioContext = win.AudioContext || win.webkitAudioContext;
-      if (!AudioContext) return;
-      context ||= new AudioContext();
-      if (context.state === 'suspended') void context.resume().catch(() => {});
-    } catch { /* Audio is optional. */ }
+    if(destroyed||typeof win.Audio!=='function')return;
+    for(const [name,src] of Object.entries(sources))if(!cache[name]) {
+      try {const audio=new win.Audio(src);audio.preload='auto';cache[name]=audio;audio.load();} catch {/* Audio is optional. */}
+    }
   }
-  function play(kind = 'move') {
+  function hit(piece,volume=1) {
+    const profile=profiles[piece]||profiles.p, base=cache[profile.file];
+    if(!base||destroyed)return;
     try {
-      prime(); if (!context || context.state !== 'running') return;
-      const t = context.currentTime;
-      if (!noise) {
-        noise = context.createBuffer(1, Math.ceil(context.sampleRate * .04), context.sampleRate);
-        const samples = noise.getChannelData(0);
-        for (let i = 0; i < samples.length; i++) samples[i] = Math.random() * 2 - 1;
-      }
-      const tap = (offset, freq, volume) => {
-        const oscillator = context.createOscillator(), tone = context.createGain();
-        oscillator.type = 'sine'; oscillator.frequency.setValueAtTime(freq, t + offset);
-        oscillator.frequency.exponentialRampToValueAtTime(freq * .48, t + offset + .035);
-        tone.gain.setValueAtTime(.0001, t + offset); tone.gain.exponentialRampToValueAtTime(volume, t + offset + .0015);
-        tone.gain.exponentialRampToValueAtTime(.0001, t + offset + .065);
-        oscillator.connect(tone); tone.connect(context.destination); oscillator.start(t + offset); oscillator.stop(t + offset + .07);
-        const source = context.createBufferSource(), filter = context.createBiquadFilter(), envelope = context.createGain();
-        source.buffer = noise; filter.type = 'lowpass'; filter.frequency.value = kind === 'capture' ? 2450 : 1900;
-        envelope.gain.setValueAtTime(.0001, t + offset); envelope.gain.exponentialRampToValueAtTime(volume * .8, t + offset + .001);
-        envelope.gain.exponentialRampToValueAtTime(.0001, t + offset + .026);
-        source.connect(filter); filter.connect(envelope); envelope.connect(context.destination); source.start(t + offset); source.stop(t + offset + .04);
-      };
-      tap(0, kind === 'capture' ? 390 : 480, .075);
-      if (kind === 'capture') tap(.026, 245, .055);
-      if (kind === 'check') tap(.04, 630, .04);
-    } catch { /* Audio support differs across browsers. */ }
+      const audio=base.cloneNode(true);audio.playbackRate=profile.rate;audio.volume=Math.min(1,profile.volume*volume);
+      playing.add(audio);audio.addEventListener('ended',()=>playing.delete(audio),{once:true});
+      const promise=audio.play();if(promise?.catch)promise.catch(()=>playing.delete(audio));
+    } catch {/* Browser autoplay policy or audio support. */}
   }
-  return { prime, play, destroy: () => { if (context) void context.close(); } };
+  function play(move={}) {
+    if(destroyed)return;prime();
+    if(move?.captured){
+      hit(move.captured,.65);
+      const timer=win.setTimeout(()=>{timers.delete(timer);hit(move.piece);},45);timers.add(timer);
+    } else hit(move?.piece);
+  }
+  return {prime,play,destroy(){destroyed=true;for(const timer of timers)win.clearTimeout(timer);timers.clear();for(const audio of playing)audio.pause();playing.clear();for(const audio of Object.values(cache))audio.pause();}};
 }

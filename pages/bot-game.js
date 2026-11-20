@@ -231,7 +231,7 @@ async function botMove() {
     if(!engine) engine=createStockfish(level);
     const [move]=await Promise.all([engine.move(chess.fen()),wait(500)]);
     if(current!==generation || phase!=='playing') return;
-    cancelDrag(); selected=null; if(promotion?.premove) { promotion=null; reveal('promotion',false); } last=chess.move(move); thinking=false; draw(last); history(); sound.play(chess.isCheck()?'check':last.captured?'capture':'move');
+    cancelDrag(); selected=null; if(promotion?.premove) { promotion=null; reveal('promotion',false); } last=chess.move(move); thinking=false; draw(last); history(); sound.play(last);
     if(!finishIfNeeded()) {
       snapshot();
       const queued=premove.shift();
@@ -247,7 +247,7 @@ async function botMove() {
 function play(move) {
   if(!game || phase!=='playing' || thinking || chess.turn()!=='w') return;
   try { last=chess.move(move); } catch { return; }
-  selected=null; promotion=null; reveal('promotion',false); draw(last); history(); sound.play(chess.isCheck()?'check':last.captured?'capture':'move');
+  selected=null; promotion=null; reveal('promotion',false); draw(last); history(); sound.play(last);
   if(!finishIfNeeded()) { snapshot(); void botMove(); }
 }
 function attempt(from,to) {

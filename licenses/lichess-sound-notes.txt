@@ -4,8 +4,8 @@ The standard Lichess sound files were not copied or sampled. The Lichess
 COPYING.md (https://github.com/lichess-org/lila/blob/master/COPYING.md) places
 "the other sounds in public/sound" under non-free / uncertain exceptions,
 while some named sound sets are separately listed under their own licenses.
-This project generates its chess clicks locally using Web Audio oscillators
-and noise; no third-party audio assets are included.
+This project uses recordings released under CC0, listed in
+public/sounds/chess/NOTICE.txt; no Lichess recordings are included.
 
 Number Ticker is inspired by Magic UI (MIT), with a native JavaScript spring
 adaptation. See /licenses/magicui.txt for the license.

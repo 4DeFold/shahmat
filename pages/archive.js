@@ -30,7 +30,7 @@ async function pumpCards(){
     const placeholder=card.querySelector('.archive-mini'), mini=miniature(card._chess,card._flip);
     placeholder.replaceWith(mini);
     await Promise.all([...mini.querySelectorAll('img')].map(img=>img.decode().catch(()=>{})));
-    if(card.isConnected&&generation===cardGeneration){card.classList.add('is-ready');await new Promise(resolve=>setTimeout(resolve,reduced()?0:100));}
+    if(card.isConnected&&generation===cardGeneration){card.classList.add('is-ready');await new Promise(resolve=>setTimeout(resolve,reduced()?0:20));}
   }
   cardWorking=false;
 }

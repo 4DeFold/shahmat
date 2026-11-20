@@ -7,6 +7,7 @@ import { createBoardAnnotations } from './board-annotations.js';
 import { createMemberBoard } from './member-board.js';
 import { createMoveHistory, historyTransition, historyKeyTarget } from './move-history.js';
 import { createGameSound } from './game-sound.js';
+import { createSearchLoader } from './search-loader.js';
 import { createRollingClock } from './rolling-clock.js';
 import { retryMessage } from './match-api.js';
 import { createClockSync } from './clock-sync.js';
@@ -55,6 +56,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     }).catch(() => { if (request === ratingsRequest) { ratingsKey = null; ratingsRetryAt = now() + 8000; } });
   }
   const sound = createGameSound(win);
+  const searchLoader = createSearchLoader($('search-loader'), win);
   const clockSync = createClockSync();
   const isVisible = () => viewVisible && browserVisible;
   const setStatus = (text, urgent = false) => { const el = $('status'); if (el.textContent !== text) el.textContent = text; el.parentElement.classList.toggle('urgent', urgent); };
@@ -65,7 +67,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   const annotations = createBoardAnnotations({ document, board, enabled: () => !!snapshot });
   // Age is provided by the server, then advanced monotonically between snapshots.
   const canResign = () => phase === 'active' && Number.isFinite(snapshot?.game_age_ms) && snapshot.game_age_ms + Math.max(0, now() - receivedAt) >= 60000;
-  const playSound = move => sound.play(chess.isCheck() ? 'check' : move?.captured ? 'capture' : 'move');
+  const playSound = move => sound.play(move);
   function modeControls() {
     const locked = phase !== 'idle';
     $('mode-list').querySelectorAll('input').forEach(input => { input.disabled = locked; });
@@ -79,7 +81,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     for (const id of ['resign-button','resign-confirm','offline-win','offline-draw']) $(id).disabled = actionPending || moving;
     if (phase !== 'active') closeResign();
     start.hidden = phase !== 'idle' || !mode; start.disabled = !userId || !ready || !mode;
-    $('search-loader').hidden = phase !== 'searching';
+    searchLoader.setVisible(phase === 'searching');
     cancel.hidden = phase !== 'searching' && phase !== 'cancelling'; cancel.disabled = phase === 'cancelling'; reset.hidden = phase !== 'finished';
     $('moves').hidden = phase !== 'active' && phase !== 'finished';
   }
@@ -513,6 +515,6 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     hide() { clearThreats(); onGameChanged(null); const wasVisible = isVisible(); viewVisible = false; if (wasVisible) pause(); },
     show() { if(snapshot?.status==='active'&&browserVisible)onGameChanged(snapshot.id); const wasVisible = isVisible(); const wasShown = viewVisible; viewVisible = true; if (!wasShown) revealPieces(); if (!wasVisible && isVisible()) resume(); },
     browserVisibility(value) { if(!value)onGameChanged(null);else if(viewVisible&&snapshot?.status==='active')onGameChanged(snapshot.id); const wasVisible = isVisible(); browserVisible = value; if (wasVisible && !isVisible()) pause(); else if (!wasVisible && isVisible()) resume(); },
-    destroy() { destroyed = true; onGameChanged(null); document.removeEventListener('keydown',onThreatDown); document.removeEventListener('keyup',onThreatUp); win.removeEventListener('blur',clearThreats); document.removeEventListener('keydown', onPremoveKey); document.removeEventListener('keydown', onHistoryKey); annotations.destroy(); generation++; cancelDrag(); cancelTimer(); clearInterval(clockInterval); clearInterval(nameTimer); revealAnimations.forEach(animation => animation.cancel()); Object.values(clocks).forEach(clock => clock.destroy()); sound.destroy(); },
+    destroy() { destroyed = true; onGameChanged(null); document.removeEventListener('keydown',onThreatDown); document.removeEventListener('keyup',onThreatUp); win.removeEventListener('blur',clearThreats); document.removeEventListener('keydown', onPremoveKey); document.removeEventListener('keydown', onHistoryKey); annotations.destroy(); generation++; cancelDrag(); cancelTimer(); clearInterval(clockInterval); clearInterval(nameTimer); revealAnimations.forEach(animation => animation.cancel()); Object.values(clocks).forEach(clock => clock.destroy()); searchLoader.destroy(); sound.destroy(); },
   };
 }

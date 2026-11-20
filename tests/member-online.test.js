@@ -48,7 +48,7 @@ test('board opens at starting position, modes are explicit and a real request st
   assert.equal(app.$('search-loader').hidden, false);
   app.$('cancel-search').click(); await flush();
   assert.equal(calls.at(-1).action, 'cancel'); assert.match(app.$('status').textContent, /отменен|отменён|отменена/);
-  assert.equal(app.$('search-loader').hidden, true);
+  await new Promise(resolve=>setTimeout(resolve,350));assert.equal(app.$('search-loader').hidden, true);
   app.close();
 });
 

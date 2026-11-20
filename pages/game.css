@@ -272,16 +272,9 @@ html, body { width: 100%; height: 100%; overflow: hidden; }
 
 .spectator-count {position:absolute;bottom:calc(100% + 5px);right:0;display:flex;align-items:center;gap:5px;color:var(--ink);font:600 12px system-ui,sans-serif;opacity:0;transform:translateY(4px);pointer-events:none;transition:opacity .25s ease,transform .25s ease}.spectator-count.is-visible{opacity:1;transform:none}.spectator-count svg{width:18px;height:18px;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}@media(prefers-reduced-motion:reduce){.spectator-count{transition:none}}
 
-/* The pictured closed knight's tour, drawn only while matchmaking is active. */
-.search-loader { position:absolute; inset:0; z-index:8; display:grid; place-items:center; background:var(--surface); padding:clamp(18px,9%,64px); pointer-events:none; }
+/* A transparent trail over the still-visible board during matchmaking. */
+.search-loader { position:absolute; inset:0; z-index:8; display:grid; place-items:center; padding:clamp(18px,9%,64px); pointer-events:none; opacity:0; filter:blur(5px); transform:scale(.97); transition:opacity .3s ease,filter .32s ease,transform .32s ease; }
 .search-loader[hidden] { display:none; }
-.search-loader svg { width:min(100%, 360px); height:auto; overflow:visible; }
-.search-grid-border,.search-grid { fill:none; stroke:var(--ink); stroke-width:.035; opacity:.48; }
-.search-grid-border { stroke-width:.06; opacity:.8; }
-.search-tour-base,.search-tour-draw,.search-tour-trace { fill:none; stroke:#1980b6; stroke-width:.075; stroke-linecap:round; stroke-linejoin:round; }
-.search-tour-base { opacity:.12; }
-.search-tour-draw { stroke-dasharray:1; stroke-dashoffset:1; animation:tour-draw 4.2s cubic-bezier(.4,0,.2,1) infinite; }
-.search-tour-trace { stroke:#62c4ed; stroke-width:.065; stroke-dasharray:.07 .93; animation:tour-trace 4.2s linear infinite; }
-@keyframes tour-draw { 0%,5%{stroke-dashoffset:1;opacity:1} 72%,82%{stroke-dashoffset:0;opacity:1} 100%{stroke-dashoffset:0;opacity:0} }
-@keyframes tour-trace { from{stroke-dashoffset:1} to{stroke-dashoffset:0} }
-@media(prefers-reduced-motion:reduce) { .search-tour-base{opacity:1} .search-tour-draw,.search-tour-trace{display:none} }
+.search-loader.is-visible { opacity:1; filter:blur(0); transform:scale(1); }
+.search-loader canvas { display:block; width:min(100%,360px); aspect-ratio:1; }
+@media(prefers-reduced-motion:reduce) { .search-loader { transition:none; } }
