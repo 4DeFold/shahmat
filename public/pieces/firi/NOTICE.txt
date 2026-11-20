@@ -1,0 +1,5 @@
+firi chess pieces by James Faure
+License: CC BY 4.0; see LICENSE.txt.
+Source: https://github.com/lichess-org/lila/tree/63ce12333414a2762f2f042e18e3dd528845adda/public/piece/firi
+Lichess attribution and license declaration: https://github.com/lichess-org/lila/blob/63ce12333414a2762f2f042e18e3dd528845adda/COPYING.md
+Modified: Recoloured artwork and gradients to solid black and white and made black-piece strokes white.

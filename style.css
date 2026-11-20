@@ -1003,3 +1003,13 @@ body.startup-ready #landing-screen:not([hidden]) .hero-reveal--tail { animation-
 .piece-preview-board{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));width:100%;aspect-ratio:2;overflow:hidden}.piece-preview-cell{position:relative;aspect-ratio:1}.piece-preview-cell.light{background:var(--board-light)}.piece-preview-cell.dark{background:var(--board-dark)}.piece-preview-cell img{display:block;width:100%;height:100%;object-fit:contain}.piece-option{position:relative;transition:background-color .3s,color .3s,border-color .3s}.piece-option::after{content:"";position:absolute;inset:0;pointer-events:none;border:2px solid var(--foreground);opacity:0;transition:opacity .35s ease}.piece-options input:checked+.piece-option{outline:none}.piece-options input:checked+.piece-option::after{opacity:1}.piece-options input:focus-visible+.piece-option{outline:3px solid var(--accent);outline-offset:2px}@media(prefers-reduced-motion:reduce){.piece-option,.piece-option::after{transition:none}}
 
 .piece-settings .piece-credits { font-size:12px; line-height:1.5; opacity:.75; margin:14px 0 0; }
+
+/* Full-size static game board, revealed only by an explicit piece selection. */
+.piece-full-section { margin-top:28px; }
+.piece-full-section h4 { font:600 15px/1.4 system-ui,sans-serif; margin:0 0 12px; }
+.piece-full-board { width:min(100%, 816px, calc(100dvh + 12px)); aspect-ratio:1; display:grid; grid-template-columns:repeat(8,minmax(0,1fr)); grid-template-rows:repeat(8,minmax(0,1fr)); border:5px solid var(--board-frame, #282827); overflow:hidden; }
+.piece-full-cell { display:grid; place-items:center; min-width:0; min-height:0; }
+.piece-full-cell.light { background:var(--board-light); }
+.piece-full-cell.dark { background:var(--board-dark); }
+.piece-full-cell img { display:block; width:92%; height:92%; object-fit:contain; user-select:none; }
+@media(max-width:700px) { .piece-full-board { width:min(100%, 500px); } }

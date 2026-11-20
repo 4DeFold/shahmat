@@ -1,4 +1,4 @@
-import {installPieceTheme,setPieceSet,selectedPieceSet,validPieceSet} from './pages/piece-theme.js';
+import {installPieceTheme,setPieceSet,selectedPieceSet,validPieceSet,renderLargePiecePreview} from './pages/piece-theme.js';
 installPieceTheme();
 import './pages/profile-card.css';
 import { createRatingView } from './pages/rating.js';
@@ -909,4 +909,9 @@ async function initialize() {
 }
 export const appReady = initialize();
 
-document.addEventListener('change',event=>{if(event.target.matches?.('input[name=piece-set]')){setPieceSet(event.target.value);recordAppearance();}});
+document.addEventListener('change',event=>{
+  if(!event.target.matches?.('input[name=piece-set]'))return;
+  setPieceSet(event.target.value);recordAppearance();
+  const section=$('piece-full-section'), board=$('piece-full-preview');
+  if(section&&board){const opening=section.hidden;section.hidden=false;renderLargePiecePreview(board,event.target.value);if(opening)section.scrollIntoView?.({behavior:reducedMotion.matches?'auto':'smooth',block:'nearest'});}
+});
