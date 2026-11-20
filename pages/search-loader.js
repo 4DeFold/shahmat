@@ -8,7 +8,7 @@ export function tourPoint(position) {
 
 export function createSearchLoader(element, win) {
   const canvas=element.querySelector('canvas');
-  let ctx=null, frame=null, timeout=null, active=false, destroyed=false, started=null;
+  let ctx=null, trailCanvas=null, trailCtx=null, frame=null, timeout=null, active=false, destroyed=false, started=null;
   const reduced=()=>win.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   function draw(time) {
     if (!ctx) return;
@@ -16,18 +16,40 @@ export function createSearchLoader(element, win) {
     if (!size) return;
     const pixels=Math.max(1,Math.round(size*scale));
     if(canvas.width!==pixels||canvas.height!==pixels){canvas.width=pixels;canvas.height=pixels;}
+    if (!trailCanvas) { trailCanvas=element.ownerDocument.createElement('canvas'); trailCtx=trailCanvas.getContext('2d'); }
+    if (!trailCtx) return;
+    if (trailCanvas.width!==pixels||trailCanvas.height!==pixels) {trailCanvas.width=pixels;trailCanvas.height=pixels;}
     ctx.setTransform(pixels/8,0,0,pixels/8,0,0);ctx.clearRect(0,0,8,8);
     const styles=win.getComputedStyle(element), color=styles.getPropertyValue('--accent').trim()||'#333', contrast=styles.getPropertyValue('--surface').trim()||'#fff';
-    const progress=reduced()?0:(time-started)/1000*3.5;
-    ctx.lineCap='round';ctx.lineJoin='round';
-    for(let dot=0;dot<3;dot++){
-      const head=progress+dot*(64/3), steps=36, trail=3.5;
-      ctx.shadowColor=contrast;ctx.shadowBlur=Math.min(5,pixels*.012);
-      for(let i=steps;i>0;i--){
-        const a=tourPoint(head-trail*i/steps),b=tourPoint(head-trail*(i-1)/steps), alpha=Math.pow(1-i/(steps+1),1.6);
-        ctx.globalAlpha=alpha*.8;ctx.lineWidth=.085;ctx.strokeStyle=color;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
+    const progress=reduced()?0:(time-started)/1000*7.5, trail=3.5;
+    trailCtx.setTransform(pixels/8,0,0,pixels/8,0,0);trailCtx.clearRect(0,0,8,8);
+    trailCtx.lineWidth=.085;trailCtx.lineCap='butt';
+    const opacity=distance=>.8*Math.pow(Math.max(0,1-distance/trail),1.6);
+    for(let dot=0;dot<3;dot++) {
+      const head=progress+dot*(64/3), tail=head-trail;
+      // Each straight knight-tour edge has its own continuous alpha gradient.
+      // Circular joins at the corners keep the path seamless without bead-like overlaps.
+      let start=tail;
+      while(start<head-1e-9) {
+        const end=Math.min(head,Math.floor(start+1e-9)+1), a=tourPoint(start), b=tourPoint(end);
+        const gradient=trailCtx.createLinearGradient(a.x,a.y,b.x,b.y);
+        for(let stop=0;stop<=8;stop++) {
+          const t=stop/8, alpha=opacity(head-(start+(end-start)*t));
+          gradient.addColorStop(t,`rgba(255,255,255,${alpha})`);
+        }
+        trailCtx.strokeStyle=gradient;trailCtx.beginPath();trailCtx.moveTo(a.x,a.y);trailCtx.lineTo(b.x,b.y);trailCtx.stroke();
+        if(end<head-1e-9) {
+          trailCtx.fillStyle=`rgba(255,255,255,${opacity(head-end)})`;
+          trailCtx.beginPath();trailCtx.arc(b.x,b.y,.0425,0,Math.PI*2);trailCtx.fill();
+        }
+        start=end;
       }
-      const p=tourPoint(head);ctx.globalAlpha=.38;ctx.shadowColor=contrast;ctx.shadowBlur=Math.min(6,pixels*.015);ctx.fillStyle=contrast;ctx.beginPath();ctx.arc(p.x,p.y,.13,0,Math.PI*2);ctx.fill();
+    }
+    // Tint the alpha mask once, so the gradient follows the path around corners.
+    trailCtx.globalCompositeOperation='source-in';trailCtx.fillStyle=color;trailCtx.fillRect(0,0,8,8);trailCtx.globalCompositeOperation='source-over';
+    ctx.shadowColor=contrast;ctx.shadowBlur=Math.min(5,pixels*.012);ctx.drawImage(trailCanvas,0,0,8,8);ctx.shadowBlur=0;
+    for(let dot=0;dot<3;dot++) {
+      const p=tourPoint(progress+dot*(64/3));ctx.globalAlpha=.38;ctx.shadowColor=contrast;ctx.shadowBlur=Math.min(6,pixels*.015);ctx.fillStyle=contrast;ctx.beginPath();ctx.arc(p.x,p.y,.13,0,Math.PI*2);ctx.fill();
       ctx.shadowBlur=0;ctx.globalAlpha=1;ctx.fillStyle=color;ctx.beginPath();ctx.arc(p.x,p.y,.095,0,Math.PI*2);ctx.fill();
     }
     ctx.globalAlpha=1;

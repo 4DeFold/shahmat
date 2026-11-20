@@ -20,3 +20,20 @@ test('loader exit is cancellable and reduced motion hides immediately',()=>{
  loader.setVisible(false);assert.equal(el.hidden,false);assert.ok(timer);loader.setVisible(true);assert.equal(timer,null);assert.equal(el.hidden,false);assert.ok(el.classList.contains('is-visible'));
  reduced=true;loader.setVisible(false);assert.equal(el.hidden,true);loader.destroy();
 });
+test('trails use smooth gradients along the tour and particles move faster',()=>{
+ const dom=new JSDOM('<div hidden><canvas></canvas></div>'), el=dom.window.document.querySelector('div'), original=el.querySelector('canvas');
+ const dots=[],gradients=[];
+ const canvasContext=(isMask)=>({
+  setTransform(){},clearRect(){},beginPath(){},moveTo(){},lineTo(){},stroke(){},fill(){},fillRect(){},drawImage(){},
+  arc(x,y,r){if(!isMask&&r===.095)dots.push({x,y});},
+  createLinearGradient(){const stops=[];gradients.push(stops);return {addColorStop(position,color){stops.push([position,color]);}};}
+ });
+ const main=canvasContext(false),mask=canvasContext(true),create=dom.window.document.createElement.bind(dom.window.document);
+ original.getContext=()=>main;Object.defineProperty(original,'clientWidth',{value:320});
+ dom.window.document.createElement=(name)=>{const node=create(name);if(name==='canvas')node.getContext=()=>mask;return node;};
+ let next;const win={matchMedia:()=>({matches:false}),devicePixelRatio:1,getComputedStyle:()=>({getPropertyValue:()=>''}),requestAnimationFrame:fn=>(next=fn,1),cancelAnimationFrame(){},setTimeout(){},clearTimeout(){}};
+ const loader=createSearchLoader(el,win);loader.setVisible(true);next(0);next(1000);
+ assert.deepEqual(dots[0],tourPoint(0));assert.deepEqual(dots[3],tourPoint(7.5));
+ assert.ok(gradients.length>0);assert.ok(gradients.every(stops=>stops.length===9));
+ loader.destroy();
+});

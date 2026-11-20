@@ -1,14 +1,13 @@
-Chess move recordings — CC0 1.0 Universal
+Ceramic chess move sounds — CC0 1.0 Universal
 
-mh2o-alabaster.wav: "chess_move_on_alabaster.wav" by mh2o, recorded with an
-alabaster chess piece and board. https://freesound.org/people/mh2o/sounds/351518/
+The light, medium and heavy sounds are derived from the first ceramic plate
+impact recordings in Kenney's Impact Sounds 1.0 (2019), CC0:
+https://kenney.nl/assets/impact-sounds
 
-elboss-piece-placement.mp3: "Piece Placement.mp3" by el_boss, recorded with a
-chess piece on a wooden board. https://freesound.org/people/el_boss/sounds/546119/
-
-Both original files were obtained from:
+Original files: impactPlate_light_000.ogg, impactPlate_medium_000.ogg and
+impactPlate_heavy_000.ogg, obtained from the CC0 copies at:
 https://github.com/luvkesh/Chess/tree/27e77052378f6a5c3b5af122b297abdf91c4551c/apps/web-prototype/sfx/sources
 
-No audio files have been altered. Playback rate and volume are adjusted in the
-app for different pieces; captures play two recorded sounds in succession.
+Each recording is trimmed to 95–115 ms with a short fade to remove its ringing
+and decay. Playback rates and volume vary by piece; captures use one strike.
 CC0 text: https://creativecommons.org/publicdomain/zero/1.0/legalcode
