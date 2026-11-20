@@ -1,3 +1,5 @@
+import {installLoadingIndicators} from './pages/loading-indicators.js';
+installLoadingIndicators(document);
 import {installPieceTheme,setPieceSet,selectedPieceSet,validPieceSet,renderLargePiecePreview} from './pages/piece-theme.js';
 installPieceTheme();
 import './pages/profile-card.css';
@@ -288,6 +290,7 @@ async function loadView(name) {
     const { default: html } = await pageLoaders[name]();
     if (!dashboardPreloadEnabled || $('dashboard-screen').hidden || $(viewId(name))) return;
     $('page-content').insertAdjacentHTML('beforeend', html);
+    if (name === 'home') void import('./pages/home-particles.js').then(({createHomeParticles}) => { const home=$('dashboard-home'); if(home&&!home.dataset.particlesReady) { home.dataset.particlesReady='true'; createHomeParticles(home); } }).catch(()=>{});
     if (name === 'rating') { ratingView = createRatingView($('page-rating'), supabase, { showSelf:true, onOpenProfile:openOtherProfile }); ratingView.setUnit(rankUnit); }
     if (name === 'settings') { applyPalette(selectedPalette); applyRankUnit(rankUnit); window.dispatchEvent(new Event('shahmat-piece-set')); }
     if (name === 'profile') {
@@ -312,11 +315,18 @@ async function loadView(name) {
   viewLoads.set(name, pending);
   try { await pending; } finally { viewLoads.delete(name); }
 }
+let profileLoadSequence=0;
+function showProfileData(run) {
+  const request=++profileLoadSequence, indicator=$('profile-loading');
+  if(indicator)indicator.hidden=false;
+  Promise.resolve().then(()=>{if(request===profileLoadSequence)return run();}).catch(()=>{}).finally(()=>{if(request===profileLoadSequence && indicator)indicator.hidden=true;});
+}
+function hideProfileData() { profileLoadSequence++; const indicator=$('profile-loading'); if(indicator)indicator.hidden=true; profileView?.hide(); }
 async function openOtherProfile(name) {
   if (!name || !profile) return;
   if(currentPage()!=='profile') profileReturnPage=currentPage();
   await showPage('profile', {updateHistory:true});
-  if (currentPage() === 'profile') void profileView?.showOther(name);
+  if (currentPage() === 'profile') showProfileData(()=>profileView?.showOther(name));
 }
 window.addEventListener('message', event => {
   if (event.origin !== window.location.origin || ![ $('member-game-frame')?.contentWindow, $('watch-frame')?.contentWindow ].includes(event.source)) return;
@@ -333,11 +343,23 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
   if (!pages.has(name)) name = 'home';
   const request = ++pageRequest;
   if (updateHistory && currentPage() !== name) window.history.pushState(null, '', `/${name}`);
+  // Switch the shell immediately, even if the view chunk or iframe is still loading.
+  // Each request owns its placeholder; stale completions cannot replace a newer tab.
+  const targetAlreadyVisible = $(viewId(name)) && !$(viewId(name)).hidden;
+  $('page-load-error')?.remove();
+  if (!targetAlreadyVisible) {
+    document.querySelectorAll('#dashboard-screen [data-view]').forEach(view => { view.hidden = true; });
+    hideProfileData(); ratingView?.hide();
+    for (const [id,type] of [['member-game-frame','game'],['bot-game-frame','bot'],['watch-frame','watch'],['archive-frame','archive']])
+      $(id)?.contentWindow?.postMessage({type:`shahmat-${type}-hidden`},window.location.origin);
+    if (!$('page-loading')) $('page-content').insertAdjacentHTML('beforeend', '<section class="empty-page page-loading" id="page-loading" role="status" aria-live="polite" aria-label="Загрузка"><span class="particle-loading" data-loading="page" hidden aria-hidden="true"><canvas></canvas></span></section>');
+  }
+  document.querySelectorAll('#dashboard-screen [data-page]').forEach(link => {
+    if (link.dataset.page === name) link.setAttribute('aria-current','page'); else link.removeAttribute('aria-current');
+  });
+  closeAccountMenu();
+  document.title = ({ home: 'Главная', game: 'Играть', bot: 'Бот', rating: 'Рейтинг', watch: 'Наблюдать', archive: 'Архив', profile: 'Профиль', settings: 'Настройки', help: 'Помощь' })[name] + ' — shahmat.xyz';
   try {
-    if (!$('page-content').querySelector('[data-view]:not([hidden])')) {
-      $('page-load-error')?.remove();
-      $('page-content').insertAdjacentHTML('beforeend', '<section class="empty-page" id="page-loading" role="status">Загрузка…</section>');
-    }
     await loadView(name);
     if (name === 'game' && frameReady) await frameReady;
     if (name === 'bot' && botFrameReady) await botFrameReady;
@@ -368,8 +390,8 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
         view.classList.remove('page-enter'); void view.offsetWidth; view.classList.add('page-enter');
       }
     });
-    if (name === 'profile' && profileWasHidden) { delete $('page-profile').dataset.profileOther; const requested=new URLSearchParams(window.location.search).get('player'); if(requested) {history.replaceState(null,'',window.location.pathname); void profileView?.showOther(requested);} else { updateProfileAppearance(); void profileView?.show(profile, appearanceUserId); } }
-    else if (name !== 'profile') profileView?.hide();
+    if (name === 'profile' && profileWasHidden) { delete $('page-profile').dataset.profileOther; const requested=new URLSearchParams(window.location.search).get('player'); if(requested) {history.replaceState(null,'',window.location.pathname); showProfileData(()=>profileView?.showOther(requested));} else { updateProfileAppearance(); showProfileData(()=>profileView?.show(profile, appearanceUserId)); } }
+    else if (name !== 'profile') hideProfileData();
     if (name === 'rating') ratingView?.show(); else ratingView?.hide();
     if (name !== 'settings') { clearTimeout(rankInfoTimer); rankInfoPinned = false; showRankInfo(false); }
     document.querySelectorAll('#dashboard-screen [data-page]').forEach(link => {
@@ -415,7 +437,7 @@ $('dashboard-screen').querySelectorAll('[data-page]').forEach(link => link.addEv
   if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
   event.preventDefault();
   setSidebarOpen(false);
-  if(link.dataset.page === 'profile' && $('page-profile')?.dataset.profileOther === 'true' && currentPage()==='profile') { delete $('page-profile').dataset.profileOther; updateProfileAppearance(); void profileView?.show(profile,appearanceUserId); }
+  if(link.dataset.page === 'profile' && $('page-profile')?.dataset.profileOther === 'true' && currentPage()==='profile') { delete $('page-profile').dataset.profileOther; updateProfileAppearance(); showProfileData(()=>profileView?.show(profile,appearanceUserId)); }
   void showPage(link.dataset.page, { updateHistory: true, focus: true });
 }));
 accountToggle.addEventListener('click', () => {

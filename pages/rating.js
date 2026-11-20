@@ -21,6 +21,7 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
   const freshness = 15000;
   let mode = 'overall', sequence = 0, destroyed = false, indicatorFrame = null;
   let motionFrame = null, motionItems = [];
+  const visualScores = new WeakMap();
 
   function positionIndicator() {
     if (!indicator) return;
@@ -49,24 +50,39 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
   function clearMotion() {
     if (motionFrame !== null) win.cancelAnimationFrame(motionFrame);
     motionFrame = null;
-    for (const item of motionItems) { item.el.classList.remove('rating-animating'); delete item.el.dataset.animated; }
+    for (const item of motionItems) { if (item.type === 'score') visualScores.set(item.el, Number(item.value)); item.el.classList.remove('rating-animating'); delete item.el.dataset.animated; }
     motionItems = [];
   }
+  function stopElement(el) {
+    motionItems = motionItems.filter(item => item.el !== el);
+    el.classList.remove('rating-animating'); delete el.dataset.animated;
+  }
   function animateItems(items) {
-    if (!win.requestAnimationFrame || motionPreference?.matches) return;
+    if (!win.requestAnimationFrame || motionPreference?.matches) {
+      for (const item of items) if (item.type === 'score') visualScores.set(item.el, Number(item.value));
+      return;
+    }
     const start = clock(), duration = 800;
     // Read all geometry before writes; animate only the rows on screen, so a
     // large leaderboard doesn't update hundreds of hidden nodes each frame.
     const visible = items.filter(item => {
       if (!item.el || item.value == null) return false;
       const rect = item.el.getBoundingClientRect();
-      return rect.bottom > 0 && rect.top < win.innerHeight && rect.right > 0 && rect.left < win.innerWidth;
+      const onScreen = rect.bottom > 0 && rect.top < win.innerHeight && rect.right > 0 && rect.left < win.innerWidth;
+      if (!onScreen && item.type === 'score') visualScores.set(item.el, Number(item.value));
+      return onScreen;
     });
     for (const item of visible) {
       if (!item.el || item.value == null) continue;
       item.el.classList.add('rating-animating');
-      motionItems.push({ ...item, start, duration });
-      item.el.dataset.animated = item.type === 'score' ? number.format(0) : String(item.value).replace(/[^\s]/gu, 'X');
+      // Interrupt only this element, continuing from the last displayed value.
+      motionItems = motionItems.filter(active => active.el !== item.el);
+      const from = item.type === 'score' ? (visualScores.get(item.el) ?? item.from) : null;
+      if (item.type === 'score' && (!Number.isFinite(from) || from === Number(item.value))) {
+        item.el.classList.remove('rating-animating'); delete item.el.dataset.animated; continue;
+      }
+      motionItems.push({ ...item, from, start, duration });
+      item.el.dataset.animated = item.type === 'score' ? number.format(from) : String(item.value).replace(/[^\s]/gu, 'X');
     }
     if (!motionItems.length || motionFrame !== null) return;
     const tick = timestamp => {
@@ -75,10 +91,16 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
       const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
       motionItems = motionItems.filter(item => {
         if (!item.el.isConnected || timestamp >= item.start + item.duration) {
+          if (item.type === 'score') visualScores.set(item.el, Number(item.value));
           item.el.classList.remove('rating-animating'); delete item.el.dataset.animated; return false;
         }
         const progress = Math.max(0, Math.min(1, (timestamp - item.start) / item.duration));
-        if (item.type === 'score') item.el.dataset.animated = number.format(Number(item.value) * (1 - Math.exp(-5 * progress)) / (1 - Math.exp(-5)));
+        if (item.type === 'score') {
+          // A critically damped spring, matching the Number Ticker's gentle settling.
+          const ease = (1 - (1 + 7 * progress) * Math.exp(-7 * progress)) / (1 - 8 * Math.exp(-7));
+          const value = item.from + (Number(item.value) - item.from) * ease;
+          visualScores.set(item.el, value); item.el.dataset.animated = number.format(value);
+        }
         else {
           const chars = [...String(item.value)], unlocked = progress * chars.length;
           item.el.dataset.animated = chars.map((char, i) => i <= unlocked || /\s/u.test(char) ? char : alphabet[Math.floor(Math.random()*alphabet.length)]).join('');
@@ -89,7 +111,7 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
     };
     motionFrame = win.requestAnimationFrame(tick);
   }
-  function beginMotion() { clearMotion(); }
+  function beginMotion() { /* Keep the current visual value until new data arrives. */ }
   const onMotionPreferenceChange = () => { if (motionPreference?.matches) { clearMotion(); } };
   motionPreference?.addEventListener?.('change', onMotionPreferenceChange);
 
@@ -110,11 +132,18 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
         const avatar=root.ownerDocument.createElement('img'); avatar.className='rating-avatar'; avatar.alt=''; avatar.src='/pieces/cburnett/wN.svg';
         const name=root.ownerDocument.createElement('span'); name.className='rating-player'; name.textContent=nameText; person.append(avatar,name);
         const score=root.ownerDocument.createElement('span'); score.className='rating-score'; row.append(place,person,score); fresh.push(row);
-        if (animate && !previous.size) animated.push({el:name,type:'name',value:nameText},{el:score,type:'score',value:player[unit]});
+        if (animate && !previous.size) animated.push({el:name,type:'name',value:nameText});
       }
       row.classList.toggle('rating-row-self',!!ownName && nameText===ownName);
       row.querySelector('.rating-place').textContent=String(index+1);
-      row.querySelector('.rating-score').textContent=formatScore(player);
+      const score = row.querySelector('.rating-score'), value = player[unit] == null ? null : Number(player[unit]);
+      const from = visualScores.get(score);
+      stopElement(score);
+      score.textContent=formatScore(player);
+      if (Number.isFinite(value)) {
+        if (animate && Number.isFinite(from) && from !== value) animated.push({el:score,type:'score',value,from});
+        else { visualScores.set(score,value); }
+      } else visualScores.delete(score);
       ordered.push(row);
     }
     // Reordering keeps player elements and avatars; restore focus if a moved row held it.
@@ -183,15 +212,22 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
       const { data, error } = await client.rpc('rank_my_position', { p_mode:requestedMode });
       if (destroyed || request !== sequence) return;
       if (error || !Array.isArray(data) || !data[0]) { if (selfMode !== requestedMode) self.hidden = true; return; }
-      const player = data[0]; ownName = player.username; self.dataset.profileName=String(player.username ?? ''); self.querySelector('.rating-person').dataset.profileName=String(player.username ?? ''); ownPlayer = player; selfMode = requestedMode;
+      const player = data[0], selfScore = self.querySelector('.rating-self-score'), previousName = ownName; ownName = player.username; self.dataset.profileName=String(player.username ?? ''); self.querySelector('.rating-person').dataset.profileName=String(player.username ?? ''); ownPlayer = player; selfMode = requestedMode;
       self.querySelector('.rating-self-place').textContent = player.place != null ? String(player.place) : '—';
       self.querySelector('.rating-self-name').textContent = String(player.username ?? '');
-      self.querySelector('.rating-self-score').textContent = formatScore(player);
+      const from = previousName === player.username ? visualScores.get(selfScore) : undefined;
+      const target = player[unit] == null ? null : Number(player[unit]);
+      stopElement(selfScore);
+      selfScore.textContent = formatScore(player);
+      if (Number.isFinite(target)) { if (!Number.isFinite(from)) visualScores.set(selfScore,target); } else visualScores.delete(selfScore);
       self.hidden = false;
       {
         void Promise.all([client.rpc('profile_avatars',{p_names:[ownName]}),client.rpc('profile_avatar_themes',{p_names:[ownName]}),client.rpc('profile_piece_sets',{p_names:[ownName]})]).then(([images,themes,sets])=>{if(destroyed||request!==sequence)return;const image=self.querySelector('.rating-avatar');if(!image)return;image.style.backgroundColor=profileAvatarColor(themes.data?.[0]?.palette);const avatar=images.data?.[0]?.avatar;if(/^data:image\/(?:png|jpeg);base64,/.test(avatar||'')){image.src=avatar;image.classList.add('has-custom-avatar');}else {setPublicPiece(image,sets.data?.[0]?.piece_set);image.classList.remove('has-custom-avatar');}}).catch(()=>{});
       }
-      animateItems([{el:self.querySelector('.rating-self-name'),type:'name',value:player.username ?? ''}, {el:self.querySelector('.rating-self-score'),type:'score',value:player[unit]}]);
+      const effects = [];
+      if (previousName !== player.username) effects.push({el:self.querySelector('.rating-self-name'),type:'name',value:player.username ?? ''});
+      if (Number.isFinite(from) && Number.isFinite(target) && from !== target) effects.push({el:selfScore,type:'score',value:target,from});
+      animateItems(effects);
       for (const row of list.children) row.classList.toggle('rating-row-self', row.querySelector('.rating-player')?.textContent === ownName);
     } catch { if (!destroyed && request === sequence && selfMode !== requestedMode) self.hidden = true; }
   }
@@ -209,15 +245,14 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
     board.setAttribute('aria-busy','true');
     // Keep the previous rows in place while another mode loads instead of
     // collapsing and expanding the board. They are replaced atomically.
-    if (!cached && !displayed) { status.hidden = false; status.textContent = 'Загрузка…'; }
+    if (!cached && !displayed) { status.hidden = false; status.textContent = ''; status.setAttribute('aria-label','Загрузка'); }
     try {
       const data = await fetchMode(requestedMode);
       if (destroyed || request !== sequence) return;
       // A stale cache refresh must not replace identical rows after their
       // entrance animation has started (which causes an obvious flash).
       if (!cached || JSON.stringify(data) !== JSON.stringify(cached.data)) {
-        if (cached) clearMotion();
-        render(data, !cached); displayedMode = requestedMode;
+        render(data, true); displayedMode = requestedMode;
       } else {
         displayed = data; displayedMode = requestedMode;
         status.hidden = data.length > 0;
@@ -226,7 +261,7 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
     } catch {
       if (destroyed || request !== sequence) return;
       status.hidden = false; status.textContent = 'Не удалось загрузить рейтинг'; retry.hidden = false;
-    } finally { if (!destroyed && request === sequence) board.setAttribute('aria-busy','false'); }
+    } finally { if (!destroyed && request === sequence) { board.setAttribute('aria-busy','false'); status.removeAttribute('aria-label'); } }
   }
   function onClick(event) {
     const button = event.target.closest('[data-rating-mode]');
@@ -253,9 +288,13 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
       const next = value === 'elo' ? 'elo' : 'yar';
       if (unit === next) return;
       clearMotion(); unit = next;
+      for (const el of root.querySelectorAll('.rating-score,.rating-self-score')) visualScores.delete(el);
       const label = root.querySelector('.rating-unit'); if (label) label.textContent = unit === 'elo' ? 'ЭЛО' : 'ЯР';
       if (displayed) render(displayed);
-      if (ownPlayer && self && !self.hidden) self.querySelector('.rating-self-score').textContent = formatScore(ownPlayer);
+      if (ownPlayer && self && !self.hidden) {
+        const score=self.querySelector('.rating-self-score'); score.textContent=formatScore(ownPlayer);
+        if (ownPlayer[unit] != null && Number.isFinite(Number(ownPlayer[unit]))) visualScores.set(score,Number(ownPlayer[unit]));
+      }
     },
     show() {
       root.classList.remove('rating-enter'); void root.offsetWidth; root.classList.add('rating-enter');

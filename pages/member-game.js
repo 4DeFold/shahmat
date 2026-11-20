@@ -5,8 +5,9 @@ import {renderCaptures,renderThreats} from './board-insights.js';
 import { premoveTargets, validPremove, normalizePremove, projectPremoves } from './premove.js';
 import { createBoardAnnotations } from './board-annotations.js';
 import { createMemberBoard } from './member-board.js';
-import { createMoveHistory, historyTransition, historyKeyTarget } from './move-history.js';
+import { createMoveHistory, historyTransition, historyKeyTarget, historySoundMove } from './move-history.js';
 import { createGameSound } from './game-sound.js';
+import { createSearchLoader } from './search-loader.js';
 import { createRollingClock } from './rolling-clock.js';
 import { retryMessage } from './match-api.js';
 import { createClockSync } from './clock-sync.js';
@@ -55,6 +56,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     }).catch(() => { if (request === ratingsRequest) { ratingsKey = null; ratingsRetryAt = now() + 8000; } });
   }
   const sound = createGameSound(win);
+  const searchLoader = createSearchLoader($('search-loader'), win);
   const clockSync = createClockSync();
   const isVisible = () => viewVisible && browserVisible;
   const setStatus = (text, urgent = false) => { const el = $('status'); if (el.textContent !== text) el.textContent = text; el.parentElement.classList.toggle('urgent', urgent); };
@@ -65,7 +67,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   const annotations = createBoardAnnotations({ document, board, enabled: () => !!snapshot });
   // Age is provided by the server, then advanced monotonically between snapshots.
   const canResign = () => phase === 'active' && Number.isFinite(snapshot?.game_age_ms) && snapshot.game_age_ms + Math.max(0, now() - receivedAt) >= 60000;
-  const playSound = move => sound.play(chess.isCheck() ? 'check' : move?.captured ? 'capture' : 'move');
+  const playSound = move => sound.play(move);
   function modeControls() {
     const locked = phase !== 'idle';
     $('mode-list').querySelectorAll('input').forEach(input => { input.disabled = locked; });
@@ -79,6 +81,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     for (const id of ['resign-button','resign-confirm','offline-win','offline-draw']) $(id).disabled = actionPending || moving;
     if (phase !== 'active') closeResign();
     start.hidden = phase !== 'idle' || !mode; start.disabled = !userId || !ready || !mode;
+    searchLoader.setVisible(phase === 'searching');
     cancel.hidden = phase !== 'searching' && phase !== 'cancelling'; cancel.disabled = phase === 'cancelling'; reset.hidden = phase !== 'finished';
     $('moves').hidden = phase !== 'active' && phase !== 'finished';
   }
@@ -124,6 +127,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     historyIndex=index>=count?null:Math.max(0,index);
     const target=historyIndex??count, transitions=historyTransition(chess,old,target);
     annotations.clear(); selected=null; renderBoard(null,transitions); renderHistory();
+    const move=historySoundMove(chess,old,target); if(move) sound.play(move);
     if(historyIndex!==null)setStatus(`Просмотр позиции: ход ${historyIndex} из ${count}.`);else statusGame();
   }
   function projected() { return premove.length ? projectPremoves(chess,premove,currentColor()) : chess; }
@@ -149,9 +153,11 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     nameTimer = setInterval(() => { step++; el.textContent = [...text].map((c, i) => c === ' ' || step > 5 + i ? c : letters[Math.floor(Math.random() * letters.length)]).join(''); if (step > text.length + 5) { clearInterval(nameTimer); el.textContent = text; } }, 24);
   }
   const profileTrigger = $('opponent-profile-trigger'), profileCard = $('opponent-profile-card');
-  let profilePinned = false, opponentProfileName = null;
+  let profilePinned = false, opponentProfileName = null, profileLoading = false;
+  const profileLoader=createSearchLoader($('opponent-profile-loading').querySelector('.particle-loading'),win);
+  function syncProfileLoader() { $('opponent-profile-loading').hidden=!profileLoading;profileLoader.setVisible(profileLoading && !profileCard.hidden); }
   function openOpponent(){if(!opponentProfileName)return;if(win.parent!==win)win.parent.postMessage({type:'shahmat-open-profile',username:opponentProfileName},win.location.origin);else win.location.href=`/profile?player=${encodeURIComponent(opponentProfileName)}`;}
-  function showProfile(show) { profileCard.hidden = !show; profileTrigger.setAttribute('aria-expanded', String(show)); }
+  function showProfile(show) { profileCard.hidden = !show; profileTrigger.setAttribute('aria-expanded', String(show)); syncProfileLoader(); }
   profileTrigger.addEventListener('pointerenter', event => { if (event.pointerType !== 'touch' && !profileTrigger.disabled) showProfile(true); });
   $('opponent-profile-trigger').parentElement.addEventListener('pointerleave', () => { if (!profilePinned && document.activeElement !== profileTrigger && !profileCard.contains(document.activeElement)) showProfile(false); });
   profileTrigger.addEventListener('focus', () => { if (!profileTrigger.disabled) showProfile(true); });
@@ -165,7 +171,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   document.addEventListener('pointerdown', event => { if (!profileTrigger.parentElement.contains(event.target)) { profilePinned = false; showProfile(false); } });
   function loadName(game) {
     if (nameForGame === game.id) return;
-    nameForGame = game.id; opponentProfileName=null; profilePinned = false; showProfile(false); profileTrigger.disabled = false;
+    nameForGame = game.id; opponentProfileName=null; profilePinned = false; profileLoading=true; showProfile(false); profileTrigger.disabled = false;
     $('opponent-profile-name').textContent = 'Соперник'; $('opponent-profile-bio').textContent = ''; $('opponent-profile-bio').hidden=true; if($('opponent-profile-bio-label')) $('opponent-profile-bio-label').hidden=true; applyProfileTheme(profileCard,'monochrome','light'); if($('opponent-profile-banner')) $('opponent-profile-banner').hidden=true; if($('opponent-profile-avatar')) { $('opponent-profile-avatar').src='/pieces/cburnett/bN.svg'; $('opponent-profile-avatar').classList.remove('custom'); }
     Promise.resolve(opponentName(game.id)).then(profile => {
       if (nameForGame !== game.id || !profile) return;
@@ -174,7 +180,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
       if (typeof profile === 'object' && 'bio' in profile) { const bio=profile.bio?.trim()||''; $('opponent-profile-bio').textContent=bio; $('opponent-profile-bio').hidden=!bio; if($('opponent-profile-bio-label')) $('opponent-profile-bio-label').hidden=!bio; }
       if(typeof profile === 'object') { applyProfileTheme(profileCard,profile.palette,profile.theme); const avatar=$('opponent-profile-avatar'),banner=$('opponent-profile-banner'); if(avatar){if(isProfileImage(profile.avatar))avatar.src=profile.avatar;else setPublicPiece(avatar,profile.piece_set,'b');avatar.classList.toggle('custom',isProfileImage(profile.avatar));} if(banner){banner.hidden=!isProfileImage(profile.banner);if(!banner.hidden)banner.src=profile.banner;} }
 
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => {if(nameForGame===game.id && !destroyed){profileLoading=false;syncProfileLoader();}});
   }
   function playQueuedPremove() {
     if (!premove.length || phase !== 'active' || moving || reconciling || chess.turn() !== currentColor()) return false;
@@ -512,6 +518,6 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     hide() { clearThreats(); onGameChanged(null); const wasVisible = isVisible(); viewVisible = false; if (wasVisible) pause(); },
     show() { if(snapshot?.status==='active'&&browserVisible)onGameChanged(snapshot.id); const wasVisible = isVisible(); const wasShown = viewVisible; viewVisible = true; if (!wasShown) revealPieces(); if (!wasVisible && isVisible()) resume(); },
     browserVisibility(value) { if(!value)onGameChanged(null);else if(viewVisible&&snapshot?.status==='active')onGameChanged(snapshot.id); const wasVisible = isVisible(); browserVisible = value; if (wasVisible && !isVisible()) pause(); else if (!wasVisible && isVisible()) resume(); },
-    destroy() { destroyed = true; onGameChanged(null); document.removeEventListener('keydown',onThreatDown); document.removeEventListener('keyup',onThreatUp); win.removeEventListener('blur',clearThreats); document.removeEventListener('keydown', onPremoveKey); document.removeEventListener('keydown', onHistoryKey); annotations.destroy(); generation++; cancelDrag(); cancelTimer(); clearInterval(clockInterval); clearInterval(nameTimer); revealAnimations.forEach(animation => animation.cancel()); Object.values(clocks).forEach(clock => clock.destroy()); sound.destroy(); },
+    destroy() { destroyed = true; onGameChanged(null); document.removeEventListener('keydown',onThreatDown); document.removeEventListener('keyup',onThreatUp); win.removeEventListener('blur',clearThreats); document.removeEventListener('keydown', onPremoveKey); document.removeEventListener('keydown', onHistoryKey); annotations.destroy(); generation++; cancelDrag(); cancelTimer(); clearInterval(clockInterval); clearInterval(nameTimer); revealAnimations.forEach(animation => animation.cancel()); Object.values(clocks).forEach(clock => clock.destroy()); searchLoader.destroy(); profileLoader.destroy(); sound.destroy(); },
   };
 }

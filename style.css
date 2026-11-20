@@ -954,7 +954,7 @@ body.startup-ready #landing-screen:not([hidden]) .hero-reveal--tail { animation-
 
 /* Public profile avatars accompany leaderboard names. */
 .rating-person { display:flex; align-items:center; gap:12px; min-width:0; }
-.rating-avatar { flex:0 0 36px; width:36px; height:36px; object-fit:contain; border:1px solid var(--line); border-radius:50%; background:var(--surface-raised); }
+.rating-avatar { flex:0 0 36px; width:min(180px,100%); height:auto; aspect-ratio:1; object-fit:contain; border:1px solid var(--line); border-radius:50%; background:var(--surface-raised); }
 .rating-avatar.has-custom-avatar { object-fit:cover; }
 @media (max-width:700px) { .rating-person { gap:8px; } .rating-avatar { width:30px; height:30px; flex-basis:30px; } }
 
@@ -1013,3 +1013,36 @@ body.startup-ready #landing-screen:not([hidden]) .hero-reveal--tail { animation-
 .piece-full-cell.dark { background:var(--board-dark); }
 .piece-full-cell img { display:block; width:92%; height:92%; object-fit:contain; user-select:none; }
 @media(max-width:700px) { .piece-full-board { width:min(100%, 500px); } }
+
+/* The piece picker and attribution enter with the rest of settings. */
+.support-enter .piece-settings > h3,.support-enter .piece-settings > p,.support-enter .piece-options > label,.support-enter .piece-full-section:not([hidden]) { animation:support-reveal .75s cubic-bezier(.22,1,.36,1) both; }
+.support-enter .piece-settings > h3 { animation-delay:140ms; }
+.support-enter .piece-settings > p:first-of-type { animation-delay:200ms; }
+.support-enter .piece-options > label { animation-delay:260ms; }
+.support-enter .piece-options > label:nth-of-type(5n+2) { animation-delay:300ms; }
+.support-enter .piece-options > label:nth-of-type(5n+3) { animation-delay:340ms; }
+.support-enter .piece-options > label:nth-of-type(5n+4) { animation-delay:380ms; }
+.support-enter .piece-options > label:nth-of-type(5n) { animation-delay:420ms; }
+.support-enter .piece-settings > .piece-credits { animation-delay:460ms; }
+@media(prefers-reduced-motion:reduce) { .support-enter .piece-settings > h3,.support-enter .piece-settings > p,.support-enter .piece-options > label,.support-enter .piece-full-section:not([hidden]) { animation:none; } }
+
+/* Immediate feedback while a lazy view or its iframe is arriving. */
+.page-loading { display:flex; align-items:center; justify-content:center; gap:12px; padding:0; color:var(--foreground); font-size:14px; }
+
+.profile-loading:not([hidden]) { display:flex; align-items:center; gap:8px; margin-top:8px; font-size:13px; }
+/* The same one-particle knight-tour animation used while finding a match. */
+.particle-loading { display:inline-block; flex:none; width:min(180px,100%); height:auto; aspect-ratio:1; vertical-align:middle; opacity:0; transition:opacity .2s ease; }
+.particle-loading[hidden] { display:none; }
+.particle-loading.is-visible { opacity:1; }
+.particle-loading canvas { display:block; width:100%; aspect-ratio:1; }
+.loading-status-row { display:flex; align-items:center; gap:8px; }
+.loading-status-row .particle-loading:not([hidden]) { margin-left:12px; }
+.loading-status-row .rating-status { flex:1; }
+@media(prefers-reduced-motion:reduce) { .particle-loading { transition:none; } }
+
+.rating-board[aria-busy="true"] .rating-status:empty { display:none; }
+.profile-loading:not([hidden]) { justify-content:center; }
+
+#dashboard-home { position:relative; overflow:hidden; }
+.home-particles-canvas { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+#dashboard-home h2 { position:relative; z-index:1; }

@@ -1,0 +1,14 @@
+Chess sounds: CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/)
+
+move.mp3: excerpt of "chess pieces.wav" by simone_ds,
+https://freesound.org/people/simone_ds/sounds/366065/
+Processed by LeelaChessZero/lczero-live contributors:
+https://github.com/LeelaChessZero/lczero-live/blob/c1a5e4aec34fddab1fe67693430a01fb0babb2ec/static/static/chess_move.mp3
+https://github.com/LeelaChessZero/lczero-live/pull/1
+
+capture.wav: second impact (2.568–2.850s) of the same recording, cropped,
+converted to mono, amplified and faded by mglass222/3dchess contributors:
+https://github.com/mglass222/3dchess/blob/ad2ba8ef183cd6de85dc9342532f68dea2d95acc/public/audio/README.md
+
+These are not Lichess recordings. The standard Lichess sound set is listed
+among the non-free exceptions in https://github.com/lichess-org/lila/blob/master/COPYING.md

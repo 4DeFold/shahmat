@@ -9,6 +9,11 @@ export function historyKeyTarget(key, code, index, length) {
   if (physical === 'arrowright' || physical === 'd') return Math.min(length, index + 1);
   return null;
 }
+// One representative move for either direction (or a jump), never for a redraw.
+export function historySoundMove(chess, fromPly, toPly) {
+  if (fromPly===toPly) return null;
+  return chess.history({verbose:true})[Math.max(fromPly,toPly)-1] || null;
+}
 // Follow stable piece identities through the score, including en passant,
 // castling and promotion, so jumps of any distance can be animated in reverse.
 export function historyTransition(chess, fromPly, toPly) {

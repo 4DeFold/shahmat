@@ -31,6 +31,7 @@ try {
  // Stockfish is replaced with a deterministic delayed worker, preserving the UI's real protocol.
  const page=await browser.newPage({viewport:{width:1200,height:850},reducedMotion:'reduce'});
  await page.addInitScript(value=>{
+  Math.random=()=>.1;
    localStorage.setItem('sb-eswyxbyddkajysogtglp-auth-token',JSON.stringify(value));
    window.Worker=class { postMessage(msg){ if(msg==='uci')setTimeout(()=>this.onmessage?.({data:'uciok'}),0);if(msg==='isready')setTimeout(()=>this.onmessage?.({data:'readyok'}),0);if(msg.startsWith('go '))setTimeout(()=>this.onmessage?.({data:'bestmove d7d5'}),1800); } terminate(){} };
  },session);

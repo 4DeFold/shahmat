@@ -86,12 +86,32 @@ try {
   await slow.locator('#auth-submit').click(); await slow.locator('#dashboard-home').waitFor({ state: 'visible' });
   await gameRequest;
   await slow.locator('[data-page=game]').first().click();
-  assert.equal(await slow.locator('#dashboard-home').isVisible(), true);
+  assert.equal(await slow.locator('#dashboard-home').isHidden(), true);
+  assert.equal(await slow.locator('#page-loading').isVisible(), true);
+  await slow.locator('#page-loading .particle-loading.is-visible canvas').waitFor({state:'visible'});
+  const still=await slow.locator('#page-loading canvas').evaluate(c=>c.toDataURL());await slow.waitForTimeout(100);
+  assert.equal(await slow.locator('#page-loading canvas').evaluate(c=>c.toDataURL()),still,'reduced motion renders a static particle');
+  assert.equal(await slow.locator('[data-page=game]').first().getAttribute('aria-current'), 'page');
   assert.equal(await slow.locator('#page-game').isHidden(), true);
+  await slow.locator('#nav-rating').click();
+  await slow.locator('#page-rating:not([hidden])').waitFor();
   releaseGame();
+  await slow.waitForTimeout(500);
+  assert.equal(await slow.locator('#page-rating').isVisible(),true,'a stale load must not replace the new tab');
+  await slow.locator('[data-page=game]').first().click();
   await slow.locator('#page-game').waitFor({ state: 'visible' });
   assert.equal(await slow.frameLocator('#member-game-frame').locator('#board .square').count(), 64);
   assert.equal(await slow.frameLocator('#member-game-frame').locator('#board img').evaluateAll(images => images.every(img => img.complete && img.naturalWidth > 0)), true);
+  for (const [name, documentPath] of [['bot','bot-game.html'],['watch','watch.html'],['archive','archive.html']]) {
+    await slow.locator('#nav-rating').click();
+    let release, requested; const waiting=new Promise(resolve=>requested=resolve), gate=new Promise(resolve=>release=resolve);
+    await slow.route(`**/pages/${documentPath}`, async route=>{requested();await gate;await route.continue();});
+    await slow.locator(`[data-page=${name}]`).first().click(); await waiting;
+    assert.equal(await slow.locator('#page-rating').isHidden(),true);
+    assert.equal(await slow.locator('#page-loading').isVisible(),true,`${name} immediately shows loading`);
+    assert.equal(await slow.locator(`[data-page=${name}]`).first().getAttribute('aria-current'),'page');
+    release(); await slow.locator(`#page-${name}:not([hidden])`).waitFor();
+  }
   await slowContext.close();
   const guest = await browser.newPage({ reducedMotion: 'reduce' });
   await mock(guest);

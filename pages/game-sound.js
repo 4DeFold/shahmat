@@ -1,40 +1,22 @@
-// Original, synthesized wooden taps. No third-party sound recordings are used.
+// CC0 chess-piece recordings; sources and processing are documented in NOTICE.txt.
+const sources={move:'/sounds/chess/move.mp3',capture:'/sounds/chess/capture.wav'};
 export function createGameSound(win) {
-  let context = null, noise = null;
+  const cache={},playing=new Set();let destroyed=false;
   function prime() {
-    try {
-      const AudioContext = win.AudioContext || win.webkitAudioContext;
-      if (!AudioContext) return;
-      context ||= new AudioContext();
-      if (context.state === 'suspended') void context.resume().catch(() => {});
-    } catch { /* Audio is optional. */ }
+    if(destroyed||typeof win.Audio!=='function')return;
+    for(const [name,src] of Object.entries(sources))if(!cache[name]) {
+      try {const audio=new win.Audio(src);audio.preload='auto';cache[name]=audio;audio.load();} catch {/* Audio is optional. */}
+    }
   }
-  function play(kind = 'move') {
+  function play(move={}) {
+    if(destroyed)return;prime();
+    const base=cache[move?.captured?'capture':'move'];
+    if(!base)return;
     try {
-      prime(); if (!context || context.state !== 'running') return;
-      const t = context.currentTime;
-      if (!noise) {
-        noise = context.createBuffer(1, Math.ceil(context.sampleRate * .055), context.sampleRate);
-        const samples = noise.getChannelData(0);
-        for (let i = 0; i < samples.length; i++) samples[i] = Math.random() * 2 - 1;
-      }
-      const tap = (offset, freq, volume) => {
-        const oscillator = context.createOscillator(), tone = context.createGain();
-        oscillator.type = 'sine'; oscillator.frequency.setValueAtTime(freq, t + offset);
-        oscillator.frequency.exponentialRampToValueAtTime(freq * .55, t + offset + .06);
-        tone.gain.setValueAtTime(.0001, t + offset); tone.gain.exponentialRampToValueAtTime(volume, t + offset + .003);
-        tone.gain.exponentialRampToValueAtTime(.0001, t + offset + .095);
-        oscillator.connect(tone); tone.connect(context.destination); oscillator.start(t + offset); oscillator.stop(t + offset + .1);
-        const source = context.createBufferSource(), filter = context.createBiquadFilter(), envelope = context.createGain();
-        source.buffer = noise; filter.type = 'lowpass'; filter.frequency.value = kind === 'capture' ? 1700 : 1200;
-        envelope.gain.setValueAtTime(.0001, t + offset); envelope.gain.exponentialRampToValueAtTime(volume * .55, t + offset + .002);
-        envelope.gain.exponentialRampToValueAtTime(.0001, t + offset + .045);
-        source.connect(filter); filter.connect(envelope); envelope.connect(context.destination); source.start(t + offset); source.stop(t + offset + .05);
-      };
-      tap(0, kind === 'capture' ? 260 : 340, .09);
-      if (kind === 'capture') tap(.035, 185, .055);
-      if (kind === 'check') tap(.045, 460, .045);
-    } catch { /* Audio support differs across browsers. */ }
+      const audio=base.cloneNode(true);audio.volume=move?.captured ? .75 : .65;
+      playing.add(audio);audio.addEventListener('ended',()=>playing.delete(audio),{once:true});
+      const promise=audio.play();if(promise?.catch)promise.catch(()=>playing.delete(audio));
+    } catch {/* Browser autoplay policy or audio support. */}
   }
-  return { prime, play, destroy: () => { if (context) void context.close(); } };
+  return {prime,play,destroy(){destroyed=true;for(const audio of playing)audio.pause();playing.clear();for(const audio of Object.values(cache))audio.pause();}};
 }

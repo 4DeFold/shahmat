@@ -1,0 +1,15 @@
+Sound provenance note
+
+The standard Lichess sound files were not copied or sampled. The Lichess
+COPYING.md (https://github.com/lichess-org/lila/blob/master/COPYING.md) places
+"the other sounds in public/sound" under non-free / uncertain exceptions,
+while some named sound sets are separately listed under their own licenses.
+This project uses recordings released under CC0, listed in
+public/sounds/chess/NOTICE.txt; no Lichess recordings are included.
+
+Number Ticker is inspired by Magic UI (MIT), with a native JavaScript spring
+adaptation. See /licenses/magicui.txt for the license.
+
+The replacement move and capture files are independently processed excerpts
+of simone_ds's CC0 "chess pieces.wav"; see NOTICE.txt for source URLs and
+processing details. They are an approximation, not the Lichess originals.

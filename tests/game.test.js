@@ -6,6 +6,7 @@ import { Chess } from 'chess.js';
 import { chooseBotMove } from '../pages/bot.js';
 import { premoveTargets, validPremove, normalizePremove, projectPremoves } from '../pages/premove.js';
 import { createBoardAnnotations } from '../pages/board-annotations.js';
+import { createGameSound } from '../pages/game-sound.js';
 
 const html = await readFile('pages/play.html', 'utf8');
 const source = (await readFile('pages/play.js', 'utf8')).replace(/^import .*;\n/gm, '') + '\nwindow.testGame = game; window.testRender = render;';
@@ -20,10 +21,11 @@ function setup({ saved = null, storageError = false, memberId = null, now = null
   if (storageError) Object.defineProperty(dom.window, 'localStorage', { get() { throw new Error('storage blocked'); } });
   if (now !== null) dom.window.Date.now = () => now.value;
   dom.window.Math.random = () => random;
+  dom.window.Audio = class { load() {} pause() {} addEventListener() {} cloneNode() { return new this.constructor(); } play() { return Promise.resolve(); } };
   dom.window.themedPieceSrc = (color,type) => `/pieces/cburnett/${color}${type.toUpperCase()}.svg`;
   dom.window.Chess = Chess;
   dom.window.chooseBotMove = botMove;
-  Object.assign(dom.window,{premoveTargets,validPremove,normalizePremove,projectPremoves,createBoardAnnotations});
+  Object.assign(dom.window,{premoveTargets,validPremove,normalizePremove,projectPremoves,createBoardAnnotations,createGameSound});
   dom.window.eval(source);
   const { document } = dom.window;
   const click = square => document.querySelector(`[data-square="${square}"]`).click();

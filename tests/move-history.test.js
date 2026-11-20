@@ -19,3 +19,8 @@ test('history shortcuts jump to start/end and preserve single-step navigation', 
   assert.equal(historyKeyTarget('x','KeyX',4,9),null);
   assert.equal(historyKeyTarget('w','KeyW',0,0),0);
 });
+
+test('history sounds track the crossed move in either direction and ignore unchanged positions',async()=>{
+ const {historySoundMove}=await import('../pages/move-history.js');const c=new Chess();['e4','d5','exd5','Qxd5'].forEach(m=>c.move(m));
+ assert.equal(historySoundMove(c,0,0),null);assert.equal(historySoundMove(c,3,4).piece,'q');assert.equal(historySoundMove(c,4,3).piece,'q');assert.equal(historySoundMove(c,0,3).captured,'p');assert.equal(historySoundMove(c,3,0).captured,'p');
+});

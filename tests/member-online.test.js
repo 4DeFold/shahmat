@@ -37,6 +37,7 @@ test('board opens at starting position, modes are explicit and a real request st
   assert.equal(app.$('board').querySelector('[data-square=e2] img').getAttribute('src'), '/pieces/cburnett/wP.svg');
   assert.deepEqual([...app.$('mode-list').querySelectorAll('input')].map(input => input.value), ['blitz','rapid','classical']);
   assert.equal(app.$('start-search').disabled, true); assert.equal(app.$('start-search').hidden, true);
+  assert.equal(app.$('search-loader').hidden, true);
   await app.ui.open(A);
   assert.equal(app.$('player-color'), null);
   const rapid = app.$('mode-list').querySelector('[value=rapid]'); rapid.checked = true; rapid.dispatchEvent(new app.dom.window.Event('change', { bubbles:true }));
@@ -44,8 +45,10 @@ test('board opens at starting position, modes are explicit and a real request st
   app.$('start-search').click(); await flush();
   assert.deepEqual(calls.at(-1), { action:'search', mode:'rapid' });
   assert.match(app.$('status').textContent, /Ищем/);
+  assert.equal(app.$('search-loader').hidden, false);
   app.$('cancel-search').click(); await flush();
   assert.equal(calls.at(-1).action, 'cancel'); assert.match(app.$('status').textContent, /отменен|отменён|отменена/);
+  await new Promise(resolve=>setTimeout(resolve,350));assert.equal(app.$('search-loader').hidden, true);
   app.close();
 });
 
@@ -593,4 +596,12 @@ test('captures and held physical attack keys follow the displayed history, inclu
  key('keyup','KeyQ');assert.equal(app.$('board').querySelectorAll('.threat-enemy').length,0);
  app.$('history-first').click();assert.equal(app.$('player-captured').querySelectorAll('img').length,0);assert.equal(app.$('opponent-captured').querySelectorAll('img').length,0);
  assert.equal(app.$('board').querySelector('[data-square=a4]').classList.contains('threat-own'),false);key('keyup','KeyE');assert.equal(app.$('board').querySelectorAll('.threat-own').length,0);
+});
+
+test('newly matched and restored games start silently',async t=>{
+ const app=setup(async body=>body.action==='current'?{game:null}: {game:game()});t.after(()=>app.close());const plays=[];
+ app.dom.window.Audio=class {constructor(src){this.src=src;}load(){}pause(){}addEventListener(){}cloneNode(){return new this.constructor(this.src);}play(){plays.push({src:this.src,volume:this.volume});return Promise.resolve();}};
+ await app.ui.open(A);const blitz=app.$('mode-list').querySelector('[value=blitz]');blitz.checked=true;blitz.dispatchEvent(new app.dom.window.Event('change',{bubbles:true}));app.$('start-search').click();await flush();
+ assert.equal(plays.length,0,'matching is silent');
+ const restored=setup(async()=>({game:game()}));t.after(()=>restored.close());restored.dom.window.Audio=app.dom.window.Audio;await restored.ui.open(A);await flush();assert.equal(plays.length,0,'restoring a game is silent');
 });
