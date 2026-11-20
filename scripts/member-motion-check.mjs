@@ -39,7 +39,7 @@ try {
   await page.locator('[data-square=e2]').click(); await page.locator('[data-square=e4]').click();
   assert.equal(await page.evaluate(() => document.querySelector('[data-square=e4] img') === window.pawn),true, 'move is immediate and reuses the piece');
   assert.equal(await page.evaluate(() => window.pieceAnimations),1);
-  assert.equal(await page.evaluate(() => window.soundTaps), 2, 'piece selection and the move both sound despite an old mute preference');
+  assert.equal(await page.evaluate(() => window.soundTaps), 1, 'only the move sounds despite an old mute preference');
   await page.locator('[data-square=g1]').click(); await page.locator('[data-square=f3]').click();
   assert.equal(await page.locator('[data-square=f3]').evaluate(el => el.classList.contains('premove')),true);
   release(); await page.locator('#status').filter({hasText:'Ход соперника'}).waitFor();

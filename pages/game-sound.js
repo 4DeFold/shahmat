@@ -1,10 +1,5 @@
-// Short, damped CC0 recordings of ceramic impacts (see sounds/chess/NOTICE.txt).
-const profiles={
-  p:{file:'light',rate:1.04,volume:.57}, n:{file:'medium',rate:1.07,volume:.58},
-  b:{file:'medium',rate:1,volume:.59}, r:{file:'heavy',rate:1.08,volume:.58},
-  q:{file:'heavy',rate:.96,volume:.61}, k:{file:'heavy',rate:.92,volume:.62},
-};
-const sources={light:'/sounds/chess/ceramic-light.wav',medium:'/sounds/chess/ceramic-medium.wav',heavy:'/sounds/chess/ceramic-heavy.wav'};
+// CC0 chess-piece recordings; sources and processing are documented in NOTICE.txt.
+const sources={move:'/sounds/chess/move.mp3',capture:'/sounds/chess/capture.wav'};
 export function createGameSound(win) {
   const cache={},playing=new Set();let destroyed=false;
   function prime() {
@@ -13,20 +8,15 @@ export function createGameSound(win) {
       try {const audio=new win.Audio(src);audio.preload='auto';cache[name]=audio;audio.load();} catch {/* Audio is optional. */}
     }
   }
-  function strike(profile, boost=1) {
+  function play(move={}) {
     if(destroyed)return;prime();
-    const base=cache[profile.file];
+    const base=cache[move?.captured?'capture':'move'];
     if(!base)return;
     try {
-      const audio=base.cloneNode(true);audio.preservesPitch=false;audio.playbackRate=profile.rate;
-      // A single, slightly stronger impact keeps captures distinct without an echo.
-      audio.volume=Math.min(1,profile.volume*boost);
+      const audio=base.cloneNode(true);audio.volume=move?.captured ? .75 : .65;
       playing.add(audio);audio.addEventListener('ended',()=>playing.delete(audio),{once:true});
       const promise=audio.play();if(promise?.catch)promise.catch(()=>playing.delete(audio));
     } catch {/* Browser autoplay policy or audio support. */}
   }
-  function play(move={}) { strike(profiles[move?.piece]||profiles.p,move?.captured?1.16:1); }
-  const effects={click:{file:'light',rate:1.2,volume:.12}, select:{file:'medium',rate:1.2,volume:.15}, start:{file:'heavy',rate:1.1,volume:.22}};
-  function effect(name) { if(effects[name])strike(effects[name]); }
-  return {prime,play,effect,destroy(){destroyed=true;for(const audio of playing)audio.pause();playing.clear();for(const audio of Object.values(cache))audio.pause();}};
+  return {prime,play,destroy(){destroyed=true;for(const audio of playing)audio.pause();playing.clear();for(const audio of Object.values(cache))audio.pause();}};
 }

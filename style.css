@@ -1028,11 +1028,14 @@ body.startup-ready #landing-screen:not([hidden]) .hero-reveal--tail { animation-
 
 /* Immediate feedback while a lazy view or its iframe is arriving. */
 .page-loading { display:flex; align-items:center; justify-content:center; gap:12px; padding:0; color:var(--foreground); font-size:14px; }
-.page-loading-spinner { width:20px; height:20px; border:2px solid color-mix(in srgb,var(--foreground) 18%,transparent); border-top-color:var(--foreground); border-radius:50%; animation:page-loading-spin .7s linear infinite; }
-@keyframes page-loading-spin { to { transform:rotate(360deg); } }
-@media(prefers-reduced-motion:reduce) { .page-loading-spinner { animation:none; } }
 
 .profile-loading:not([hidden]) { display:flex; align-items:center; gap:8px; margin-top:8px; font-size:13px; }
-.profile-loading .page-loading-spinner { flex:none; width:16px; height:16px; }
-.rating-board[aria-busy="true"] .rating-status:not([hidden])::before { content:""; display:inline-block; width:14px; height:14px; margin-right:8px; vertical-align:middle; border:2px solid color-mix(in srgb,var(--foreground) 18%,transparent); border-top-color:var(--foreground); border-radius:50%; animation:page-loading-spin .7s linear infinite; }
-@media(prefers-reduced-motion:reduce) { .rating-board[aria-busy="true"] .rating-status::before { animation:none; } }
+/* The same one-particle knight-tour animation used while finding a match. */
+.particle-loading { display:inline-block; flex:none; width:36px; height:36px; vertical-align:middle; opacity:0; transition:opacity .2s ease; }
+.particle-loading[hidden] { display:none; }
+.particle-loading.is-visible { opacity:1; }
+.particle-loading canvas { display:block; width:100%; aspect-ratio:1; }
+.loading-status-row { display:flex; align-items:center; gap:8px; }
+.loading-status-row .particle-loading:not([hidden]) { margin-left:12px; }
+.loading-status-row .rating-status { flex:1; }
+@media(prefers-reduced-motion:reduce) { .particle-loading { transition:none; } }

@@ -88,6 +88,9 @@ try {
   await slow.locator('[data-page=game]').first().click();
   assert.equal(await slow.locator('#dashboard-home').isHidden(), true);
   assert.equal(await slow.locator('#page-loading').isVisible(), true);
+  await slow.locator('#page-loading .particle-loading.is-visible canvas').waitFor({state:'visible'});
+  const still=await slow.locator('#page-loading canvas').evaluate(c=>c.toDataURL());await slow.waitForTimeout(100);
+  assert.equal(await slow.locator('#page-loading canvas').evaluate(c=>c.toDataURL()),still,'reduced motion renders a static particle');
   assert.equal(await slow.locator('[data-page=game]').first().getAttribute('aria-current'), 'page');
   assert.equal(await slow.locator('#page-game').isHidden(), true);
   await slow.locator('#nav-rating').click();

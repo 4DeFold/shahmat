@@ -1,13 +1,14 @@
-Ceramic chess move sounds — CC0 1.0 Universal
+Chess sounds: CC0 1.0 (https://creativecommons.org/publicdomain/zero/1.0/)
 
-The light, medium and heavy sounds are derived from the first ceramic plate
-impact recordings in Kenney's Impact Sounds 1.0 (2019), CC0:
-https://kenney.nl/assets/impact-sounds
+move.mp3: excerpt of "chess pieces.wav" by simone_ds,
+https://freesound.org/people/simone_ds/sounds/366065/
+Processed by LeelaChessZero/lczero-live contributors:
+https://github.com/LeelaChessZero/lczero-live/blob/c1a5e4aec34fddab1fe67693430a01fb0babb2ec/static/static/chess_move.mp3
+https://github.com/LeelaChessZero/lczero-live/pull/1
 
-Original files: impactPlate_light_000.ogg, impactPlate_medium_000.ogg and
-impactPlate_heavy_000.ogg, obtained from the CC0 copies at:
-https://github.com/luvkesh/Chess/tree/27e77052378f6a5c3b5af122b297abdf91c4551c/apps/web-prototype/sfx/sources
+capture.wav: second impact (2.568–2.850s) of the same recording, cropped,
+converted to mono, amplified and faded by mglass222/3dchess contributors:
+https://github.com/mglass222/3dchess/blob/ad2ba8ef183cd6de85dc9342532f68dea2d95acc/public/audio/README.md
 
-Each recording is trimmed to 95–115 ms with a short fade to remove its ringing
-and decay. Playback rates and volume vary by piece; captures use one strike.
-CC0 text: https://creativecommons.org/publicdomain/zero/1.0/legalcode
+These are not Lichess recordings. The standard Lichess sound set is listed
+among the non-free exceptions in https://github.com/lichess-org/lila/blob/master/COPYING.md

@@ -1,3 +1,5 @@
+import {installLoadingIndicators} from './pages/loading-indicators.js';
+installLoadingIndicators(document);
 import {installPieceTheme,setPieceSet,selectedPieceSet,validPieceSet,renderLargePiecePreview} from './pages/piece-theme.js';
 installPieceTheme();
 import './pages/profile-card.css';
@@ -349,7 +351,7 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
     hideProfileData(); ratingView?.hide();
     for (const [id,type] of [['member-game-frame','game'],['bot-game-frame','bot'],['watch-frame','watch'],['archive-frame','archive']])
       $(id)?.contentWindow?.postMessage({type:`shahmat-${type}-hidden`},window.location.origin);
-    if (!$('page-loading')) $('page-content').insertAdjacentHTML('beforeend', '<section class="empty-page page-loading" id="page-loading" role="status" aria-live="polite"><span class="page-loading-spinner" aria-hidden="true"></span><span>Загрузка…</span></section>');
+    if (!$('page-loading')) $('page-content').insertAdjacentHTML('beforeend', '<section class="empty-page page-loading" id="page-loading" role="status" aria-live="polite"><span class="particle-loading" data-loading="page" hidden aria-hidden="true"><canvas></canvas></span><span>Загрузка…</span></section>');
   }
   document.querySelectorAll('#dashboard-screen [data-page]').forEach(link => {
     if (link.dataset.page === name) link.setAttribute('aria-current','page'); else link.removeAttribute('aria-current');

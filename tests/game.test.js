@@ -7,7 +7,6 @@ import { chooseBotMove } from '../pages/bot.js';
 import { premoveTargets, validPremove, normalizePremove, projectPremoves } from '../pages/premove.js';
 import { createBoardAnnotations } from '../pages/board-annotations.js';
 import { createGameSound } from '../pages/game-sound.js';
-import { installInteractionSounds } from '../pages/interaction-sounds.js';
 
 const html = await readFile('pages/play.html', 'utf8');
 const source = (await readFile('pages/play.js', 'utf8')).replace(/^import .*;\n/gm, '') + '\nwindow.testGame = game; window.testRender = render;';
@@ -26,7 +25,7 @@ function setup({ saved = null, storageError = false, memberId = null, now = null
   dom.window.themedPieceSrc = (color,type) => `/pieces/cburnett/${color}${type.toUpperCase()}.svg`;
   dom.window.Chess = Chess;
   dom.window.chooseBotMove = botMove;
-  Object.assign(dom.window,{premoveTargets,validPremove,normalizePremove,projectPremoves,createBoardAnnotations,createGameSound,installInteractionSounds});
+  Object.assign(dom.window,{premoveTargets,validPremove,normalizePremove,projectPremoves,createBoardAnnotations,createGameSound});
   dom.window.eval(source);
   const { document } = dom.window;
   const click = square => document.querySelector(`[data-square="${square}"]`).click();

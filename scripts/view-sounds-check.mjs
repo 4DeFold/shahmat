@@ -14,19 +14,21 @@ try{
  if(p==='/auth/v1/user')return route.fulfill({json:user});if(p==='/rest/v1/profiles')return route.fulfill({json:{username:'Alice'}});
  if(p.endsWith('/my_archive_all')){await archiveGate;return route.fulfill({json:[{...row(),my_color:'w',result:'white_win'}]});}if(p.endsWith('/my_archive_ratings'))return route.fulfill({json:[]});
  if(p.endsWith('/spectator_modes')){await watchGate;return route.fulfill({json:[{mode:'blitz',game_count:1}]});}if(p.endsWith('/spectator_games_sorted'))return route.fulfill({json:[row()]});if(p.endsWith('/spectator_game'))return route.fulfill({json:row()});return route.fulfill({json:[]});});
- await page.goto(base+'/pages/archive.html');await page.locator('#archive-status.is-loading').waitFor();releaseArchive();await page.locator('.archive-card').first().click();await page.locator('#history-prev').waitFor();
+ await page.goto(base+'/pages/archive.html');await page.locator('#archive-status.is-loading').waitFor();await page.locator('[data-loading=status].is-visible canvas').waitFor({state:'visible'});assert.equal(await page.evaluate(()=>window.sounds.length),0,'initial archive loading is silent');releaseArchive();await page.locator('.archive-card').first().click();await page.locator('#history-prev').waitFor();
  await page.evaluate(()=>window.sounds=[]);await page.locator('#history-prev').click();assert.equal(await page.evaluate(()=>window.sounds.length),1);assert.ok(await page.evaluate(()=>window.sounds[0].volume>.5));
  await page.locator('#history-next').click();assert.equal(await page.evaluate(()=>window.sounds.length),2);
  await page.locator('#history-last').evaluate(el=>el.click());assert.equal(await page.evaluate(()=>window.sounds.length),2,'no sound for unchanged position');
- await page.goto(base+'/pages/watch.html');await page.locator('#watch-status.is-loading').waitFor();releaseWatch();await page.locator('[data-game-id=watch1]').click();await page.locator('#history-prev').waitFor({state:'visible'});await page.waitForTimeout(500);
+ await page.goto(base+'/pages/watch.html');await page.locator('#watch-status.is-loading').waitFor();await page.locator('[data-loading=status].is-visible canvas').waitFor({state:'visible'});assert.equal(await page.evaluate(()=>window.sounds.length),0,'initial spectator loading is silent');releaseWatch();await page.locator('[data-game-id=watch1]').click();await page.locator('#history-prev').waitFor({state:'visible'});await page.waitForTimeout(500);
  await page.evaluate(()=>window.sounds=[]);await page.locator('#history-prev').click();assert.equal(await page.evaluate(()=>window.sounds.length),1);await page.locator('#history-next').click();assert.equal(await page.evaluate(()=>window.sounds.length),2);
  await page.evaluate(()=>window.sounds=[]);moves.push('Qxd5');await page.locator('[data-history-index=\"4\"]').waitFor({timeout:6000});
- assert.equal(await page.evaluate(()=>window.sounds.length),1,'a live move plays once');assert.match(await page.evaluate(()=>window.sounds[0].src),/ceramic-heavy/);
+ assert.equal(await page.evaluate(()=>window.sounds.length),1,'a live move plays once');assert.match(await page.evaluate(()=>window.sounds[0].src),/capture\.wav/);
  await page.waitForTimeout(1300);assert.equal(await page.evaluate(()=>window.sounds.length),1,'polls do not repeat the sound');
  await page.locator('#history-prev').click();await page.evaluate(()=>window.sounds=[]);moves.push('Nc3');await page.waitForTimeout(1600);assert.equal(await page.evaluate(()=>window.sounds.length),0,'live moves do not sound while examining history');
+ for(const src of ['/sounds/chess/move.mp3','/sounds/chess/capture.wav']) assert.ok(await page.evaluate(async src=>{const ctx=new AudioContext();try{return (await ctx.decodeAudioData(await (await fetch(src)).arrayBuffer())).duration>0;}finally{await ctx.close();}},src),'audio decodes in Chromium');
  await page.goto(base+'/pages/bot-game.html');await page.locator('#bot-play:not([disabled])').waitFor({timeout:10000});
  await page.evaluate(()=>window.sounds=[]);await page.locator('#bot-play').click();await page.locator('#bot-app[data-phase=playing]').waitFor();
- const startSounds=await page.evaluate(()=>window.sounds);assert.equal(startSounds.length,2);assert.ok(startSounds.every(x=>x.volume<=.22));assert.match(startSounds[1].src,/ceramic-heavy/);
- await page.evaluate(()=>window.sounds=[]);await page.locator('[data-square=e2]').click();assert.ok(await page.evaluate(()=>window.sounds[0].volume<=.15));
- assert.deepEqual(errors,[]);console.log('✓ Quiet bot start and selection; archive and spectator history, live moves, no duplicate polling or hidden-history sounds');
+ assert.equal(await page.evaluate(()=>window.sounds.length),0,'starting a game is silent');
+ await page.locator('[data-square=e2]').click();assert.equal(await page.evaluate(()=>window.sounds.length),0,'piece selection is silent');
+ await page.locator('[data-square=e4]').click();assert.equal(await page.evaluate(()=>window.sounds.length),1,'a played move sounds');
+ assert.deepEqual(errors,[]);console.log('✓ Silent bot start and selection; archive and spectator history, live moves, no duplicate polling or hidden-history sounds');
 }finally{await browser.close();}

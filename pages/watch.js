@@ -1,6 +1,6 @@
+import {installLoadingIndicators} from './loading-indicators.js';
+installLoadingIndicators(document, {embeddedFrame:true});
 import {createGameSound} from './game-sound.js';
-import { installInteractionSounds } from './interaction-sounds.js';
-installInteractionSounds(document);
 import {pieceSrc as themedPieceSrc} from './piece-theme.js';
 import {Chess} from 'chess.js';
 import {startFibers} from './watch-fibers.js';

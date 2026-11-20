@@ -279,6 +279,9 @@ html, body { width: 100%; height: 100%; overflow: hidden; }
 .search-loader canvas { display:block; width:min(100%,360px); aspect-ratio:1; }
 @media(prefers-reduced-motion:reduce) { .search-loader { transition:none; } }
 
-#archive-status.is-loading::before, #watch-status.is-loading::before { content:""; display:inline-block; width:14px; height:14px; margin-right:8px; vertical-align:middle; border:2px solid color-mix(in srgb,var(--ink) 18%,transparent); border-top-color:var(--ink); border-radius:50%; animation:status-loading-spin .7s linear infinite; }
-@keyframes status-loading-spin { to { transform:rotate(360deg); } }
-@media(prefers-reduced-motion:reduce) { #archive-status.is-loading::before, #watch-status.is-loading::before { animation:none; } }
+.particle-loading { display:inline-block; flex:none; width:36px; height:36px; opacity:0; transition:opacity .2s ease; }
+.particle-loading[hidden] { display:none; }
+.particle-loading.is-visible { opacity:1; }
+.particle-loading canvas { display:block; width:100%; aspect-ratio:1; }
+.loading-status-row { display:flex; align-items:center; gap:8px; }
+@media(prefers-reduced-motion:reduce) { .particle-loading { transition:none; } }

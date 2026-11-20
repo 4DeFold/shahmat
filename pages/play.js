@@ -1,5 +1,3 @@
-import { installInteractionSounds } from './interaction-sounds.js';
-installInteractionSounds(document);
 import {createGameSound} from './game-sound.js';
 const sound=createGameSound(window);
 import {pieceSrc as themedPieceSrc} from './piece-theme.js';
@@ -187,7 +185,6 @@ board.addEventListener('click', event => {
   if (suppressClick || pending || game.isGameOver()) return;
   const square=event.target.closest('[data-square]')?.dataset.square; if(!square) return;
   if(selected && attempt(selected,square)) return;
-  sound.effect('click');
   if(premove.length && !projected().get(square)) { premove=[]; selected=null; render(); return; }
   selected=projected().get(square)?.color===playerColor && selected!==square ? square : null; render();
   board.querySelector(`[data-square="${square}"]`)?.focus();

@@ -3,29 +3,18 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createGameSound } from '../pages/game-sound.js';
 
-test('short ceramic recordings vary by piece; capture is one dry impact', async () => {
+test('only moves and captures play CC0 chess recordings, once per move', async () => {
   const plays=[];
   class Audio {
-    constructor(src){this.src=src;}
-    load(){} pause(){} addEventListener(){}
+    constructor(src){this.src=src;} load(){} pause(){} addEventListener(){}
     cloneNode(){return new Audio(this.src);}
-    play(){plays.push({src:this.src,rate:this.playbackRate,volume:this.volume,preservesPitch:this.preservesPitch});return Promise.resolve();}
+    play(){plays.push({src:this.src,volume:this.volume});return Promise.resolve();}
   }
-  const sound=createGameSound({Audio});
-  sound.prime();sound.play({piece:'p'});sound.play({piece:'q'});sound.play({piece:'r'});
-  assert.match(plays[0].src,/ceramic-light/);assert.match(plays[1].src,/ceramic-heavy/);
-  assert.notEqual(plays[1].rate,plays[2].rate);assert.equal(plays[1].preservesPitch,false);
-  sound.play({piece:'q',captured:'p'});assert.equal(plays.length,4);assert.ok(plays[3].volume>plays[1].volume);
-  assert.equal('setMuted' in sound,false);sound.destroy();sound.play({piece:'p'});assert.equal(plays.length,4);
-  for(const file of ['ceramic-light.wav','ceramic-medium.wav','ceramic-heavy.wav']){
-    const wav=await readFile(`public/sounds/chess/${file}`);
-    assert.equal(wav.toString('ascii',0,4),'RIFF');assert.ok(wav.readUInt32LE(40)/wav.readUInt32LE(28)<.12,'short recording with no lingering echo');
-  }
-});
-
-test('interface and start effects are short, quiet recorded hits',()=>{
-  const played=[];
-  class Audio {constructor(src){this.src=src} load(){} pause(){} addEventListener(){} cloneNode(){return new Audio(this.src)} play(){played.push({src:this.src,volume:this.volume});return Promise.resolve()}}
-  const sound=createGameSound({Audio});sound.effect('click');sound.effect('select');sound.effect('start');sound.effect('unknown');
-  assert.equal(played.length,3);assert.ok(played.every(x=>x.volume<=.22));assert.match(played[2].src,/ceramic-heavy/);sound.destroy();
+  const sound=createGameSound({Audio});sound.prime();assert.equal(plays.length,0);
+  assert.equal('effect' in sound,false);
+  sound.play({piece:'p'});sound.play({piece:'q'});sound.play({piece:'r',captured:'p'});
+  assert.equal(plays.length,3);assert.match(plays[0].src,/move\.mp3$/);assert.equal(plays[0].src,plays[1].src);
+  assert.match(plays[2].src,/capture\.wav$/);sound.destroy();sound.play({});assert.equal(plays.length,3);
+  const wav=await readFile('public/sounds/chess/capture.wav');assert.equal(wav.toString('ascii',0,4),'RIFF');
+  assert.ok((await readFile('public/sounds/chess/move.mp3')).length>1000);
 });

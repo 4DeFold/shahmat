@@ -1,5 +1,3 @@
-import { installInteractionSounds } from './interaction-sounds.js';
-installInteractionSounds(document);
 import {pieceSrc as themedPieceSrc} from './piece-theme.js';
 import { Chess } from 'chess.js';
 import {renderCaptures,renderThreats} from './board-insights.js';
@@ -267,7 +265,6 @@ board.addEventListener('click',event=>{
   const square=event.target.closest('[data-square]')?.dataset.square; if(!square) return;
   sound.prime();
   if(selected && attempt(selected,square)) return;
-  sound.effect('click');
   if(premove.length && !projected().get(square)) { premove=[]; selected=null; draw(); status(chess.turn()==='w'?'Ваш ход.':'Ход бота.'); return; }
   selected=projected().get(square)?.color==='w' && selected!==square?square:null; draw(); boardView.cell(square)?.focus();
 });
@@ -370,7 +367,6 @@ async function launch() {
     if(current!==generation || destroyed) return;
     setPhase('playing'); updateResign(); status('Ваш ход. Вы играете белыми.');
   }
-  if(current===generation && !destroyed && pageVisible && !document.hidden) sound.effect('start');
 }
 $('bot-play').addEventListener('click',()=>void launch());
 async function restore(id) {

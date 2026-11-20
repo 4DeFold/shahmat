@@ -9,7 +9,8 @@ export function tourPoint(position) {
 export function createSearchLoader(element, win) {
   const canvas=element.querySelector('canvas');
   let ctx=null, trailCanvas=null, trailCtx=null, frame=null, timeout=null, active=false, destroyed=false, started=null;
-  const reduced=()=>win.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const motion=win.matchMedia?.('(prefers-reduced-motion: reduce)');
+  const reduced=()=>!!motion?.matches;
   function draw(time) {
     if (!ctx) return;
     const size=canvas.clientWidth, scale=Math.min(win.devicePixelRatio||1,2);
@@ -70,5 +71,11 @@ export function createSearchLoader(element, win) {
       timeout=win.setTimeout(()=>{if(!active)element.hidden=true;timeout=null;},320);
     }
   }
-  return {setVisible,destroy(){destroyed=true;active=false;if(frame!==null)win.cancelAnimationFrame(frame);if(timeout!==null)win.clearTimeout(timeout);element.hidden=true;}};
+  function motionChanged() {
+    if(!active || destroyed || !ctx || !win.requestAnimationFrame)return;
+    if(frame!==null)win.cancelAnimationFrame(frame);
+    started=null;frame=win.requestAnimationFrame(tick);
+  }
+  motion?.addEventListener?.('change',motionChanged);
+  return {setVisible,destroy(){destroyed=true;active=false;motion?.removeEventListener?.('change',motionChanged);if(frame!==null)win.cancelAnimationFrame(frame);if(timeout!==null)win.clearTimeout(timeout);element.hidden=true;}};
 }

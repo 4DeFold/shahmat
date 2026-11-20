@@ -14,7 +14,7 @@ test('matchmaking loader reproduces a closed 64-square knight tour without a gri
 test('loader exit is cancellable and reduced motion hides immediately',()=>{
  const dom=new JSDOM('<div hidden><canvas></canvas></div>'),el=dom.window.document.querySelector('div');
  let reduced=false, timer;
- const win={matchMedia:()=>({matches:reduced}),setTimeout:fn=>(timer=fn,1),clearTimeout:()=>{timer=null;},requestAnimationFrame:()=>2,cancelAnimationFrame:()=>{},getComputedStyle:()=>({getPropertyValue:()=>''})};
+ const win={matchMedia:()=>({get matches(){return reduced;}}),setTimeout:fn=>(timer=fn,1),clearTimeout:()=>{timer=null;},requestAnimationFrame:()=>2,cancelAnimationFrame:()=>{},getComputedStyle:()=>({getPropertyValue:()=>''})};
  el.querySelector('canvas').getContext=()=>null;
  const loader=createSearchLoader(el,win);loader.setVisible(true);assert.equal(el.hidden,false);assert.ok(el.classList.contains('is-visible'));
  loader.setVisible(false);assert.equal(el.hidden,false);assert.ok(timer);loader.setVisible(true);assert.equal(timer,null);assert.equal(el.hidden,false);assert.ok(el.classList.contains('is-visible'));
@@ -36,4 +36,15 @@ test('trails use smooth gradients along the tour and particles move faster',()=>
  assert.deepEqual(dots[0],tourPoint(0));assert.equal(dots.length,2);assert.deepEqual(dots[1],tourPoint(15));
  assert.equal(gradients.length,28);assert.ok(gradients.every(stops=>stops.length===9));
  loader.destroy();
+});
+test('changing reduced motion while visible stops and resumes animation',()=>{
+ const dom=new JSDOM('<div hidden><canvas></canvas></div>'),el=dom.window.document.querySelector('div'),canvas=el.querySelector('canvas');
+ const ctx={setTransform(){},clearRect(){},beginPath(){},moveTo(){},lineTo(){},stroke(){},fill(){},fillRect(){},drawImage(){},arc(){},createLinearGradient(){return {addColorStop(){}};}};
+ canvas.getContext=()=>ctx;Object.defineProperty(canvas,'clientWidth',{value:100});
+ const create=dom.window.document.createElement.bind(dom.window.document);dom.window.document.createElement=name=>{const node=create(name);if(name==='canvas')node.getContext=()=>ctx;return node;};
+ let change,next,id=0,cancelled=0;const motion={matches:false,addEventListener(_,fn){change=fn},removeEventListener(){change=null}};
+ const win={matchMedia:()=>motion,devicePixelRatio:1,getComputedStyle:()=>({getPropertyValue:()=>''}),requestAnimationFrame:fn=>(next=fn,++id),cancelAnimationFrame(){cancelled++},setTimeout(){},clearTimeout(){}};
+ const loader=createSearchLoader(el,win);loader.setVisible(true);next(0);assert.equal(id,2);
+ motion.matches=true;change();assert.equal(cancelled,1);next(10);assert.equal(id,3,'static frame is not rescheduled');
+ motion.matches=false;change();next(20);assert.equal(id,5,'animation resumes');loader.destroy();assert.equal(change,null);
 });

@@ -9,3 +9,7 @@ public/sounds/chess/NOTICE.txt; no Lichess recordings are included.
 
 Number Ticker is inspired by Magic UI (MIT), with a native JavaScript spring
 adaptation. See /licenses/magicui.txt for the license.
+
+The replacement move and capture files are independently processed excerpts
+of simone_ds's CC0 "chess pieces.wav"; see NOTICE.txt for source URLs and
+processing details. They are an approximation, not the Lichess originals.
