@@ -16,7 +16,7 @@ function updateSpectators(id){if(id===watchingGame)return;stopSpectators?.();sto
 const ui = createMemberGame({ document, onGameChanged:updateSpectators, opponentName: async gameId => {
   const { data, error } = await supabase.functions.invoke('matchplay', { body: { action:'opponent', gameId }, timeout: 8000 });
   if(error||!data?.username) return error ? null : data;
-  try { const result=await supabase.rpc('profile_public',{p_name:data.username}); return result.data||data; } catch { return data; }
+  try { const {data: profile, error: profileError}=await supabase.rpc('profile_public',{p_name:data.username}); return !profileError && profile && typeof profile.username === 'string' && profile.username ? profile : data; } catch { return data; }
 }, playerRatings: async gameId => {
   const { data, error } = await supabase.rpc('rank_game_players', { p_game:gameId });
   if(error||!Array.isArray(data)) return null;

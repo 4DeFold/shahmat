@@ -28,10 +28,10 @@ try {
     await page.locator('#feedback-message').fill('There is a bug'); await page.locator('#feedback-form button').click();
     await page.locator('#feedback-status').filter({hasText:'отправлено'}).waitFor(); assert.equal(submitted,1);
     await page.goto(`${base}/profile`); await page.locator('#page-profile').waitFor({state:'visible'});
-    assert.equal(await page.locator('#page-profile').evaluate(el=>el.children.length),0);
+    await page.locator('#profile-display-name').waitFor({state:'visible'});
     await page.goto(`${base}/settings`); await page.locator('#dashboard-palettes').waitFor({state:'visible'});
     assert.equal(await page.locator('#dashboard-palettes input').count(),10);
     await page.close();
   }
-  console.log('✓ Personal sticky rating, feedback, empty profile and 10 palettes at mobile and desktop');
+  console.log('✓ Personal sticky rating, feedback, profile and 10 palettes at mobile and desktop');
 } finally { await browser.close(); }

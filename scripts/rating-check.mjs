@@ -20,6 +20,7 @@ try {
         if (path==='/rest/v1/rpc/profile_public') { const who=route.request().postDataJSON().p_name; return route.fulfill({json:{username:who,bio:who==='Player_One'?'Привет':'',palette:'forest',theme:'dark',avatar,banner:avatar,ratings:{overall:1100,blitz:1100,rapid:1000,classical:1000},games:{blitz:2,rapid:0,classical:0,bot:1}}}); }
         if (path==='/rest/v1/rpc/profile_avatar_themes') return route.fulfill({json:[{username:'LongestName_123456789012',palette:'amber'}]});
         if (path==='/rest/v1/rpc/profile_avatars') return route.fulfill({json:[{username:'Player_One',avatar}]});
+        if (path==='/rest/v1/rpc/profile_piece_sets') return route.fulfill({json:[{username:'LongestName_123456789012',piece_set:'chessnut'},{username:'Player',piece_set:'fantasy'}]});
         if (path==='/rest/v1/rpc/rank_my_position') return route.fulfill({json:[{username:'Player',yar:1000,elo:1000,ranked:true,place:3}]});
         if (path==='/rest/v1/rpc/rank_leaderboard') {
           const mode=route.request().postDataJSON().p_mode; modes.push(mode);
@@ -35,7 +36,16 @@ try {
       await page.locator('.rating-row').first().waitFor();
       await page.locator('.rating-row .rating-avatar.has-custom-avatar').first().waitFor();
       assert.equal(await page.locator('.rating-row .rating-avatar').first().getAttribute('src'),avatar);
-      assert.equal(await page.locator('.rating-avatar').nth(1).getAttribute('src'),'/pieces/cburnett/wN.svg');await page.waitForFunction(()=>document.querySelectorAll('.rating-avatar')[1]?.style.backgroundColor==='rgb(153, 88, 42)');
+      await page.waitForFunction(()=>document.querySelectorAll('.rating-row .rating-avatar')[1]?.getAttribute('src')==='/pieces/chessnut/wN.svg');
+      await page.waitForFunction(()=>document.querySelector('.rating-self .rating-avatar')?.getAttribute('src')==='/pieces/fantasy/wN.svg');
+      await page.waitForFunction(()=>document.querySelectorAll('.rating-row .rating-avatar')[1]?.style.backgroundColor==='rgb(153, 88, 42)');
+      for (const img of await page.locator('.rating-avatar').all()) {
+        await img.evaluate(el => el.decode());
+        const size=await img.boundingBox(), expected=viewport.width<=700?30:36;
+        assert.ok(Math.abs(size.width-expected)<1 && Math.abs(size.height-expected)<1, `avatar stays ${expected}px for ${await img.getAttribute('src')}: ${JSON.stringify(size)}`);
+      }
+      const rows=await page.locator('.rating-row').evaluateAll(els=>els.map(el=>el.getBoundingClientRect().height));
+      assert.ok(Math.abs(rows[0]-rows[1])<1, `custom and piece avatars must not change row height: ${rows}`);
       if(viewport.width===1440 && reducedMotion==='no-preference'){
         const card=page.locator('.player-mini-card');
         await page.locator('.rating-place').first().hover();await page.waitForTimeout(220);assert.equal(await card.isHidden(),true,'place must not trigger profile card');

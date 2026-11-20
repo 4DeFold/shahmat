@@ -169,6 +169,11 @@ body.startup-ready :is(.play-button, .landing-login) {
   body.startup-ready :is(.play-button, .landing-login) { animation: none; visibility: visible; }
 }
 
+/* Keep the visual proportions while providing a comfortable touch target. */
+@media (pointer: coarse) {
+  .play-button::before { content: ''; position: absolute; width: 100%; min-height: 44px; height: 100%; top: 50%; left: 0; transform: translateY(-50%); }
+}
+
 .play-button:focus-visible {
   outline: 2px solid var(--foreground);
   outline-offset: 4px;
@@ -954,7 +959,7 @@ body.startup-ready #landing-screen:not([hidden]) .hero-reveal--tail { animation-
 
 /* Public profile avatars accompany leaderboard names. */
 .rating-person { display:flex; align-items:center; gap:12px; min-width:0; }
-.rating-avatar { flex:0 0 36px; width:min(180px,100%); height:auto; aspect-ratio:1; object-fit:contain; border:1px solid var(--line); border-radius:50%; background:var(--surface-raised); }
+.rating-avatar { flex:0 0 36px; width:36px; height:36px; object-fit:contain; border:1px solid var(--line); border-radius:50%; background:var(--surface-raised); }
 .rating-avatar.has-custom-avatar { object-fit:cover; }
 @media (max-width:700px) { .rating-person { gap:8px; } .rating-avatar { width:30px; height:30px; flex-basis:30px; } }
 

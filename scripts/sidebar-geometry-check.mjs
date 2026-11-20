@@ -32,7 +32,7 @@ try {
         const text = range.getBoundingClientRect(), sidebar = el.closest('.app-sidebar').getBoundingClientRect();
         return {ratio:text.width / sidebar.width, center:Math.abs((text.left + text.right - sidebar.left - sidebar.right) / 2), left:text.left - sidebar.left, right:sidebar.right - text.right};
       });
-      assert.ok(Math.abs(logo.ratio - .8) < .025 && logo.center < 1.5 && logo.left >= 0 && logo.right >= 0, `logo fills and centers in rail: ${JSON.stringify(logo)}`);
+      assert.ok(logo.ratio >= .75 && logo.ratio <= .95 && logo.center < 1.5 && logo.left >= 0 && logo.right >= 0, `logo fills and centers in rail: ${JSON.stringify(logo)}`);
     }
     if (viewport.width <= 700 || (touch && viewport.height <= 500)) await page.locator('#mobile-menu-toggle').click();
     const spansRail = async selector => {

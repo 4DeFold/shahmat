@@ -40,7 +40,7 @@ try {
   await page.evaluate(() => document.querySelector('[data-square=d2]').click());
   assert.equal(await page.locator('#move-list strong').first().evaluate(el => el.getAnimations().filter(animation => animation.playState === 'running').length), 0, 'old moves should not animate on selection');
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.evaluate(() => localStorage.removeItem('shahmat.guest-game.v1'));
+  await page.evaluate(() => { localStorage.removeItem('shahmat.guest-game.v1'); localStorage.removeItem('shahmat.member-game.v1.test-user'); });
   await page.reload();
   await page.locator('#board .piece').first().waitFor();
   const reduced = await page.evaluate(() => {
