@@ -1,3 +1,5 @@
+import {installPieceTheme,setPieceSet,selectedPieceSet,validPieceSet,renderLargePiecePreview} from './pages/piece-theme.js';
+installPieceTheme();
 import './pages/profile-card.css';
 import { createRatingView } from './pages/rating.js';
 import { startOnlinePresence } from './pages/online-presence.js';
@@ -33,6 +35,8 @@ const landing = document.querySelector('.landing');
 function applyRankUnit(value) {
   rankUnit = value === 'elo' ? 'elo' : 'yar';
   document.querySelectorAll('#rank-unit-options input').forEach(input => { input.checked = input.value === rankUnit; });
+  const swap=$('rank-unit-swap');
+  if (swap) swap.setAttribute('aria-label', rankUnit === 'yar' ? 'Показаны Яры. Переключить на Эло' : 'Показано Эло. Переключить на Яры');
   ratingView?.setUnit(rankUnit);
   $('member-game-frame')?.contentWindow?.postMessage({ type:'shahmat-rank-unit', value:rankUnit }, window.location.origin);
 }
@@ -86,7 +90,7 @@ function writeAppearance(id, value) {
 function recordAppearance() {
   if (!appearanceUserId) return;
   const previous = readAppearance(appearanceUserId);
-  writeAppearance(appearanceUserId, { palette: selectedPalette, theme: selectedTheme, rankUnit, dirty: true, version: (previous?.version || 0) + 1 });
+  writeAppearance(appearanceUserId, { palette: selectedPalette, theme: selectedTheme, rankUnit, pieceSet:selectedPieceSet(), dirty: true, version: (previous?.version || 0) + 1 });
   if (retryTimer !== null) { clearTimeout(retryTimer); retryTimer = null; }
   void syncAppearance();
 }
@@ -108,7 +112,7 @@ async function syncAppearance() {
     if (sessionError) throw sessionError;
     if (appearanceUserId !== id) return;
     if (!data.session || data.session.user.id !== id) throw new Error('Session unavailable');
-    const { error } = await supabase.auth.updateUser({ data: { palette: pending.palette, palette_theme: pending.theme, palette_effective_theme: pending.theme || (systemTheme.matches ? 'dark' : 'light'), rank_unit: pending.rankUnit || rankUnit } });
+    const { error } = await supabase.auth.updateUser({ data: { palette: pending.palette, palette_theme: pending.theme, palette_effective_theme: pending.theme || (systemTheme.matches ? 'dark' : 'light'), rank_unit: pending.rankUnit || rankUnit, piece_set:validPieceSet(pending.pieceSet) } });
     if (error) throw error;
     const latest = readAppearance(id);
     if (latest?.version === pending.version) writeAppearance(id, { ...latest, dirty: false });
@@ -141,10 +145,11 @@ async function pollAppearance() {
     if (!palettes.has(remote.palette)) return;
     const remoteRankUnit = remote.rank_unit === 'elo' ? 'elo' : 'yar';
     const theme = remote.palette_theme === 'dark' || remote.palette_theme === 'light' ? remote.palette_theme : null;
-    if (selectedPalette !== remote.palette || selectedTheme !== theme || rankUnit !== remoteRankUnit) {
+    const remotePieceSet=validPieceSet(remote.piece_set);
+    if (selectedPalette !== remote.palette || selectedTheme !== theme || rankUnit !== remoteRankUnit || selectedPieceSet()!==remotePieceSet) {
       applyPalette(remote.palette);
-      applyTheme(theme); applyRankUnit(remoteRankUnit);
-      writeAppearance(id, { palette: selectedPalette, theme: selectedTheme, rankUnit, dirty: false, version: latest?.version || 0 });
+      applyTheme(theme); applyRankUnit(remoteRankUnit); setPieceSet(remotePieceSet);
+      writeAppearance(id, { palette: selectedPalette, theme: selectedTheme, rankUnit, pieceSet:selectedPieceSet(), dirty: false, version: latest?.version || 0 });
     }
   } catch { /* Keep the current appearance while offline. */ }
   finally { if (appearancePollInFlight === epoch) appearancePollInFlight = null; }
@@ -162,10 +167,10 @@ function restoreAppearance(user) {
   const local = readAppearance(user.id);
   const remote = user.user_metadata || {};
   if (local?.dirty || (!palettes.has(remote.palette) && local)) {
-    applyPalette(local.palette); applyTheme(local.theme); applyRankUnit(local.rankUnit || remote.rank_unit);
+    applyPalette(local.palette); applyTheme(local.theme); applyRankUnit(local.rankUnit || remote.rank_unit); setPieceSet(local.pieceSet || remote.piece_set);
   } else {
-    applyPalette(remote.palette); applyTheme(remote.palette_theme); applyRankUnit(remote.rank_unit);
-    writeAppearance(user.id, { palette: selectedPalette, theme: selectedTheme, rankUnit, dirty: false, version: local?.version || 0 });
+    applyPalette(remote.palette); applyTheme(remote.palette_theme); applyRankUnit(remote.rank_unit); setPieceSet(remote.piece_set || local?.pieceSet);
+    writeAppearance(user.id, { palette: selectedPalette, theme: selectedTheme, rankUnit, pieceSet:selectedPieceSet(), dirty: false, version: local?.version || 0 });
   }
   if (!local?.dirty && remote.palette_effective_theme !== (selectedTheme || (systemTheme.matches ? 'dark' : 'light'))) recordAppearance();
   else void syncAppearance();
@@ -187,7 +192,7 @@ let navigating = false;
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const accountMenu = $('account-menu');
 const accountToggle = $('account-toggle');
-const pages = new Set(['home', 'game', 'bot', 'rating', 'watch', 'profile', 'settings', 'help']);
+const pages = new Set(['home', 'game', 'bot', 'rating', 'watch', 'archive', 'profile', 'settings', 'help']);
 const sidebar = $('app-sidebar');
 const mobileMenuToggle = $('mobile-menu-toggle');
 let sidebarOpen = false;
@@ -258,6 +263,7 @@ const pageLoaders = {
   bot: () => import('./pages/bot-view.html?raw'),
   rating: () => import('./pages/rating.html?raw'),
   watch: () => import('./pages/watch-view.html?raw'),
+  archive: () => import('./pages/archive-view.html?raw'),
   profile: () => import('./pages/profile.html?raw'),
   settings: () => import('./pages/settings.html?raw'),
   help: () => import('./pages/help.html?raw'),
@@ -265,7 +271,7 @@ const pageLoaders = {
 let pageRequest = 0;
 const viewId = name => name === 'home' ? 'dashboard-home' : `page-${name}`;
 const viewLoads = new Map();
-let frameReady = null, botFrameReady = null, watchFrameReady = null, ratingView = null, profileView = null, profileReturnPage = 'rating';
+let frameReady = null, botFrameReady = null, watchFrameReady = null, archiveFrameReady = null, ratingView = null, profileView = null, profileReturnPage = 'rating';
 let onlineStop = null, heartbeatStop = null, onlineUser = null, onlineCount = null;
 function sendOnline() { $('member-game-frame')?.contentWindow?.postMessage({ type: 'shahmat-online', count: onlineCount }, window.location.origin); }
 function startOnline(id) {
@@ -283,7 +289,7 @@ async function loadView(name) {
     if (!dashboardPreloadEnabled || $('dashboard-screen').hidden || $(viewId(name))) return;
     $('page-content').insertAdjacentHTML('beforeend', html);
     if (name === 'rating') { ratingView = createRatingView($('page-rating'), supabase, { showSelf:true, onOpenProfile:openOtherProfile }); ratingView.setUnit(rankUnit); }
-    if (name === 'settings') { applyPalette(selectedPalette); applyRankUnit(rankUnit); }
+    if (name === 'settings') { applyPalette(selectedPalette); applyRankUnit(rankUnit); window.dispatchEvent(new Event('shahmat-piece-set')); }
     if (name === 'profile') {
       updateProfileAppearance();
       profileView = createProfileView($('page-profile'), supabase, { onBack() { void showPage(profileReturnPage,{updateHistory:true,focus:true}); }, onTheme(palette,theme) { const sidebar=$('app-sidebar');if(!sidebar)return;if(palette){applyProfileTheme(sidebar,palette,theme);sidebar.style.backgroundColor='var(--surface-raised)';}else clearProfileTheme(sidebar); }, onLoaded(updated) { profile = updated; }, onSaved(updated, media) {
@@ -291,8 +297,8 @@ async function loadView(name) {
         for (const id of ['member-game-frame','bot-game-frame']) $(id)?.contentWindow?.postMessage({type:'shahmat-profile-updated',username:updated.username,avatar:media.avatar}, window.location.origin);
       } });
     }
-    if (name === 'game' || name === 'bot' || name === 'watch') {
-      const frame = $(({game:'member-game-frame',bot:'bot-game-frame',watch:'watch-frame'})[name]);
+    if (name === 'game' || name === 'bot' || name === 'watch' || name === 'archive') {
+      const frame = $(({game:'member-game-frame',bot:'bot-game-frame',watch:'watch-frame',archive:'archive-frame'})[name]);
       const ready = new Promise((resolve, reject) => {
         const timeout = setTimeout(() => reject(new Error('Game load timed out')), 15000);
         frame.addEventListener('load', () => { clearTimeout(timeout); resolve(); }, { once: true });
@@ -300,7 +306,7 @@ async function loadView(name) {
       });
       // Prevent an unhandled rejection if a background load fails before navigation.
       ready.catch(() => {});
-      if (name === 'game') frameReady = ready; else if(name === 'bot') botFrameReady = ready; else watchFrameReady = ready;
+      if (name === 'game') frameReady = ready; else if(name === 'bot') botFrameReady = ready; else if(name === 'watch') watchFrameReady = ready; else archiveFrameReady = ready;
     }
   })();
   viewLoads.set(name, pending);
@@ -336,12 +342,14 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
     if (name === 'game' && frameReady) await frameReady;
     if (name === 'bot' && botFrameReady) await botFrameReady;
     if (name === 'watch' && watchFrameReady) await watchFrameReady;
+    if (name === 'archive' && archiveFrameReady) await archiveFrameReady;
     if (request !== pageRequest) return;
     $('page-load-error')?.remove();
     $('page-loading')?.remove();
     $('member-game-frame')?.contentWindow?.postMessage({ type: name === 'game' ? 'shahmat-game-shown' : 'shahmat-game-hidden' }, window.location.origin);
     $('bot-game-frame')?.contentWindow?.postMessage({ type: name === 'bot' ? 'shahmat-bot-shown' : 'shahmat-bot-hidden' }, window.location.origin);
     $('watch-frame')?.contentWindow?.postMessage({type:name === 'watch'?'shahmat-watch-shown':'shahmat-watch-hidden'},window.location.origin);
+    $('archive-frame')?.contentWindow?.postMessage({type:name === 'archive'?'shahmat-archive-shown':'shahmat-archive-hidden'},window.location.origin);
     const profileWasHidden = $('page-profile')?.hidden;
     document.querySelectorAll('#dashboard-screen [data-view]').forEach(view => {
       const active = view.dataset.view === name;
@@ -374,7 +382,7 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
       const heading = $('page-' + name + '-title');
       if (heading) { heading.setAttribute('tabindex', '-1'); heading.focus({ preventScroll: true }); }
     }
-    document.title = ({ home: 'Главная', game: 'Играть', bot: 'Бот', rating: 'Рейтинг', watch: 'Наблюдать', profile: 'Профиль', settings: 'Настройки', help: 'Помощь' })[name] + ' — shahmat.xyz';
+    document.title = ({ home: 'Главная', game: 'Играть', bot: 'Бот', rating: 'Рейтинг', watch: 'Наблюдать', archive: 'Архив', profile: 'Профиль', settings: 'Настройки', help: 'Помощь' })[name] + ' — shahmat.xyz';
   } catch {
     if (request !== pageRequest) return;
     document.querySelectorAll('#dashboard-screen [data-view]').forEach(view => { view.hidden = true; });
@@ -382,12 +390,13 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
     if (name === 'game') { $('page-game')?.remove(); frameReady = null; }
     if (name === 'bot') { $('page-bot')?.remove(); botFrameReady = null; }
     if (name === 'watch') { $('page-watch')?.remove(); watchFrameReady = null; }
+    if (name === 'archive') { $('page-archive')?.remove(); archiveFrameReady = null; }
     $('page-content').insertAdjacentHTML('beforeend', '<section class="empty-page" id="page-load-error" role="alert"><h2>Страница не загрузилась.</h2><p>Проверь соединение и обнови страницу.</p></section>');
   }
 }
 // The game remains a separate page; send appearance only to our own frame.
 function syncGameAppearance() {
-  const frames = [$('member-game-frame'), $('bot-game-frame'), $('watch-frame')].filter(frame => frame?.contentWindow);
+  const frames = [$('member-game-frame'), $('bot-game-frame'), $('watch-frame'), $('archive-frame')].filter(frame => frame?.contentWindow);
   if (!frames.length) return;
   const style = getComputedStyle(landing);
   const names = ['--page-background', '--foreground', '--surface', '--surface-raised', '--line', '--button-background', '--button-text', '--accent', '--board-light', '--board-dark', '--clock-white', '--clock-black'];
@@ -401,7 +410,7 @@ function syncGameAppearance() {
   }
 }
 new MutationObserver(syncGameAppearance).observe(landing, { attributes: true, attributeFilter: ['data-palette', 'data-palette-theme', 'class'] });
-$('page-content').addEventListener('load', event => { if (event.target.id === 'member-game-frame' || event.target.id === 'bot-game-frame' || event.target.id === 'watch-frame') { syncGameAppearance(); sendOnline(); applyRankUnit(rankUnit); } }, true);
+$('page-content').addEventListener('load', event => { if (event.target.id === 'member-game-frame' || event.target.id === 'bot-game-frame' || event.target.id === 'watch-frame' || event.target.id === 'archive-frame') { syncGameAppearance(); sendOnline(); applyRankUnit(rankUnit); } }, true);
 $('dashboard-screen').querySelectorAll('[data-page]').forEach(link => link.addEventListener('click', event => {
   if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
   event.preventDefault();
@@ -417,9 +426,17 @@ document.addEventListener('click', event => {
   if (accountToggle.getAttribute('aria-expanded') === 'true' && !$('sidebar-account').contains(event.target)) closeAccountMenu();
 });
 document.addEventListener('keydown', event => {
-  if (!['game','bot','watch'].includes(currentPage()) || $('dashboard-screen').hidden || event.defaultPrevented || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey || event.target.closest?.('input, textarea, select, [contenteditable]:not([contenteditable=false]), [role=textbox]') || document.querySelector('dialog[open]')) return;
-  if (['ArrowLeft','ArrowRight','a','A','d','D'].includes(event.key)) { event.preventDefault(); $(({game:'member-game-frame',bot:'bot-game-frame',watch:'watch-frame'})[currentPage()])?.contentWindow?.postMessage({type:'shahmat-history-key',key:event.key},window.location.origin); }
+  if (!['game','bot','watch','archive'].includes(currentPage()) || $('dashboard-screen').hidden || event.defaultPrevented || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey || event.target.closest?.('input, textarea, select, [contenteditable]:not([contenteditable=false]), [role=textbox]') || document.querySelector('dialog[open]')) return;
+  const key=({KeyA:'a',KeyD:'d',KeyW:'w',KeyS:'s'})[event.code]||event.key;
+  if (['ArrowLeft','ArrowRight','a','d'].includes(key) || (currentPage()!=='watch' && ['ArrowUp','ArrowDown','w','s'].includes(key)) || (key==='Enter' && currentPage()==='bot' && !event.target.closest?.('button,a'))) { event.preventDefault(); $(({game:'member-game-frame',bot:'bot-game-frame',watch:'watch-frame',archive:'archive-frame'})[currentPage()])?.contentWindow?.postMessage({type:'shahmat-history-key',key,code:event.code},window.location.origin); }
 });
+// Forward held physical Q/E keys when the shell, rather than the frame, has focus.
+for (const type of ['keydown','keyup']) document.addEventListener(type,event=>{
+  if(!['game','bot','archive'].includes(currentPage())||$('dashboard-screen').hidden||!['KeyQ','KeyE'].includes(event.code))return;
+  if(type==='keydown'&&(event.ctrlKey||event.metaKey||event.altKey||event.target.closest?.('input,textarea,select,[contenteditable]:not([contenteditable=false])')||document.querySelector('dialog[open]')))return;
+   $(({game:'member-game-frame',bot:'bot-game-frame',archive:'archive-frame'})[currentPage()])?.contentWindow?.postMessage({type:'shahmat-threat-key',code:event.code,down:type==='keydown'},window.location.origin);
+});
+window.addEventListener('blur',()=>{for(const id of ['member-game-frame','bot-game-frame','archive-frame'])for(const code of ['KeyQ','KeyE'])$(id)?.contentWindow?.postMessage({type:'shahmat-threat-key',code,down:false},window.location.origin);});
 document.addEventListener('keydown', event => {
   if (event.key !== 'Escape') return;
   if (accountToggle.getAttribute('aria-expanded') === 'true') { closeAccountMenu(); accountToggle.focus(); }
@@ -435,7 +452,7 @@ async function show(id, immediate = false) {
   const next = $(id);
   screen.classList.add('leaving');
   if (!immediate && !reducedMotion.matches) await new Promise(resolve => setTimeout(resolve, 300));
-  if (screen.id === 'dashboard-screen') { $('member-game-frame')?.contentWindow?.postMessage({ type: 'shahmat-game-hidden' }, window.location.origin); $('bot-game-frame')?.contentWindow?.postMessage({ type: 'shahmat-bot-hidden' }, window.location.origin); $('watch-frame')?.contentWindow?.postMessage({type:'shahmat-watch-hidden'},window.location.origin); }
+  if (screen.id === 'dashboard-screen') { $('member-game-frame')?.contentWindow?.postMessage({ type: 'shahmat-game-hidden' }, window.location.origin); $('bot-game-frame')?.contentWindow?.postMessage({ type: 'shahmat-bot-hidden' }, window.location.origin); $('watch-frame')?.contentWindow?.postMessage({type:'shahmat-watch-hidden'},window.location.origin); $('archive-frame')?.contentWindow?.postMessage({type:'shahmat-archive-hidden'},window.location.origin); }
   screen.hidden = true;
   screen.classList.remove('leaving');
   landing.classList.toggle('palette-active', ['profile-screen', 'palette-screen', 'dashboard-screen'].includes(id));
@@ -804,19 +821,13 @@ function stopPaletteScroll() {
 $('page-content').addEventListener('wheel', event => {
   const strip = event.target.closest('#palette-scroll');
   if (!strip || event.ctrlKey || event.metaKey || event.shiftKey) return;
-  const delta = Math.abs(event.deltaX) >= Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
-  const vertical = Math.abs(event.deltaX) < Math.abs(event.deltaY);
+  if (Math.abs(event.deltaY) >= Math.abs(event.deltaX)) return;
+  const delta = event.deltaX;
   const max = Math.max(0, strip.scrollWidth - strip.clientWidth);
   const currentTarget = paletteScroll?.strip === strip ? paletteScroll.target : strip.scrollLeft;
   if (!max || !delta || (delta < 0 && currentTarget <= 0) || (delta > 0 && currentTarget >= max)) return;
-  // For reduced motion, keep horizontal touchpads native; map vertical wheels instantly.
-  if (reducedMotion.matches || !window.requestAnimationFrame) {
-    if (!vertical) return;
-    event.preventDefault();
-    const multiplier = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? strip.clientWidth : 1;
-    strip.scrollBy({ left:delta * multiplier, behavior:'instant' });
-    return;
-  }
+  // Preserve native horizontal scrolling when motion is reduced.
+  if (reducedMotion.matches || !window.requestAnimationFrame) return;
   event.preventDefault();
   if (paletteScroll?.strip !== strip) { stopPaletteScroll(); paletteScroll = {strip, target:strip.scrollLeft, frame:null, last:null}; }
   const state = paletteScroll, multiplier = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? strip.clientWidth : 1;
@@ -836,6 +847,9 @@ $('page-content').addEventListener('wheel', event => {
   state.frame = window.requestAnimationFrame(tick);
 }, { passive:false });
 $('page-content').addEventListener('pointerdown', event => { if (event.target.closest('#palette-scroll')) stopPaletteScroll(); });
+$('page-content').addEventListener('click', event => {
+  if (event.target.closest('#rank-unit-swap')) { applyRankUnit(rankUnit === 'yar' ? 'elo' : 'yar'); recordAppearance(); }
+});
 $('page-content').addEventListener('change', event => {
   if (event.target.matches('#rank-unit-options input[name="rank-unit"]')) { applyRankUnit(event.target.value); recordAppearance(); }
   if (event.target.matches('#dashboard-palettes input[name="dashboard-palette"]') && event.target.value !== selectedPalette) {
@@ -855,7 +869,7 @@ document.querySelectorAll('.signout').forEach(button => button.addEventListener(
     onlineStop?.(); heartbeatStop?.(); onlineStop = null; heartbeatStop = null; onlineUser = null; onlineCount = null;
     dashboardPreloadEnabled = false; pageRequest++;
     // Discard account-specific views on logout.
-    $('page-game')?.remove(); frameReady = null; $('page-bot')?.remove(); botFrameReady = null; $('page-watch')?.remove(); watchFrameReady = null;
+    $('page-game')?.remove(); frameReady = null; $('page-bot')?.remove(); botFrameReady = null; $('page-watch')?.remove(); watchFrameReady = null; $('page-archive')?.remove(); archiveFrameReady = null;
     ratingView?.destroy(); $('page-rating')?.remove(); ratingView = null;
     profileView?.destroy(); $('page-profile')?.remove(); profileView = null;
     profile = null; applyPalette('monochrome'); applyTheme(null); applyRankUnit('yar'); $('auth-form').reset(); setMode('login');
@@ -894,3 +908,10 @@ async function initialize() {
   document.body.classList.add('startup-ready');
 }
 export const appReady = initialize();
+
+document.addEventListener('change',event=>{
+  if(!event.target.matches?.('input[name=piece-set]'))return;
+  setPieceSet(event.target.value);recordAppearance();
+  const section=$('piece-full-section'), board=$('piece-full-preview');
+  if(section&&board){const opening=section.hidden;section.hidden=false;renderLargePiecePreview(board,event.target.value);if(opening)section.scrollIntoView?.({behavior:reducedMotion.matches?'auto':'smooth',block:'nearest'});}
+});

@@ -10,7 +10,7 @@
 @keyframes bot-glow { 0%,100% { opacity:.5; transform:translate(-50%,-50%) rotate(0deg) scale(.96); } 50% { opacity:.95; transform:translate(-50%,-50%) rotate(18deg) scale(1.08); } }
 .glow-holder { position:absolute; inset:0; opacity:1; transition:opacity 1s ease,transform 1.1s cubic-bezier(.22,1,.36,1); pointer-events:none; }
 .bot-glow { animation:bot-glow 9s ease-in-out infinite; position:absolute; width:54%; aspect-ratio:1; left:50%; top:50%; transform:translate(-50%,-50%); background:repeating-conic-gradient(from 2deg, color-mix(in srgb,var(--accent) 21%,transparent) 0deg 2deg,transparent 4deg 17deg); mask-image:radial-gradient(circle,transparent 10%,black 27%,transparent 72%); opacity:.8; pointer-events:none; }
-.hero-piece { position:absolute; width:var(--hero-size); height:var(--hero-size); object-fit:contain; left:50%; top:50%; transform:translate(-50%,-50%); filter:drop-shadow(0 10px 22px #0003); z-index:3; }
+.hero-piece { position:absolute; width:var(--hero-size); height:var(--hero-size); object-fit:contain; left:50%; top:50%; transform:translate(-50%,-50%);  z-index:6; }
 .orbit-board { position:absolute; left:50%; top:50%; width:clamp(48px, 20%, 200px); aspect-ratio:1; background:var(--board-frame); padding:3px; border-radius:3px; box-shadow:0 8px 18px #0003; will-change:transform; }
 .mini-grid { display:grid; width:100%; height:100%; grid-template-columns:repeat(8,1fr); overflow:hidden; }
 .mini-square { position:relative; width:100%; height:100%; }
@@ -63,8 +63,10 @@
 
 /* The page background is the lightest/darkest swatch of the selected palette.
    Paint over the orbit, not the sidebars; touches pass through the veil. */
-.bot-stage::after { content:""; position:absolute; inset:0 0 auto; height:min(40%, 320px); z-index:40; pointer-events:none; background:linear-gradient(to bottom, var(--bg) 0%, color-mix(in srgb,var(--bg) 78%,transparent) 18%, color-mix(in srgb,var(--bg) 26%,transparent) 58%, transparent 100%); opacity:1; transition:opacity .65s ease; }
-.bot-shell:is([data-phase=playing],[data-phase=finished]) .bot-stage::after { opacity:0; }
-@media (prefers-reduced-motion:reduce) { .bot-stage::after { transition:none; } }
+.orbit-stage::after { content:""; position:absolute; left:0; right:0; top:calc(50% - 8px - var(--hero-size) / 2); height:min(40dvh, 320px); z-index:5; pointer-events:none; background:linear-gradient(to bottom, var(--bg) 0%, color-mix(in srgb,var(--bg) 78%,transparent) 18%, color-mix(in srgb,var(--bg) 26%,transparent) 58%, transparent 100%); opacity:1; transition:opacity .65s ease; }
+.bot-shell:is([data-phase=playing],[data-phase=finished]) .orbit-stage::after { opacity:0; }
+@media (prefers-reduced-motion:reduce) { .orbit-stage::after { transition:none; } }
 /* Child elements run the same entrance choreography on return and on tab entry. */
 .bot-shell[data-phase=choose] .bot-showcase { transition:none; }
+
+.bot-showcase {grid-template-rows:minmax(0,1fr) auto auto auto}.bot-selector{grid-row:2}.bot-completed{grid-row:3;color:var(--accent);font:600 14px system-ui,sans-serif;animation:bot-completed-in .45s ease both}.bot-play{grid-row:4}@keyframes bot-completed-in{from{opacity:0;transform:translateY(7px);filter:blur(3px)}to{opacity:1;transform:none;filter:blur(0)}}@media(prefers-reduced-motion:reduce){.bot-completed{animation:none}}

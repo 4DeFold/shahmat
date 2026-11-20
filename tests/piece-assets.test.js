@@ -27,3 +27,35 @@ test('all board avatars and account icons use the same set', async () => {
     assert.doesNotMatch(html, /pieces\/neo|[♔♕♖♗♘♙♚♛♜♝♞♟]/);
   }
 });
+
+test('licensed Lichess sets are complete and recoloured only black and white', async () => {
+  for (const set of ['chessnut', 'fantasy', 'spatial', 'celtic', 'merida', 'firi', 'rhosgfx', 'kiwen-suwi', 'mono']) {
+    const files = (await readdir(`public/pieces/${set}`)).filter(name => name.endsWith('.svg'));
+    assert.equal(files.length, 12);
+    for (const color of ['w', 'b']) for (const type of ['K', 'Q', 'B', 'N', 'R', 'P']) {
+      const svg = await readFile(`public/pieces/${set}/${color}${type}.svg`, 'utf8');
+      assert.match(svg, /<svg\b/);
+      assert.doesNotMatch(svg, /<script\b|<foreignObject\b|filter|shadow/i);
+      for (const color of svg.match(/#[a-f\d]{3,6}\b/gi) || []) assert.ok(['#000','#fff'].includes(color.toLowerCase()), `${set}: ${color}`);
+    }
+    const license = {chessnut:/Apache License/,fantasy:/MIT License/,spatial:/MIT License/,celtic:/MIT License/,merida:/GNU GENERAL PUBLIC LICENSE/,mono:/GNU GENERAL PUBLIC LICENSE/,firi:/Attribution 4.0 International/, 'kiwen-suwi':/Attribution 4.0 International/,rhosgfx:/CC0 1.0 Universal/}[set];
+    assert.match(await readFile(`public/pieces/${set}/LICENSE.txt`, 'utf8'), license);
+    assert.match(await readFile(`public/pieces/${set}/NOTICE.txt`, 'utf8'), /Modification|Modified/);
+  }
+});
+
+test('large preview renders the full initial position and updates without clones', async () => {
+  const {renderLargePiecePreview} = await import('../pages/piece-theme.js');
+  const doc = new JSDOM('<div id="board" data-piece-preview></div>').window.document;
+  const board = doc.getElementById('board');
+  renderLargePiecePreview(board, 'merida');
+  assert.equal(board.children.length, 64);
+  assert.equal(board.querySelectorAll('img').length, 32);
+  assert.equal(board.children[0].firstChild.getAttribute('src'), '/pieces/merida/bR.svg');
+  assert.equal(board.children[4].firstChild.getAttribute('src'), '/pieces/merida/bK.svg');
+  assert.equal(board.children[60].firstChild.getAttribute('src'), '/pieces/merida/wK.svg');
+  assert.equal(board.children[32].children.length, 0);
+  renderLargePiecePreview(board, 'firi');
+  assert.equal(board.querySelectorAll('img[src^="/pieces/firi/"]').length, 32);
+  assert.equal(doc.querySelectorAll('img').length, 32);
+});

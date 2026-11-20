@@ -1,9 +1,11 @@
+import {pieceSrc as themedPieceSrc} from './piece-theme.js';
 import { Chess } from 'chess.js';
+import {renderCaptures,renderThreats} from './board-insights.js';
 import { premoveTargets, validPremove, normalizePremove, projectPremoves } from './premove.js';
 import { createBoardAnnotations } from './board-annotations.js';
 import { createClient } from '@supabase/supabase-js';
 import { createMemberBoard } from './member-board.js';
-import { createMoveHistory, historyTransition } from './move-history.js';
+import { createMoveHistory, historyTransition, historyKeyTarget } from './move-history.js';
 import { createGameSound } from './game-sound.js';
 import { createStockfish, BOT_LEVELS } from './stockfish-engine.js';
 import { createBotStorage } from './bot-storage.js';
@@ -18,9 +20,9 @@ const motion=window.matchMedia('(prefers-reduced-motion: reduce)');
 const sound=createGameSound(window), boardView=createMemberBoard({document,board,reducedMotion:()=>motion.matches});
 const annotations=createBoardAnnotations({document,board});
 const names={q:'ферзь',r:'ладья',b:'слон',n:'конь'};
-const piece=(color,type)=>`/pieces/cburnett/${color}${type.toUpperCase()}.svg`;
+const piece=(color,type)=>themedPieceSrc(color,type);
 let level=0, phase='choose', userId=null, store=null, game=null, chess=new Chess(), selected=null, promotion=null, last=null, engine=null, thinking=false, generation=0;
-let launchDrain=null, premove=[], historyIndex=null;
+let launchDrain=null, premove=[], historyIndex=null, completedLevels=new Set(), threatKeys=new Set();
 let pageVisible=window.parent===window, orbitFrame=null, orbitAngle=0, orbitSpeed=0, lastFrame=0, demoClock=0, carouselPosition=0, carouselVelocity=0, drag=null, suppressClick=false, destroyed=false;
 const status=text=>{ if ($('status').textContent!==text) $('status').textContent=text; };
 function reveal(id, open) { const el=$(id); if (el.classList.contains('is-open')===open) return; el.classList.toggle('is-open',open); el.inert=!open; el.setAttribute('aria-hidden',String(!open)); }
@@ -159,7 +161,7 @@ document.addEventListener('visibilitychange',()=>{ if(document.hidden) stopOrbit
 
 function showLevel() {
   const bot=BOT_LEVELS[level];
-  $('bot-name').textContent=bot.name;
+  $('bot-name').textContent=bot.name; $('bot-completed').hidden=!completedLevels.has(level+1);
   $('game-bot-piece').src=piece('b',bot.piece); $('game-bot-name').textContent=bot.name;
   $('bot-prev').disabled=level===0; $('bot-next').disabled=level===BOT_LEVELS.length-1;
 }
@@ -173,7 +175,7 @@ function switchLevel(next) {
 }
 $('bot-prev').addEventListener('click',()=>switchLevel(level-1)); $('bot-next').addEventListener('click',()=>switchLevel(level+1));
 function setPhase(value) {
-  phase=value; shell.dataset.phase=value; const inGame=value==='playing'||value==='finished';
+  phase=value; shell.dataset.phase=value; $('return-button').textContent=value==='finished' && game?.status==='black_win' ? 'Завершить' : 'К выбору бота'; const inGame=value==='playing'||value==='finished';
   showcase.inert=inGame||value==='launching'||value==='returning'; showcase.setAttribute('aria-hidden',String(inGame||value==='launching'||value==='returning'));
   $('bot-board-wrap').inert=!inGame; $('bot-board-wrap').setAttribute('aria-hidden',String(!inGame));
   for(const id of ['bot-actions','moves']) { $(id).inert=!inGame; $(id).setAttribute('aria-hidden',String(!inGame)); }
@@ -186,16 +188,28 @@ function draw(move=null,transitions=[]) {
   const legal=selected&&isLive?(chess.turn()==='w'&&!premove.length?chess.moves({square:selected,verbose:true}):premoveTargets(shown,selected,'w')).map(m=>m.to):[];
   const displayedLast=isLive?last:shown.history({verbose:true}).at(-1);
   boardView.render({shown,selected,legal,last:displayedLast,premoves:isLive?premove:[],actual:isLive&&premove.length?chess:null,premoveMode:chess.turn()!=='w'||premove.length>0,animatedMove:isLive?move:null,transitions});
+  const actualShown=isLive?chess:shown;renderCaptures(actualShown,'w',$('bot-player-captured'),$('bot-opponent-captured'));renderThreats(actualShown,'w',boardView,threatKeys);
 }
+function setThreat(code,down){if(!['KeyQ','KeyE'].includes(code))return;if(down&&(!pageVisible||!['playing','finished'].includes(phase)))return;if(down)threatKeys.add(code);else threatKeys.delete(code);draw();}
+for(const type of ['keydown','keyup'])document.addEventListener(type,e=>{if(!['KeyQ','KeyE'].includes(e.code))return;if(type==='keydown'&&(e.ctrlKey||e.metaKey||e.altKey||e.target.closest?.('input,textarea,select,[contenteditable]:not([contenteditable=false])')||document.querySelector('dialog[open]')))return;setThreat(e.code,type==='keydown');});window.addEventListener('blur',()=>{setThreat('KeyQ',false);setThreat('KeyE',false);});
 const renderMoves=createMoveHistory({document,list:$('move-list'),count:$('move-count'),onSelect:showHistory});
 function history() { const length=chess.history().length,index=historyIndex??length;renderMoves(chess,historyIndex);$('history-first').disabled=$('history-prev').disabled=index===0;$('history-next').disabled=$('history-last').disabled=index===length; }
 function showHistory(index) {
  const length=chess.history().length,old=historyIndex??length; historyIndex=index>=length?null:Math.max(0,index); selected=null; annotations.clear();draw(null,historyTransition(chess,old,historyIndex??length));history();
  status(historyIndex!==null?`Просмотр позиции: ход ${historyIndex} из ${length}.`:phase==='finished'?'Партия завершена.':chess.turn()==='w'?'Ваш ход.':'Ход бота.');
 }
-function navigateHistory(key) { if(!pageVisible || !['playing','finished'].includes(phase) || promotion || document.querySelector('dialog[open]'))return false;const delta=key==='ArrowLeft'||key.toLowerCase()==='a'?-1:key==='ArrowRight'||key.toLowerCase()==='d'?1:0;if(!delta)return false;showHistory((historyIndex??chess.history().length)+delta);return true; }
+function navigateHistory(key,code='') { if(!pageVisible || !['playing','finished'].includes(phase) || promotion || document.querySelector('dialog[open]'))return false;const length=chess.history().length,target=historyKeyTarget(key,code,historyIndex??length,length);if(target===null)return false;showHistory(target);return true; }
+function handleNavigation(key,code='') {
+ const physical=code==='KeyA'?'a':code==='KeyD'?'d':key;
+ if(pageVisible && phase==='choose' && !document.querySelector('dialog[open]')) {
+  if(physical==='ArrowLeft'||physical.toLowerCase()==='a') { switchLevel(level-1); return true; }
+  if(physical==='ArrowRight'||physical.toLowerCase()==='d') { switchLevel(level+1); return true; }
+  if(physical==='Enter' && !$('bot-play').disabled) { $('bot-play').click(); return true; }
+ }
+ return navigateHistory(key,code);
+}
 for(const [id,fn] of [['history-first',()=>0],['history-prev',()=>(historyIndex??chess.history().length)-1],['history-next',()=>(historyIndex??chess.history().length)+1],['history-last',()=>chess.history().length]]) $(id).addEventListener('click',()=>showHistory(fn()));
-document.addEventListener('keydown',event=>{if(event.defaultPrevented||event.ctrlKey||event.altKey||event.metaKey||event.shiftKey||event.target.closest?.('input,textarea,select,[contenteditable]:not([contenteditable=false])'))return;if(navigateHistory(event.key))event.preventDefault();});
+document.addEventListener('keydown',event=>{if(event.defaultPrevented||event.ctrlKey||event.altKey||event.metaKey||event.shiftKey||event.target.closest?.('input,textarea,select,[contenteditable]:not([contenteditable=false])'))return;if(event.key==='Enter' && event.target.closest?.('button,a'))return;if(handleNavigation(event.key,event.code))event.preventDefault();});
 function snapshot() { game.moves=chess.history(); game.updated_at=new Date().toISOString(); store?.put(game); }
 function finishIfNeeded() {
   if(!game || phase!=='playing') return false;
@@ -204,6 +218,7 @@ function finishIfNeeded() {
   else if(chess.isStalemate()) { game.status='draw'; result='Ничья: пат.'; }
   else if(chess.isDraw() || chess.history().length>=1000) { game.status='draw'; result='Ничья.'; }
   if(!result) return false;
+  if(game.status==='white_win'){completedLevels.add(level+1);store?.markWin(level+1);}
   thinking=false; premove=[]; draw(); setPhase('finished'); reveal('resign-wrap',false); status(result); snapshot(); return true;
 }
 function resignAvailable() { return phase==='playing' && game && Date.now()-Date.parse(game.started_at)>=60000; }
@@ -214,7 +229,7 @@ async function botMove() {
   const current=++generation; thinking=true; status(!engine && level===5 ? 'Загружаем полную сеть Stockfish (около 75 МБ)…' : 'Stockfish думает…');
   try {
     if(!engine) engine=createStockfish(level);
-    const move=await engine.move(chess.fen());
+    const [move]=await Promise.all([engine.move(chess.fen()),wait(500)]);
     if(current!==generation || phase!=='playing') return;
     cancelDrag(); selected=null; if(promotion?.premove) { promotion=null; reveal('promotion',false); } last=chess.move(move); thinking=false; draw(last); history(); sound.play(chess.isCheck()?'check':last.captured?'capture':'move');
     if(!finishIfNeeded()) {
@@ -274,9 +289,9 @@ $('resign-confirm').addEventListener('click',()=>{ $('resign-dialog').close(); i
 $('return-button').addEventListener('click',()=>void returnToSelection());
 async function returnToSelection() {
   if(phase!=='playing' && phase!=='finished') return;
-  if(phase==='playing' && !confirm('Вернуться к выбору? Текущая партия будет завершена.')) return;
+  if(phase==='playing' && !confirm('Вернуться к выбору? Текущая партия будет удалена.')) return;
   const current=++generation; engine?.destroy(); engine=null; thinking=false; premove=[]; cancelDrag(); annotations.clear();
-  if(game?.status==='active') { game.status='abandoned'; snapshot(); }
+  const passed=game?.status==='white_win'; if(game) { if(phase==='finished') store?.finish(game.id); else store?.remove(game.id); }
   reveal('promotion',false); reveal('retry-wrap',false); promotion=null;
   const target=$('target-board');
   if(!motion.matches && pageVisible && !document.hidden && target.animate) {
@@ -296,7 +311,7 @@ async function returnToSelection() {
     animation?.cancel(); flyer.remove(); target.style.visibility='';
     if(current!==generation || destroyed) return;
   }
-  game=null; chess=new Chess(); selected=null; last=null; setPhase('choose'); status('');
+  game=null; chess=new Chess(); selected=null; last=null; setPhase('choose'); status(''); showLevel(); if(passed){await wait(motion.matches?0:650);if(current===generation&&!destroyed)switchLevel(Math.min(BOT_LEVELS.length-1,Math.max(...completedLevels)));}
   if(pageVisible && !document.hidden) animateEntry();
 }
 $('retry-bot').addEventListener('click',()=>{ reveal('retry-wrap',false); void botMove(); });
@@ -356,6 +371,7 @@ async function launch() {
 $('bot-play').addEventListener('click',()=>void launch());
 async function restore(id) {
   userId=id; store=createBotStorage({client:supabase,userId:id,storage:window.localStorage,onStatus:text=>{$('save-status').textContent=/^(Партия сохранена|Сохраняем партию)/.test(text)?'':text;}});
+  const wins=await store.completed();if(destroyed||userId!==id)return;completedLevels=new Set(wins);if(phase==='choose'&&wins.length){level=Math.min(BOT_LEVELS.length-1,Math.max(...wins));carouselPosition=level;carouselVelocity=0;showLevel();positionOrbit();}
   const row=await store.restore(); if(destroyed || userId!==id || phase!=='choose' || !row) return;
   try {
     if(!Number.isInteger(row.level) || row.level<1 || row.level>6 || !Array.isArray(row.moves) || row.moves.length>1000 || !Number.isFinite(Date.parse(row.started_at))) throw Error('invalid save');
@@ -399,9 +415,10 @@ function animateEntry() {
 }
 window.addEventListener('message',event=>{
   if(event.origin!==location.origin || event.source!==window.parent) return;
-  if(event.data?.type==='shahmat-history-key' && typeof event.data.key==='string') { navigateHistory(event.data.key); return; }
+  if(event.data?.type==='shahmat-threat-key'){setThreat(event.data.code,!!event.data.down);return;}
+  if(event.data?.type==='shahmat-history-key' && typeof event.data.key==='string') { handleNavigation(event.data.key,event.data.code); return; }
   if(event.data?.type==='shahmat-profile-updated') { setPlayerAvatar(event.data.avatar); return; }
-  if(event.data?.type==='shahmat-bot-hidden') { pageVisible=false; stopOrbit(); return; }
+  if(event.data?.type==='shahmat-bot-hidden') { pageVisible=false;setThreat('KeyQ',false);setThreat('KeyE',false); stopOrbit(); return; }
   if(event.data?.type==='shahmat-bot-shown') { const wasHidden=!pageVisible; pageVisible=true; startOrbit(); if(wasHidden) animateEntry(); return; }
   if(event.data?.type!=='shahmat-appearance') return;
   const targets={'--page-background':'--bg','--foreground':'--ink','--surface':'--surface','--surface-raised':'--surface-alt','--line':'--line','--button-background':'--control','--button-text':'--control-ink','--accent':'--accent','--board-light':'--board-light','--board-dark':'--board-dark'};

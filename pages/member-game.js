@@ -1,9 +1,11 @@
+import {pieceSrc as themedPieceSrc,setPublicPiece} from './piece-theme.js';
 import {applyProfileTheme,isProfileImage,profileAvatarColor} from './profile-theme.js';
 import { Chess } from 'chess.js';
+import {renderCaptures,renderThreats} from './board-insights.js';
 import { premoveTargets, validPremove, normalizePremove, projectPremoves } from './premove.js';
 import { createBoardAnnotations } from './board-annotations.js';
 import { createMemberBoard } from './member-board.js';
-import { createMoveHistory, historyTransition } from './move-history.js';
+import { createMoveHistory, historyTransition, historyKeyTarget } from './move-history.js';
 import { createGameSound } from './game-sound.js';
 import { createRollingClock } from './rolling-clock.js';
 import { retryMessage } from './match-api.js';
@@ -13,7 +15,7 @@ const times = { blitz: 180000, rapid: 600000, classical: 3600000 };
 const modeLabels = { blitz:'Блиц · 3 мин', rapid:'Рапид · 10 мин', classical:'Классика · 1 час' };
 const names = { k:'король', q:'ферзь', r:'ладья', b:'слон', n:'конь', p:'пешка' };
 const files = 'abcdefgh';
-const pieceSrc = (color, type) => `/pieces/cburnett/${color}${type.toUpperCase()}.svg`;
+const pieceSrc = (color, type) => themedPieceSrc(color,type);
 export function formatClock(ms) {
   if (ms == null) return '00:00';
   const seconds = Math.max(0, Math.ceil(ms / 1000));
@@ -21,17 +23,18 @@ export function formatClock(ms) {
   return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-export function createMemberGame({ document, api, opponentName = async () => null, playerRatings = async () => null, now = () => performance.now() }) {
+export function createMemberGame({ document, api, opponentName = async () => null, playerRatings = async () => null, onGameChanged = () => {}, now = () => performance.now() }) {
   const $ = id => document.getElementById(id), win = document.defaultView;
   const board = $('board'), start = $('start-search'), cancel = $('cancel-search'), reset = $('new-game');
   const promotion = $('promotion'), options = $('promotion-options');
   let userId = null, ready = false, chess = new Chess(), latestMove = null, mode = null, phase = 'idle', selected = null, pending = null;
   let snapshot = null, receivedAt = 0, polling = null, generation = 0, moving = false, pendingSearch = null, viewVisible = true, browserVisible = true, pollFailures = 0;
   let currentRequest = null, destroyed = false, reconciling = false, cancelPending = false;
+  let threatKeys = new Set();
   let premove = [], historyIndex = null, nameForGame = null, nameTimer = null, drag = null, suppressClick = false, actionPending = false;
   let rankUnit = 'yar', ownScore = null, scores = null, ratingsKey = null, ratingsRequest = 0, ratingsRetryAt = 0;
   const format = value => value == null || !Number.isFinite(Number(value)) ? '' : `(${new Intl.NumberFormat('ru-RU', { maximumFractionDigits:0 }).format(Number(value))} ${rankUnit === 'elo' ? 'Эло' : 'ЯР'})`;
-  function setAvatar(who, value) { const img = $(`${who}-avatar-image`); if(!img)return; const custom=typeof value==='string' && /^data:image\/(?:png|jpeg);base64,/.test(value); img.src=custom?value:`/pieces/cburnett/${who==='player'?'wN':'bN'}.svg`; img.classList.toggle('custom-profile-avatar',custom); }
+  function setAvatar(who, value, set) { const img = $(`${who}-avatar-image`); if(!img)return; const custom=typeof value==='string' && /^data:image\/(?:png|jpeg);base64,/.test(value); if(who==='opponent')setPublicPiece(img,set,'b');else {delete img.dataset.pieceFixed;img.src=themedPieceSrc('w','n');}if(custom)img.src=value; img.classList.toggle('custom-profile-avatar',custom); }
   function renderRatings() {
     for (const who of ['player','opponent']) {
       const data=who === 'player' ? (scores?.self || ownScore) : scores?.opponent; const rating = $(who + '-rating'); if (rating) rating.textContent = format(data?.[rankUnit]); const badge=$(who+'-top-status'); if(badge){const place=Number(data?.topPlace);badge.hidden=!(place>=1&&place<=5);badge.textContent=badge.hidden?'':`Топ ${place}`;} const img=$(who+'-avatar-image');if(img)img.parentElement.style.backgroundColor=profileAvatarColor(data?.palette);
@@ -47,7 +50,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
       if (!Array.isArray(rows)) throw new Error('missing ratings');
       scores = Object.fromEntries(rows.filter(row => row.player === 'self' || row.player === 'opponent').map(row => [row.player,row]));
       const name = scores.self?.username; if (typeof name === 'string' && name && $('player-name')) { $('player-name').textContent = name; $('player-profile-trigger').dataset.profileName = name; }
-      setAvatar('player',scores.self?.avatar); setAvatar('opponent',scores.opponent?.avatar);
+      setAvatar('player',scores.self?.avatar); setAvatar('opponent',scores.opponent?.avatar,scores.opponent?.piece_set);
       renderRatings();
     }).catch(() => { if (request === ratingsRequest) { ratingsKey = null; ratingsRetryAt = now() + 8000; } });
   }
@@ -133,6 +136,8 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     const legal = selected && historyIndex === null ? legalFor(selected).map(move => move.to) : [];
     const last = historyIndex === null ? latestMove : shown.history({ verbose:true }).at(-1);
     boardView.render({ shown, selected, legal, last, premoves: historyIndex === null ? premove : [], actual: historyIndex === null && premove.length ? chess : null, premoveMode: (chess.turn() !== color || premove.length > 0) && historyIndex === null, transitions, animatedMove: historyIndex === null ? animatedMove : null });
+    const actualShown=historyIndex===null?chess:shown;
+    renderThreats(actualShown,color,boardView,threatKeys);renderCaptures(actualShown,color,$('player-captured'),$('opponent-captured'));
     // Establish initial rotation before the board changes sides.
     if (board.classList.contains('waiting') && snapshot) void board.offsetWidth;
     board.classList.toggle('waiting', !snapshot); board.classList.toggle('black', !!snapshot && color === 'b');
@@ -167,7 +172,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
       const name = typeof profile === 'string' ? profile : profile.username;
       if (typeof name === 'string' && name) { opponentProfileName=name; revealName(name); $('opponent-profile-name').textContent = name; }
       if (typeof profile === 'object' && 'bio' in profile) { const bio=profile.bio?.trim()||''; $('opponent-profile-bio').textContent=bio; $('opponent-profile-bio').hidden=!bio; if($('opponent-profile-bio-label')) $('opponent-profile-bio-label').hidden=!bio; }
-      if(typeof profile === 'object') { applyProfileTheme(profileCard,profile.palette,profile.theme); const avatar=$('opponent-profile-avatar'),banner=$('opponent-profile-banner'); if(avatar){avatar.src=isProfileImage(profile.avatar)?profile.avatar:'/pieces/cburnett/bN.svg';avatar.classList.toggle('custom',isProfileImage(profile.avatar));} if(banner){banner.hidden=!isProfileImage(profile.banner);if(!banner.hidden)banner.src=profile.banner;} }
+      if(typeof profile === 'object') { applyProfileTheme(profileCard,profile.palette,profile.theme); const avatar=$('opponent-profile-avatar'),banner=$('opponent-profile-banner'); if(avatar){if(isProfileImage(profile.avatar))avatar.src=profile.avatar;else setPublicPiece(avatar,profile.piece_set,'b');avatar.classList.toggle('custom',isProfileImage(profile.avatar));} if(banner){banner.hidden=!isProfileImage(profile.banner);if(!banner.hidden)banner.src=profile.banner;} }
 
     }).catch(() => {});
   }
@@ -180,6 +185,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   }
   function applyGame(game) {
     if (!game || !Array.isArray(game.moves) || (snapshot && snapshot.id === game.id && game.version < snapshot.version)) return;
+    onGameChanged(game.status==='active'&&isVisible()?game.id:null);
     if (snapshot && snapshot.id === game.id && game.version === snapshot.version && game.status === snapshot.status && !moving) {
       snapshot = game; receivedAt = now(); clockSync.update(game, receivedAt); loadRatings(game); modeControls(); drawClocks(); playQueuedPremove(); return;
     }
@@ -343,14 +349,20 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   board.addEventListener('pointerdown', event => { if(event.button === 2 && premove.length) { premove=[]; selected=null; renderBoard(); statusGame(); } });
   const onPremoveKey = event => { if(event.key === 'Escape' && premove.length) { premove=[]; selected=null; renderBoard(); statusGame(); } };
   document.addEventListener('keydown', onPremoveKey);
-  function navigateHistory(key) {
+  function navigateHistory(key, code = '') {
     if (!isVisible() || !snapshot || !['active','finished'].includes(phase) || pending || document.querySelector('dialog[open]')) return false;
-    const delta = key === 'ArrowLeft' || key.toLowerCase() === 'a' ? -1 : key === 'ArrowRight' || key.toLowerCase() === 'd' ? 1 : 0;
-    if (!delta) return false; showHistory((historyIndex ?? chess.history().length) + delta); return true;
+    const length = chess.history().length, target = historyKeyTarget(key, code, historyIndex ?? length, length);
+    if (target === null) return false; showHistory(target); return true;
   }
+  function setThreat(code,down) { if(!['KeyQ','KeyE'].includes(code))return; if(down && (!isVisible()||!snapshot||!['active','finished'].includes(phase)))return; if(down)threatKeys.add(code);else threatKeys.delete(code);renderBoard(); }
+
+  const onThreatDown = event => { if(event.ctrlKey||event.metaKey||event.altKey||event.target.closest?.('input,textarea,select,[contenteditable]:not([contenteditable=false])')||document.querySelector('dialog[open]'))return;setThreat(event.code,true); };
+  const onThreatUp = event => setThreat(event.code,false);
+  const clearThreats = () => { if(threatKeys.size){threatKeys.clear();renderBoard();} };
+  document.addEventListener('keydown',onThreatDown); document.addEventListener('keyup',onThreatUp); win.addEventListener('blur',clearThreats);
   const onHistoryKey = event => {
     if (event.defaultPrevented || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey || event.target.closest?.('input, textarea, select, [contenteditable]:not([contenteditable=false]), [role=textbox]') || document.querySelector('dialog[open]') || pending) return;
-    if (navigateHistory(event.key)) event.preventDefault();
+    if (navigateHistory(event.key, event.code)) event.preventDefault();
   };
   document.addEventListener('keydown', onHistoryKey);
   start.addEventListener('pointerdown', () => sound.prime());
@@ -442,7 +454,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   $('offline-draw').addEventListener('click', () => void finishAction('offline_draw'));
   $('mode-list').addEventListener('change', event => { if (phase === 'idle' && times[event.target.value]) { mode = event.target.value; modeControls(); drawClocks(); if (ready) setStatus('Всё готово к поиску.'); } });
   start.addEventListener('click', () => void search()); cancel.addEventListener('click', () => void cancelSearch());
-  reset.addEventListener('click', () => { annotations.clear(); cancelTimer(); generation++; snapshot = null; scores = null; ratingsKey = null; ratingsRetryAt = 0; ratingsRequest++; renderRatings(); clockSync.clear(); chess = new Chess(); latestMove = null; phase = 'idle'; mode = null; $('mode-list').querySelectorAll('input').forEach(input => { input.checked = false; }); premove = []; historyIndex = null; nameForGame = null; profileTrigger.disabled = true; profilePinned = false; showProfile(false); clearInterval(nameTimer); $('opponent-name').textContent = 'Соперник'; setAvatar('opponent',null); modeControls(); renderBoard(); renderHistory(); drawClocks(); setStatus('Выбери режим.'); });
+  reset.addEventListener('click', () => { annotations.clear(); onGameChanged(null); cancelTimer(); generation++; snapshot = null; scores = null; ratingsKey = null; ratingsRetryAt = 0; ratingsRequest++; renderRatings(); clockSync.clear(); chess = new Chess(); latestMove = null; phase = 'idle'; mode = null; $('mode-list').querySelectorAll('input').forEach(input => { input.checked = false; }); premove = []; historyIndex = null; nameForGame = null; profileTrigger.disabled = true; profilePinned = false; showProfile(false); clearInterval(nameTimer); $('opponent-name').textContent = 'Соперник'; setAvatar('opponent',null); modeControls(); renderBoard(); renderHistory(); drawClocks(); setStatus(''); });
   function pause() { cancelDrag(); if (moving) reconciling = true; if (phase === 'searching') void cancelSearch(); else if (phase !== 'cancelling') { generation++; cancelTimer(); } }
   function resume() {
     if (!userId || destroyed) return;
@@ -462,7 +474,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
         if (!result || !Object.hasOwn(result, 'game') || (result.game && !Array.isArray(result.game.moves))) throw Error('invalid current state');
         ready = true; pollFailures = 0;
         if (result.game && phase === 'idle') applyGame(result.game);
-        else if (phase === 'idle') setStatus(mode ? 'Всё готово к поиску.' : 'Выбери режим.');
+        else if (phase === 'idle') setStatus(mode ? 'Всё готово к поиску.' : '');
         modeControls();
         if (isVisible() && phase === 'active') void poll(++generation);
       } catch (error) {
@@ -486,7 +498,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   modeControls(); renderBoard(); drawClocks(); board.classList.add('ready');
   if (win.parent === win) revealPieces();
   return {
-    navigateHistory,
+    navigateHistory, setThreat, clearThreats,
     setOwnRating(value) { ownScore = value; renderRatings(); },
     setRatingUnit(value) { rankUnit = value === 'elo' ? 'elo' : 'yar'; renderRatings(); },
     setPlayerAvatar(value) { setAvatar('player',value); },
@@ -497,9 +509,9 @@ export function createMemberGame({ document, api, opponentName = async () => nul
       await checkCurrent();
     },
     online() { if (isVisible()) resume(); },
-    hide() { const wasVisible = isVisible(); viewVisible = false; if (wasVisible) pause(); },
-    show() { const wasVisible = isVisible(); const wasShown = viewVisible; viewVisible = true; if (!wasShown) revealPieces(); if (!wasVisible && isVisible()) resume(); },
-    browserVisibility(value) { const wasVisible = isVisible(); browserVisible = value; if (wasVisible && !isVisible()) pause(); else if (!wasVisible && isVisible()) resume(); },
-    destroy() { destroyed = true; document.removeEventListener('keydown', onPremoveKey); document.removeEventListener('keydown', onHistoryKey); annotations.destroy(); generation++; cancelDrag(); cancelTimer(); clearInterval(clockInterval); clearInterval(nameTimer); revealAnimations.forEach(animation => animation.cancel()); Object.values(clocks).forEach(clock => clock.destroy()); sound.destroy(); },
+    hide() { clearThreats(); onGameChanged(null); const wasVisible = isVisible(); viewVisible = false; if (wasVisible) pause(); },
+    show() { if(snapshot?.status==='active'&&browserVisible)onGameChanged(snapshot.id); const wasVisible = isVisible(); const wasShown = viewVisible; viewVisible = true; if (!wasShown) revealPieces(); if (!wasVisible && isVisible()) resume(); },
+    browserVisibility(value) { if(!value)onGameChanged(null);else if(viewVisible&&snapshot?.status==='active')onGameChanged(snapshot.id); const wasVisible = isVisible(); browserVisible = value; if (wasVisible && !isVisible()) pause(); else if (!wasVisible && isVisible()) resume(); },
+    destroy() { destroyed = true; onGameChanged(null); document.removeEventListener('keydown',onThreatDown); document.removeEventListener('keyup',onThreatUp); win.removeEventListener('blur',clearThreats); document.removeEventListener('keydown', onPremoveKey); document.removeEventListener('keydown', onHistoryKey); annotations.destroy(); generation++; cancelDrag(); cancelTimer(); clearInterval(clockInterval); clearInterval(nameTimer); revealAnimations.forEach(animation => animation.cancel()); Object.values(clocks).forEach(clock => clock.destroy()); sound.destroy(); },
   };
 }

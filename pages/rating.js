@@ -1,3 +1,4 @@
+import {setPublicPiece} from './piece-theme.js';
 import {createProfileCard} from './profile-card.js';
 import {profileAvatarColor} from './profile-theme.js';
 // Animata's Fluid Tabs, adapted to native buttons without React or animation dependencies.
@@ -93,21 +94,42 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
   motionPreference?.addEventListener?.('change', onMotionPreferenceChange);
 
   function render(data, animate = false) {
+    const previous = new Map([...list.children].map(row => [row.dataset.profileName, row]));
+    // Capture the current visual position, including an interrupted animation.
+    const positions = new Map([...previous].map(([name,row]) => [name,row.getBoundingClientRect()]));
+    for (const row of previous.values()) row.getAnimations?.().forEach(animation => animation.cancel());
     displayed = data;
-    const fragment = root.ownerDocument.createDocumentFragment(), animated = [];
+    const animated = [], ordered = [], fresh = [];
     for (const [index, player] of data.slice(0,100).entries()) {
-      const row = root.ownerDocument.createElement('li'); row.className = 'rating-row'; row.dataset.profileNoHover=''; row.dataset.profileName=String(player.username ?? '');
-      if (ownName && player.username === ownName) row.classList.add('rating-row-self');
-      const place = root.ownerDocument.createElement('span'); place.className='rating-place'; place.textContent = String(index + 1);
-      const person = root.ownerDocument.createElement('button'); person.type='button'; person.className='rating-person rating-profile-trigger'; person.dataset.profileName=String(player.username ?? '');
-      const avatar = root.ownerDocument.createElement('img'); avatar.className='rating-avatar'; avatar.alt=''; avatar.src='/pieces/cburnett/wN.svg';
-      const name = root.ownerDocument.createElement('span'); name.className='rating-player'; name.textContent = String(player.username ?? ''); person.append(avatar,name);
-      const score = root.ownerDocument.createElement('span'); score.className='rating-score'; score.textContent = formatScore(player);
-      row.append(place,person,score); fragment.append(row);
-      if (animate) { animated.push({el:name,type:'name',value:player.username ?? ''}, {el:score,type:'score',value:player[unit]}); }
+      const nameText=String(player.username ?? '');
+      let row=previous.get(nameText);
+      if (!row) {
+        row=root.ownerDocument.createElement('li'); row.className='rating-row'; row.dataset.profileNoHover=''; row.dataset.profileName=nameText;
+        const place=root.ownerDocument.createElement('span'); place.className='rating-place';
+        const person=root.ownerDocument.createElement('button'); person.type='button'; person.className='rating-person rating-profile-trigger'; person.dataset.profileName=nameText;
+        const avatar=root.ownerDocument.createElement('img'); avatar.className='rating-avatar'; avatar.alt=''; avatar.src='/pieces/cburnett/wN.svg';
+        const name=root.ownerDocument.createElement('span'); name.className='rating-player'; name.textContent=nameText; person.append(avatar,name);
+        const score=root.ownerDocument.createElement('span'); score.className='rating-score'; row.append(place,person,score); fresh.push(row);
+        if (animate && !previous.size) animated.push({el:name,type:'name',value:nameText},{el:score,type:'score',value:player[unit]});
+      }
+      row.classList.toggle('rating-row-self',!!ownName && nameText===ownName);
+      row.querySelector('.rating-place').textContent=String(index+1);
+      row.querySelector('.rating-score').textContent=formatScore(player);
+      ordered.push(row);
     }
-    list.replaceChildren(fragment);
-    if (animate) animateItems(animated);
+    // Reordering keeps player elements and avatars; restore focus if a moved row held it.
+    const focused=list.contains(root.ownerDocument.activeElement)?root.ownerDocument.activeElement:null;
+    for (const row of ordered) list.append(row);
+    for (const row of previous.values()) if (!ordered.includes(row)) row.remove();
+    if (focused?.isConnected && root.ownerDocument.activeElement!==focused) focused.focus({preventScroll:true});
+    if (!motionPreference?.matches) for (const row of ordered) {
+      const before=positions.get(row.dataset.profileName), after=row.getBoundingClientRect();
+      if (before && row.animate) {
+        const dx=before.left-after.left,dy=before.top-after.top;
+        if (Math.abs(dx)>.5 || Math.abs(dy)>.5) row.animate([{transform:`translate(${dx}px,${dy}px)`},{transform:'translate(0,0)'}],{duration:600,easing:'cubic-bezier(.22,1,.36,1)'});
+      } else if (previous.size && row.animate) row.animate([{opacity:0,transform:'translateY(8px)'},{opacity:1,transform:'none'}],{duration:350,easing:'ease-out'});
+    }
+    if (animated.length) animateItems(animated);
     void loadAvatars(data);
     status.hidden = data.length > 0;
     status.textContent = data.length ? '' : 'Пока нет игроков';
@@ -118,12 +140,13 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
     const request=++avatarRequest, names=[...new Set(data.map(p=>p.username).filter(name=>typeof name==='string'))].slice(0,100);
     if (!names.length) return;
     try {
-      const [{data:avatars,error},{data:themes}]=await Promise.all([client.rpc('profile_avatars',{p_names:names}),Promise.resolve(client.rpc('profile_avatar_themes',{p_names:names})).catch(()=>({data:[]}))]);
+      const [{data:avatars,error},{data:themes},{data:sets}]=await Promise.all([client.rpc('profile_avatars',{p_names:names}),Promise.resolve(client.rpc('profile_avatar_themes',{p_names:names})).catch(()=>({data:[]})),Promise.resolve(client.rpc('profile_piece_sets',{p_names:names})).catch(()=>({data:[]}))]);
       if(error||!Array.isArray(avatars)||destroyed||request!==avatarRequest) return;
+      const pieceSets=new Map((Array.isArray(sets)?sets:[]).map(p=>[p.username,p.piece_set]));
       const colors=new Map((Array.isArray(themes)?themes:[]).map(p=>[p.username,profileAvatarColor(p.palette)]));
       const images=new Map(avatars.filter(a=>typeof a.avatar==='string'&&/^data:image\/(?:png|jpeg);base64,/.test(a.avatar)).map(a=>[a.username,a.avatar]));
-      for(const row of list.children) { const name=row.querySelector('.rating-player')?.textContent, img=row.querySelector('.rating-avatar'); if(img){img.style.backgroundColor=colors.get(name)||profileAvatarColor('monochrome');if(images.has(name)){img.src=images.get(name);img.classList.add('has-custom-avatar');}} }
-      const own=self?.querySelector('.rating-avatar'); if(own)own.style.backgroundColor=colors.get(ownName)||profileAvatarColor('monochrome'); if(own&&images.has(ownName)) {own.src=images.get(ownName);own.classList.add('has-custom-avatar');}
+      for(const row of list.children) { const name=row.querySelector('.rating-player')?.textContent, img=row.querySelector('.rating-avatar'); if(img){img.style.backgroundColor=colors.get(name)||profileAvatarColor('monochrome');if(images.has(name)){img.src=images.get(name);img.classList.add('has-custom-avatar');}else{setPublicPiece(img,pieceSets.get(name));img.classList.remove('has-custom-avatar');}} }
+      const own=self?.querySelector('.rating-avatar'); if(own)own.style.backgroundColor=colors.get(ownName)||profileAvatarColor('monochrome'); if(own&&images.has(ownName)) {own.src=images.get(ownName);own.classList.add('has-custom-avatar');}else if(own){setPublicPiece(own,pieceSets.get(ownName));own.classList.remove('has-custom-avatar');}
     } catch { /* Ranking remains available if images cannot load. */ }
   }
 
@@ -166,7 +189,7 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
       self.querySelector('.rating-self-score').textContent = formatScore(player);
       self.hidden = false;
       {
-        void Promise.all([client.rpc('profile_avatars',{p_names:[ownName]}),client.rpc('profile_avatar_themes',{p_names:[ownName]})]).then(([images,themes])=>{if(destroyed||request!==sequence)return;const image=self.querySelector('.rating-avatar');if(!image)return;image.style.backgroundColor=profileAvatarColor(themes.data?.[0]?.palette);const avatar=images.data?.[0]?.avatar;if(/^data:image\/(?:png|jpeg);base64,/.test(avatar||'')){image.src=avatar;image.classList.add('has-custom-avatar');}else {image.src='/pieces/cburnett/wN.svg';image.classList.remove('has-custom-avatar');}}).catch(()=>{});
+        void Promise.all([client.rpc('profile_avatars',{p_names:[ownName]}),client.rpc('profile_avatar_themes',{p_names:[ownName]}),client.rpc('profile_piece_sets',{p_names:[ownName]})]).then(([images,themes,sets])=>{if(destroyed||request!==sequence)return;const image=self.querySelector('.rating-avatar');if(!image)return;image.style.backgroundColor=profileAvatarColor(themes.data?.[0]?.palette);const avatar=images.data?.[0]?.avatar;if(/^data:image\/(?:png|jpeg);base64,/.test(avatar||'')){image.src=avatar;image.classList.add('has-custom-avatar');}else {setPublicPiece(image,sets.data?.[0]?.piece_set);image.classList.remove('has-custom-avatar');}}).catch(()=>{});
       }
       animateItems([{el:self.querySelector('.rating-self-name'),type:'name',value:player.username ?? ''}, {el:self.querySelector('.rating-self-score'),type:'score',value:player[unit]}]);
       for (const row of list.children) row.classList.toggle('rating-row-self', row.querySelector('.rating-player')?.textContent === ownName);
@@ -215,6 +238,13 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
       void refresh();
     } else if (event.target.closest('.rating-retry')) void refresh({ force:true });
   }
+  function onKey(event) {
+    if (root.hidden || root.inert || root.closest('[hidden],[inert]') || !root.isConnected || event.defaultPrevented || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey || root.ownerDocument.querySelector('dialog[open]') || event.target.closest?.('input,textarea,select,[contenteditable]:not([contenteditable=false])')) return;
+    const delta = event.code === 'KeyA' || event.key === 'ArrowLeft' ? -1 : event.code === 'KeyD' || event.key === 'ArrowRight' ? 1 : 0;
+    if (!delta) return;
+    event.preventDefault(); const index=buttons.findIndex(button=>button.dataset.ratingMode===mode); buttons[(index+delta+buttons.length)%buttons.length].click();
+  }
+  root.ownerDocument.addEventListener('keydown', onKey);
   root.addEventListener('click', onClick);
   return {
     refresh,
@@ -235,7 +265,7 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
     hide() { clearMotion(); profileCard.hide(); },
     destroy() {
       destroyed = true; clearMotion(); sequence++; profileCard.destroy();
-      root.removeEventListener('click', onClick);
+      root.removeEventListener('click', onClick); root.ownerDocument.removeEventListener('keydown', onKey);
       win.removeEventListener('resize', scheduleIndicator);
       motionPreference?.removeEventListener?.('change', onMotionPreferenceChange);
       if (indicatorFrame !== null) win.cancelAnimationFrame(indicatorFrame);

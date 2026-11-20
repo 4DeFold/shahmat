@@ -370,7 +370,7 @@ textarea { resize: vertical; min-height: 92px; }
 .board-square.light { background-color: var(--board-light); }
 .board-square.dark { background-color: var(--board-dark); }
 .board-squares span { position: absolute; inset: 0; display: grid; place-items: center; color: var(--accent); font: 140px/1 Georgia, serif; text-shadow: 1px 2px 0 var(--board-light); transform: rotate(8deg); }
-.board-squares span img { width: 140px; height: 140px; max-width: 90%; filter: drop-shadow(0 2px 2px #0007); }
+.board-squares span img { width: 140px; height: 140px; max-width: 90%; }
 .activity-title { display: flex; justify-content: space-between; align-items: end; gap: 20px; margin: 55px 0 22px; }
 .activity-title h3 { margin: 0; font: 400 25px/1.2 'Playfair Display', Georgia, serif; }
 .activity-title > span { white-space: nowrap; opacity: .65; }
@@ -422,7 +422,7 @@ textarea { resize: vertical; min-height: 92px; }
 
 /* The signed-in area has a persistent left rail; landing and onboarding stay unchanged. */
 .landing:has(.dashboard:not([hidden])) {
-  padding: 40px 40px 40px 248px;
+  padding: 40px 40px 40px 227px;
   align-items: flex-start;
 }
 .dashboard { min-width: 0; }
@@ -430,7 +430,7 @@ textarea { resize: vertical; min-height: 92px; }
   position: fixed;
   z-index: 20;
   inset: 0 auto 0 0;
-  width: 208px;
+  width: 187px;
   min-height: 100vh;
   min-height: 100dvh;
   display: flex;
@@ -691,7 +691,7 @@ textarea { resize: vertical; min-height: 92px; }
 
 /* The game is an independent document inside the persistent account shell. */
 .game-view { width: 100%; min-width: 0; }
-#member-game-frame, #watch-frame { display: block; width: 100%; height: 1100px; min-height: 500px; border: 0; background: var(--page-background); }
+#member-game-frame, #watch-frame, #archive-frame { display: block; width: 100%; height: 1100px; min-height: 500px; border: 0; background: var(--page-background); }
 
 
 /* Settings: equal columns of diagonal colour ribbons in a native scroll strip. */
@@ -715,13 +715,13 @@ textarea { resize: vertical; min-height: 92px; }
 @media (prefers-reduced-motion: reduce) { .palette-scroll { scroll-behavior: auto; } .landing.palette-active .dashboard .settings-palette-list .palette-option { transition: none; } }
 
 /* Game fills the viewport beside the persistent navigation. */
-.landing:has(.dashboard:not([hidden]) :is(#page-game,#page-watch):not([hidden])) { padding: 0 0 0 208px; height: 100dvh; min-height: 0; }
-.landing:has(.dashboard:not([hidden]) :is(#page-game,#page-watch):not([hidden])) .dashboard { width: 100%; height: 100%; }
-.landing:has(.dashboard:not([hidden]) :is(#page-game,#page-watch):not([hidden])) #page-content { height: 100%; }
-:is(#page-game,#page-watch):not([hidden]) { height: 100%; }
-#page-game:not([hidden]) #member-game-frame, #page-watch:not([hidden]) #watch-frame { height: 100%; min-height: 0; }
+.landing:has(.dashboard:not([hidden]) :is(#page-game,#page-watch,#page-archive):not([hidden])) { padding: 0 0 0 187px; height: 100dvh; min-height: 0; }
+.landing:has(.dashboard:not([hidden]) :is(#page-game,#page-watch,#page-archive):not([hidden])) .dashboard { width: 100%; height: 100%; }
+.landing:has(.dashboard:not([hidden]) :is(#page-game,#page-watch,#page-archive):not([hidden])) #page-content { height: 100%; }
+:is(#page-game,#page-watch,#page-archive):not([hidden]) { height: 100%; }
+#page-game:not([hidden]) #member-game-frame, #page-watch:not([hidden]) #watch-frame, #page-archive:not([hidden]) #archive-frame { height: 100%; min-height: 0; }
 @media (max-width: 700px), (max-height: 500px) and (pointer: coarse) {
-  .landing:has(.dashboard:not([hidden]) :is(#page-game,#page-watch):not([hidden])) { padding: 68px 0 0; }
+  .landing:has(.dashboard:not([hidden]) :is(#page-game,#page-watch,#page-archive):not([hidden])) { padding: 68px 0 0; }
 }
 
 /* A transformed dashboard becomes a containing block for its fixed sidebar. */
@@ -782,8 +782,8 @@ body.startup-ready #landing-screen:not([hidden]) .hero-reveal--tail { animation-
   #auth-submit:hover::after { animation: none; }
 }
 
-/* The wordmark fills roughly 90% of the full 208px desktop rail. */
-.sidebar-brand { width: calc(100% + 28px); margin-inline: -14px; padding-inline: 0; font-size: 36px; }
+/* The wordmark fills roughly 90% of the full desktop rail. */
+.sidebar-brand { width: calc(100% + 28px); margin-inline: -14px; padding-inline: 0; font-size: 32px; }
 
 /* Navigation hit areas and highlights span the rail without shifting their contents. */
 .sidebar-nav > .sidebar-item, .sidebar-account > .sidebar-item {
@@ -914,22 +914,17 @@ body.startup-ready #landing-screen:not([hidden]) .hero-reveal--tail { animation-
 /* Rank-unit setting and an accessible description for hover, touch and keyboard. */
 .rank-setting { margin: 36px 0 44px; max-width: 680px; }
 .rank-setting-line { display:flex; flex-wrap:wrap; align-items:center; gap:12px; font-size:18px; }
-.rank-unit-options { display:flex; padding:3px; margin:0; border:1px solid var(--line); border-radius:999px; gap:2px; }
-.rank-unit-options label { cursor:pointer; }
-.rank-unit-options input { position:absolute; opacity:0; }
-.rank-unit-options span { display:block; padding:8px 16px; border-radius:999px; }
-.rank-unit-options input:checked + span { background:var(--accent); color:var(--accent-ink); }
-.rank-unit-options input:focus-visible + span, .rank-info-button:focus-visible { outline:2px solid var(--foreground); outline-offset:2px; }
+/* Adapted from Animata Swap Text (MIT): https://animata.design/docs/text/swap-text.
+   Copyright (c) Animata; license: /licenses/animata.txt. */
+.landing.palette-active .dashboard .rank-unit-options { display:inline-flex; border:0; padding:0; margin:0; }
+.rank-unit-options #rank-unit-swap { border:1px solid var(--line); border-radius:999px; background:var(--accent); color:var(--accent-ink); cursor:pointer; padding:5px 16px; font:600 14px/20px system-ui,sans-serif; }
+.rank-unit-options #rank-unit-swap:focus-visible, .rank-info-button:focus-visible { outline:2px solid var(--foreground); outline-offset:2px; }
+.rank-swap-clip { display:block; overflow:hidden; height:20px; min-width:34px; }
+.rank-swap-track { display:block; text-align:center; transition:transform 1s cubic-bezier(.405,0,.025,1); }
+.rank-swap-track > span { display:block; height:20px; }
+.rank-unit-options:has(input[value='elo']:checked) .rank-swap-track { transform:translateY(-50%); }
 .rank-info-button { width:28px; height:28px; border:1px solid var(--line); border-radius:50%; background:transparent; color:var(--ink); font:600 14px Arial,sans-serif; cursor:pointer; }
 .rank-info { margin-top:12px; padding:15px 18px; background:var(--surface-raised); border:1px solid var(--line); line-height:1.5; font-size:15px; }
-/* Compact fluid segmented control, following Animata's moving pill. */
-.landing.palette-active .dashboard .rank-unit-options { position:relative; isolation:isolate; display:inline-flex; width:132px; height:32px; padding:2px; gap:0; border:1px solid var(--line); background:var(--surface-raised); }
-.rank-unit-options::before { content:''; position:absolute; z-index:0; top:2px; bottom:2px; left:2px; width:calc((100% - 4px) / 2); border-radius:999px; background:var(--accent); transform:translateX(0); transition:transform .45s cubic-bezier(.22,1,.36,1), background-color .25s ease; }
-.rank-unit-options:has(input[value='elo']:checked)::before { transform:translateX(100%); }
-.rank-unit-options label { position:relative; z-index:1; width:50%; display:grid; place-items:center; }
-.rank-unit-options input { inset:0; width:100%; height:100%; margin:0; cursor:pointer; }
-.landing.palette-active .dashboard .rank-unit-options label span { width:100%; padding:4px 8px; text-align:center; background:transparent; color:var(--ink); font-size:14px; line-height:20px; transition:color .25s ease; }
-.landing.palette-active .dashboard .rank-unit-options input:checked + span { color:var(--accent-ink); background:transparent; }
 /* The outer grid animates the actual height, while the inner text blurs in. */
 .landing.palette-active .dashboard .rank-info { display:grid; grid-template-rows:0fr; margin:0; padding:0; border:0; background:transparent; transition:grid-template-rows .48s cubic-bezier(.22,1,.36,1); }
 .landing.palette-active .dashboard .rank-info.is-open { grid-template-rows:1fr; }
@@ -942,12 +937,12 @@ body.startup-ready #landing-screen:not([hidden]) .hero-reveal--tail { animation-
 .landing.palette-active .dashboard :is(.rating-player,.rating-score,.rating-self-name,.rating-self-score).rating-animating { position:relative; color:transparent; transition:none; }
 .rating-animating::after { content:attr(data-animated); position:absolute; inset:0; color:var(--ink); pointer-events:none; }
 @media (prefers-reduced-motion: reduce) {
-  .rank-unit-options::before, .landing.palette-active .dashboard .rank-unit-options label span,
+  .rank-swap-track,
   .landing.palette-active .dashboard .rank-info, .landing.palette-active .dashboard .rank-info-content { transition:none; }
 }
 
 /* Bot uses the same full-height frame and rail geometry as online play. */
-.landing:has(.dashboard:not([hidden]) #page-bot:not([hidden])) { padding:0 0 0 208px; height:100dvh; min-height:0; }
+.landing:has(.dashboard:not([hidden]) #page-bot:not([hidden])) { padding:0 0 0 187px; height:100dvh; min-height:0; }
 .landing:has(.dashboard:not([hidden]) #page-bot:not([hidden])) .dashboard,
 .landing:has(.dashboard:not([hidden]) #page-bot:not([hidden])) #page-content,
 #page-bot:not([hidden]), #page-bot:not([hidden]) #bot-game-frame { width:100%; height:100%; min-height:0; }
@@ -993,3 +988,28 @@ body.startup-ready #landing-screen:not([hidden]) .hero-reveal--tail { animation-
 .board-guide { max-width: 620px; margin-top: 36px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-raised); }
 .board-guide h3 { margin: 0 0 12px; font: 400 24px/1.2 'Playfair Display', Georgia, serif; }
 .board-guide p { margin: 10px 0 0; font-size: 14px; line-height: 1.55; }
+
+.support-enter > .board-guide { animation:support-reveal .75s 100ms cubic-bezier(.22,1,.36,1) both; }
+.rating-page { padding-top:clamp(9px,2vw,25px); }
+@media (max-width:700px) { .rating-page { padding-top:7px; } }
+@media (prefers-reduced-motion:reduce) { .support-enter > .board-guide { animation:none; } }
+
+@media (min-width:701px) { .landing:has(.dashboard:not([hidden]) #page-rating:not([hidden])) { padding-top:13px; } }
+
+.landing .rating-score,.landing .rating-self-score {font-family:'Inclusive Sans',sans-serif;font-variant-numeric:tabular-nums}
+
+.piece-settings{margin-top:clamp(46px,7vw,82px)}.piece-settings h3{margin:0;font:400 clamp(36px,4.5vw,58px)/1.1 'Playfair Display',Georgia,serif;letter-spacing:-.04em}.piece-settings h3 span{opacity:.4}.piece-settings p{margin:12px 0 24px}.piece-options{border:0;padding:0;margin:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}.piece-options label{position:relative;cursor:pointer;min-width:0}.piece-options input{position:absolute;opacity:0}.piece-option{display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px 8px;border:1px solid var(--line);background:var(--surface);color:var(--foreground);min-height:112px}.piece-options input:checked+.piece-option{outline:2px solid var(--foreground);outline-offset:-2px}.piece-options input:focus-visible+.piece-option{outline:3px solid var(--accent);outline-offset:2px}.piece-preview{display:flex;background:linear-gradient(90deg,#d6c7ad 50%,#988970 50%);width:100%;justify-content:center}.piece-preview img{width:min(50%,60px);height:auto}.piece-option strong{font:600 13px system-ui,sans-serif}@media(max-width:700px){.piece-options{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+.piece-preview-board{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));width:100%;aspect-ratio:2;overflow:hidden}.piece-preview-cell{position:relative;aspect-ratio:1}.piece-preview-cell.light{background:var(--board-light)}.piece-preview-cell.dark{background:var(--board-dark)}.piece-preview-cell img{display:block;width:100%;height:100%;object-fit:contain}.piece-option{position:relative;transition:background-color .3s,color .3s,border-color .3s}.piece-option::after{content:"";position:absolute;inset:0;pointer-events:none;border:2px solid var(--foreground);opacity:0;transition:opacity .35s ease}.piece-options input:checked+.piece-option{outline:none}.piece-options input:checked+.piece-option::after{opacity:1}.piece-options input:focus-visible+.piece-option{outline:3px solid var(--accent);outline-offset:2px}@media(prefers-reduced-motion:reduce){.piece-option,.piece-option::after{transition:none}}
+
+.piece-settings .piece-credits { font-size:12px; line-height:1.5; opacity:.75; margin:14px 0 0; }
+
+/* Full-size static game board, revealed only by an explicit piece selection. */
+.piece-full-section { margin-top:28px; }
+.piece-full-section h4 { font:600 15px/1.4 system-ui,sans-serif; margin:0 0 12px; }
+.piece-full-board { width:min(100%, 816px, calc(100dvh + 12px)); aspect-ratio:1; display:grid; grid-template-columns:repeat(8,minmax(0,1fr)); grid-template-rows:repeat(8,minmax(0,1fr)); border:5px solid var(--board-frame, #282827); overflow:hidden; }
+.piece-full-cell { display:grid; place-items:center; min-width:0; min-height:0; }
+.piece-full-cell.light { background:var(--board-light); }
+.piece-full-cell.dark { background:var(--board-dark); }
+.piece-full-cell img { display:block; width:92%; height:92%; object-fit:contain; user-select:none; }
+@media(max-width:700px) { .piece-full-board { width:min(100%, 500px); } }

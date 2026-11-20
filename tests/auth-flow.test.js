@@ -8,7 +8,7 @@ const shellHtml = await readFile('pages/app-shell.html', 'utf8');
 const pageHtml = (await Promise.all(['home', 'game-view', 'profile', 'settings', 'help'].map(name => readFile(`pages/${name}.html`, 'utf8')))).join('');
 // Unit tests preload views; browser checks verify the actual lazy loading.
 const html = rootHtml.replace('    </main>', shellHtml.replace('<div id="page-content"></div>', `<div id="page-content">${pageHtml}</div>`) + '    </main>');
-const source = (await readFile('app.js', 'utf8')).replace(/import .*?;\n/g, '').replace('export const appReady = initialize();', 'initialize();');
+const source = 'const installPieceTheme = () => {}; const setPieceSet = () => {}; const selectedPieceSet = () => "cburnett"; const validPieceSet = () => "cburnett";\n' + (await readFile('app.js', 'utf8')).replace(/import .*?;\n/g, '').replace('export const appReady = initialize();', 'initialize();');
 const tick = () => new Promise(resolve => setTimeout(resolve, 10));
 async function setup({ existing = false, palette = 'monochrome', failSave = false, systemDark = false, initialStorage = {}, saveHandler = null, getUserHandler = null, userId = 'user-1', otpReady = true, autoConfirm = false, signupError = null, signInHandler = null, url = 'https://example.com', accessToken = null, feedbackHandler = null } = {}) {
   const dom = new JSDOM(html, { runScripts: 'outside-only', url });
@@ -554,26 +554,16 @@ test('settings contains palette options and keeps selection when navigating', as
 });
 
 
-test('palette mouse wheel scrolls the strip and leaves page scrolling available at edges', async () => {
+test('palette scrolling ignores vertical wheel and preserves native horizontal scrolling', async () => {
   const { $, window } = await setup({ existing: true });
   const strip = $('palette-scroll');
   Object.defineProperties(strip, { scrollWidth: { value: 900 }, clientWidth: { value: 300 } });
-  let scroll = null;
-  strip.scrollBy = options => { scroll = options; };
-  const wheel = values => {
-    const event = new window.WheelEvent('wheel', { bubbles: true, cancelable: true, ...values });
-    strip.dispatchEvent(event); return event;
-  };
-  assert.equal(wheel({ deltaY: -30 }).defaultPrevented, false);
-  assert.equal(wheel({ deltaY: 60 }).defaultPrevented, true);
-  assert.equal(scroll.left, 60);
-  assert.equal(scroll.behavior, 'instant'); // test setup prefers reduced motion
-  scroll = null;
-  assert.equal(wheel({ deltaX: 60, deltaY: 10 }).defaultPrevented, false);
-  assert.equal(wheel({ deltaY: 50, ctrlKey: true }).defaultPrevented, false);
+  let scroll = null; strip.scrollBy = options => { scroll = options; };
+  const wheel = values => { const event = new window.WheelEvent('wheel', { bubbles:true, cancelable:true, ...values }); strip.dispatchEvent(event); return event; };
+  assert.equal(wheel({ deltaY:60 }).defaultPrevented, false);
+  assert.equal(wheel({ deltaX:60, deltaY:10 }).defaultPrevented, false);
+  assert.equal(wheel({ deltaY:50, ctrlKey:true }).defaultPrevented, false);
   assert.equal(scroll, null);
-  strip.scrollLeft = 600;
-  assert.equal(wheel({ deltaY: 20 }).defaultPrevented, false);
 });
 
 

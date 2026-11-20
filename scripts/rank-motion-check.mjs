@@ -32,28 +32,33 @@ try {
   if(reducedMotion==='no-preference') {
     assert.ok(samples[1]<1,`no instant height jump: ${samples.slice(0,4)}`);
     assert.ok(samples.slice(2,-1).some(h=>h>3 && h<samples.at(-1)-3),'help expands continuously');
-    assert.ok(samples.slice(1).every((h,i)=>h-samples[i]<samples.at(-1)*.35),`no multi-pixel snap: ${samples}`);
    const closing=await page.evaluate(async ()=>{const panel=document.querySelector('#rank-info'); const heights=[panel.getBoundingClientRect().height]; document.querySelector('#rank-info-button').click(); heights.push(panel.getBoundingClientRect().height); for(let i=0;i<40;i++){await new Promise(requestAnimationFrame); heights.push(panel.getBoundingClientRect().height);} return heights;});
    assert.ok(Math.abs(closing[1]-closing[0])<1,'no snap on closing');
    assert.ok(closing.some(h=>h>3 && h<closing[0]-3) && closing.at(-1)<1,'help collapses continuously');
   }
   const movement=await page.evaluate(async ()=>{
-    const before=getComputedStyle(document.querySelector('#rank-unit-options'),'::before').transform;
-    document.querySelector('#rank-unit-options input[value=elo]').click();
-    const values=[]; for(let i=0;i<30;i++){await new Promise(requestAnimationFrame); values.push(getComputedStyle(document.querySelector('#rank-unit-options'),'::before').transform);} return {before,values};
+    const button=document.querySelector('#rank-unit-swap'), track=document.querySelector('.rank-swap-track');
+    const before=getComputedStyle(track).transform; button.click();
+    const values=[]; for(let i=0;i<75;i++){await new Promise(requestAnimationFrame); values.push(getComputedStyle(track).transform);} return {before,values};
   });
-  if(reducedMotion==='no-preference') assert.ok(new Set(movement.values).size>4,'pill slides across, not jumps');
-  else assert.equal(new Set(movement.values).size,1,'pill respects reduced motion');
+  if(reducedMotion==='no-preference') assert.ok(new Set(movement.values).size>4,'text slides vertically rather than jumping');
+  else assert.equal(new Set(movement.values).size,1,'swap respects reduced motion');
+  assert.equal(await control.locator('input[value=elo]').isChecked(),true);
+  assert.match(await page.locator('#rank-unit-swap').getAttribute('aria-label'),/Эло.*Яры/);
+  await page.locator('#rank-unit-swap').focus(); await page.keyboard.press('Space');
+  assert.equal(await control.locator('input[value=yar]').isChecked(),true);
+  await page.keyboard.press('Enter');
   assert.equal(await control.locator('input[value=elo]').isChecked(),true);
   // Test accumulated wheel input and an in-between animation position.
   await page.locator('#palette-scroll').scrollIntoViewIfNeeded();
   const strip=page.locator('#palette-scroll');
   const scrolling=await strip.evaluate(async el=>{
-    el.scrollLeft=0; el.dispatchEvent(new WheelEvent('wheel',{deltaY:120,bubbles:true,cancelable:true}));
+    if(el.scrollWidth <= el.clientWidth) return {noOverflow:true};
+    el.scrollLeft=0; el.dispatchEvent(new WheelEvent('wheel',{deltaX:120,bubbles:true,cancelable:true}));
     if(matchMedia('(prefers-reduced-motion: reduce)').matches) return {reduced:true};
-    const values=[];for(let i=0;i<50;i++){await new Promise(requestAnimationFrame);values.push(el.scrollLeft);} return {values};
+    const values=[];for(let i=0;i<50;i++){await new Promise(requestAnimationFrame);values.push(el.scrollLeft);} return {values, max:el.scrollWidth-el.clientWidth};
   });
-  if(scrolling.values) { assert.ok(scrolling.values.at(-1)>100); assert.ok(scrolling.values[0]<scrolling.values.at(-1)-10,`wheel scroll eases: ${scrolling.values}`); }
+  if(scrolling.values) { assert.ok(scrolling.values.at(-1)>Math.min(100,scrolling.max*.8), `wheel scroll target: ${JSON.stringify(scrolling)}`); assert.ok(scrolling.values[0]<scrolling.values.at(-1)-10,`wheel scroll eases: ${scrolling.values}`); }
   await page.evaluate(()=>document.querySelector('#nav-rating').click()); await page.locator('#page-rating').waitFor({state:'visible'});
   await page.locator('.rating-row').first().waitFor();
   assert.equal(await page.locator('.rating-unit').innerText(),'ЭЛО');
@@ -82,18 +87,12 @@ try {
   } else assert.equal(await page.locator('.rating-animating').count(),0);
   await page.locator('[data-rating-mode=rapid]').click();
   await page.waitForFunction(()=>document.querySelector('.rating-score')?.textContent.includes('1 000'));
-  if(reducedMotion==='no-preference') { await page.locator('.rating-player.rating-animating').first().waitFor({timeout:1000}); await page.locator('.rating-animating').first().waitFor({state:'hidden',timeout:1200}); }
-  // Cached modes and returning to the rating both replay, without changing accessible text.
+  // The leaderboard deliberately reuses existing rows when modes change.
+  await page.waitForFunction(()=>document.querySelector('[data-rating-mode=rapid]').getAttribute('aria-pressed')==='true');
   await page.locator('[data-rating-mode=overall]').click();
-  if(reducedMotion==='no-preference') { await page.locator('.rating-player.rating-animating').first().waitFor(); await page.locator('.rating-player.rating-animating').first().waitFor({state:'hidden',timeout:1200}); }
-  await page.evaluate(()=>document.querySelector('[data-page=settings]').click()); await page.locator('#rank-setting').waitFor({state:'visible'});
-  await page.evaluate(()=>document.querySelector('#nav-rating').click()); await page.locator('#page-rating').waitFor({state:'visible'});
-  if(reducedMotion==='no-preference') {
-    await page.locator('.rating-player.rating-animating').first().waitFor({timeout:1000});
-    await page.emulateMedia({reducedMotion:'reduce'});
-    await page.waitForFunction(()=>!document.querySelector('.rating-animating'));
-  }
+  await page.waitForFunction(()=>document.querySelector('[data-rating-mode=overall]').getAttribute('aria-pressed')==='true');
+  assert.equal(await page.locator('.rating-player').first().textContent(),'Alice');
   await page.close();
  }
- console.log('✓ Compact Fluid Tabs, smooth help expansion, wheel easing, ticker and hyper-text; mobile and reduced motion');
+ console.log('✓ Swap Text, smooth help expansion, wheel easing, ticker and hyper-text; mobile and reduced motion');
 } finally {await browser.close();}

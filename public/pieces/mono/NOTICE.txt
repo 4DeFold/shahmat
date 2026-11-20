@@ -1,0 +1,5 @@
+mono chess pieces by Thibault Duplessis and Colin M. L. Burnett
+License: GPL-2.0-or-later; see LICENSE.txt.
+Source: https://github.com/lichess-org/lila/tree/63ce12333414a2762f2f042e18e3dd528845adda/public/piece/mono
+Lichess attribution and license declaration: https://github.com/lichess-org/lila/blob/63ce12333414a2762f2f042e18e3dd528845adda/COPYING.md
+Modified: Recoloured six original monochrome silhouettes into separate black and white variants with black outlines.
