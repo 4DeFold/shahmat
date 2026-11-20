@@ -245,7 +245,7 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
     board.setAttribute('aria-busy','true');
     // Keep the previous rows in place while another mode loads instead of
     // collapsing and expanding the board. They are replaced atomically.
-    if (!cached && !displayed) { status.hidden = false; status.textContent = 'Загрузка…'; }
+    if (!cached && !displayed) { status.hidden = false; status.textContent = ''; status.setAttribute('aria-label','Загрузка'); }
     try {
       const data = await fetchMode(requestedMode);
       if (destroyed || request !== sequence) return;
@@ -261,7 +261,7 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
     } catch {
       if (destroyed || request !== sequence) return;
       status.hidden = false; status.textContent = 'Не удалось загрузить рейтинг'; retry.hidden = false;
-    } finally { if (!destroyed && request === sequence) board.setAttribute('aria-busy','false'); }
+    } finally { if (!destroyed && request === sequence) { board.setAttribute('aria-busy','false'); status.removeAttribute('aria-label'); } }
   }
   function onClick(event) {
     const button = event.target.closest('[data-rating-mode]');

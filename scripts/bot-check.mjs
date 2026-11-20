@@ -11,7 +11,7 @@ try {
  for(const [viewport,reducedMotion] of [[{width:1440,height:900},'no-preference'],[{width:390,height:844},'no-preference'],[{width:844,height:390},'no-preference'],[{width:390,height:844},'reduce']]) {
   const page=await browser.newPage({viewport,reducedMotion,...(viewport.width===844?{isMobile:true,hasTouch:true}:{})}); const errors=[],writes=[];
   page.on('pageerror',error=>errors.push(error.message));
-  await page.addInitScript(value=>localStorage.setItem('sb-eswyxbyddkajysogtglp-auth-token',JSON.stringify(value)),session);
+  await page.addInitScript(value=>{Math.random=()=>.1;localStorage.setItem('sb-eswyxbyddkajysogtglp-auth-token',JSON.stringify(value));},session);
   await page.route('https://eswyxbyddkajysogtglp.supabase.co/**',route=>{
    const path=new URL(route.request().url()).pathname;
    if(path==='/auth/v1/user') return route.fulfill({json:user});

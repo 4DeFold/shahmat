@@ -290,6 +290,7 @@ async function loadView(name) {
     const { default: html } = await pageLoaders[name]();
     if (!dashboardPreloadEnabled || $('dashboard-screen').hidden || $(viewId(name))) return;
     $('page-content').insertAdjacentHTML('beforeend', html);
+    if (name === 'home') void import('./pages/home-particles.js').then(({createHomeParticles}) => { const home=$('dashboard-home'); if(home&&!home.dataset.particlesReady) { home.dataset.particlesReady='true'; createHomeParticles(home); } }).catch(()=>{});
     if (name === 'rating') { ratingView = createRatingView($('page-rating'), supabase, { showSelf:true, onOpenProfile:openOtherProfile }); ratingView.setUnit(rankUnit); }
     if (name === 'settings') { applyPalette(selectedPalette); applyRankUnit(rankUnit); window.dispatchEvent(new Event('shahmat-piece-set')); }
     if (name === 'profile') {
@@ -351,7 +352,7 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
     hideProfileData(); ratingView?.hide();
     for (const [id,type] of [['member-game-frame','game'],['bot-game-frame','bot'],['watch-frame','watch'],['archive-frame','archive']])
       $(id)?.contentWindow?.postMessage({type:`shahmat-${type}-hidden`},window.location.origin);
-    if (!$('page-loading')) $('page-content').insertAdjacentHTML('beforeend', '<section class="empty-page page-loading" id="page-loading" role="status" aria-live="polite"><span class="particle-loading" data-loading="page" hidden aria-hidden="true"><canvas></canvas></span><span>Загрузка…</span></section>');
+    if (!$('page-loading')) $('page-content').insertAdjacentHTML('beforeend', '<section class="empty-page page-loading" id="page-loading" role="status" aria-live="polite" aria-label="Загрузка"><span class="particle-loading" data-loading="page" hidden aria-hidden="true"><canvas></canvas></span></section>');
   }
   document.querySelectorAll('#dashboard-screen [data-page]').forEach(link => {
     if (link.dataset.page === name) link.setAttribute('aria-current','page'); else link.removeAttribute('aria-current');

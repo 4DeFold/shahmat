@@ -6,7 +6,7 @@ const id='12345678-1234-1234-1234-123456789012',user={id,aud:'authenticated',rol
 const session={access_token:token,token_type:'bearer',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,refresh_token:'mock',user};
 try {for(const viewport of [{width:1440,height:900},{width:390,height:844}]){
  const page=await browser.newPage({viewport,reducedMotion:process.env.MOTION || 'reduce'}),errors=[];page.on('pageerror',e=>errors.push(e.message));
- await page.addInitScript(s=>{localStorage.setItem('sb-eswyxbyddkajysogtglp-auth-token',JSON.stringify(s));window.Worker=class{postMessage(m){if(m==='uci')setTimeout(()=>this.onmessage?.({data:'uciok'}),0);if(m==='isready')setTimeout(()=>this.onmessage?.({data:'readyok'}),0);if(m.startsWith('go '))setTimeout(()=>this.onmessage?.({data:'bestmove e7e5'}),0);}terminate(){}};},session);
+ await page.addInitScript(s=>{Math.random=()=>.1;localStorage.setItem('sb-eswyxbyddkajysogtglp-auth-token',JSON.stringify(s));window.Worker=class{postMessage(m){if(m==='uci')setTimeout(()=>this.onmessage?.({data:'uciok'}),0);if(m==='isready')setTimeout(()=>this.onmessage?.({data:'readyok'}),0);if(m.startsWith('go '))setTimeout(()=>this.onmessage?.({data:'bestmove e7e5'}),0);}terminate(){}};},session);
  await page.route('https://eswyxbyddkajysogtglp.supabase.co/**',route=>{const path=new URL(route.request().url()).pathname;
  if(path==='/auth/v1/user')return route.fulfill({json:user});
  if(path==='/rest/v1/profiles')return route.fulfill({json:{username:'Alice',bio:'',palette:'monochrome'}});

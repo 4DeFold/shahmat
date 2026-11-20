@@ -175,20 +175,22 @@ function switchLevel(next) {
 }
 $('bot-prev').addEventListener('click',()=>switchLevel(level-1)); $('bot-next').addEventListener('click',()=>switchLevel(level+1));
 function setPhase(value) {
-  phase=value; shell.dataset.phase=value; $('return-button').textContent=value==='finished' && game?.status==='black_win' ? 'Завершить' : 'К выбору бота'; const inGame=value==='playing'||value==='finished';
+  phase=value; shell.dataset.phase=value; $('return-button').textContent=value==='finished' && game?.status && game.status!=='draw' && !playerWon() ? 'Завершить' : 'К выбору бота'; const inGame=value==='playing'||value==='finished';
   showcase.inert=inGame||value==='launching'||value==='returning'; showcase.setAttribute('aria-hidden',String(inGame||value==='launching'||value==='returning'));
   $('bot-board-wrap').inert=!inGame; $('bot-board-wrap').setAttribute('aria-hidden',String(!inGame));
   for(const id of ['bot-actions','moves']) { $(id).inert=!inGame; $(id).setAttribute('aria-hidden',String(!inGame)); }
   if(inGame || value==='returning') stopOrbit(); else startOrbit();
 }
-function projected() { return premove.length ? projectPremoves(chess,premove,'w') : chess; }
+const playerColor=()=>game?.player_color==='b'?'b':'w';
+const playerWon=()=>game?.status===(playerColor()==='w'?'white_win':'black_win');
+function projected() { return premove.length ? projectPremoves(chess,premove,playerColor()) : chess; }
 function shownChess() { if(historyIndex===null)return projected();const p=new Chess();chess.history().slice(0,historyIndex).forEach(m=>p.move(m));return p; }
 function draw(move=null,transitions=[]) {
   const shown=shownChess(), isLive=historyIndex===null;
-  const legal=selected&&isLive?(chess.turn()==='w'&&!premove.length?chess.moves({square:selected,verbose:true}):premoveTargets(shown,selected,'w')).map(m=>m.to):[];
+  const legal=selected&&isLive?(chess.turn()===playerColor()&&!premove.length?chess.moves({square:selected,verbose:true}):premoveTargets(shown,selected,playerColor())).map(m=>m.to):[];
   const displayedLast=isLive?last:shown.history({verbose:true}).at(-1);
-  boardView.render({shown,selected,legal,last:displayedLast,premoves:isLive?premove:[],actual:isLive&&premove.length?chess:null,premoveMode:chess.turn()!=='w'||premove.length>0,animatedMove:isLive?move:null,transitions});
-  const actualShown=isLive?chess:shown;renderCaptures(actualShown,'w',$('bot-player-captured'),$('bot-opponent-captured'));renderThreats(actualShown,'w',boardView,threatKeys);
+  boardView.render({shown,selected,legal,last:displayedLast,premoves:isLive?premove:[],actual:isLive&&premove.length?chess:null,premoveMode:chess.turn()!==playerColor()||premove.length>0,animatedMove:isLive?move:null,transitions});
+  const actualShown=isLive?chess:shown;renderCaptures(actualShown,playerColor(),$('bot-player-captured'),$('bot-opponent-captured'));renderThreats(actualShown,playerColor(),boardView,threatKeys);
 }
 function setThreat(code,down){if(!['KeyQ','KeyE'].includes(code))return;if(down&&(!pageVisible||!['playing','finished'].includes(phase)))return;if(down)threatKeys.add(code);else threatKeys.delete(code);draw();}
 for(const type of ['keydown','keyup'])document.addEventListener(type,e=>{if(!['KeyQ','KeyE'].includes(e.code))return;if(type==='keydown'&&(e.ctrlKey||e.metaKey||e.altKey||e.target.closest?.('input,textarea,select,[contenteditable]:not([contenteditable=false])')||document.querySelector('dialog[open]')))return;setThreat(e.code,type==='keydown');});window.addEventListener('blur',()=>{setThreat('KeyQ',false);setThreat('KeyE',false);});
@@ -196,7 +198,7 @@ const renderMoves=createMoveHistory({document,list:$('move-list'),count:$('move-
 function history() { const length=chess.history().length,index=historyIndex??length;renderMoves(chess,historyIndex);$('history-first').disabled=$('history-prev').disabled=index===0;$('history-next').disabled=$('history-last').disabled=index===length; }
 function showHistory(index) {
  const length=chess.history().length,old=historyIndex??length; historyIndex=index>=length?null:Math.max(0,index); selected=null; annotations.clear();draw(null,historyTransition(chess,old,historyIndex??length));history();const move=historySoundMove(chess,old,historyIndex??length);if(move)sound.play(move);
- status(historyIndex!==null?`Просмотр позиции: ход ${historyIndex} из ${length}.`:phase==='finished'?'Партия завершена.':chess.turn()==='w'?'Ваш ход.':'Ход бота.');
+ status(historyIndex!==null?`Просмотр позиции: ход ${historyIndex} из ${length}.`:phase==='finished'?'Партия завершена.':chess.turn()===playerColor()?'Ваш ход.':'Ход бота.');
 }
 function navigateHistory(key,code='') { if(!pageVisible || !['playing','finished'].includes(phase) || promotion || document.querySelector('dialog[open]'))return false;const length=chess.history().length,target=historyKeyTarget(key,code,historyIndex??length,length);if(target===null)return false;showHistory(target);return true; }
 function handleNavigation(key,code='') {
@@ -214,18 +216,18 @@ function snapshot() { game.moves=chess.history(); game.updated_at=new Date().toI
 function finishIfNeeded() {
   if(!game || phase!=='playing') return false;
   let result='';
-  if(chess.isCheckmate()) { game.status=chess.turn()==='w'?'black_win':'white_win'; result=chess.turn()==='w'?'Мат. Бот победил.':'Мат. Вы победили!'; }
+  if(chess.isCheckmate()) { game.status=chess.turn()==='w'?'black_win':'white_win'; result=chess.turn()===playerColor()?'Мат. Бот победил.':'Мат. Вы победили!'; }
   else if(chess.isStalemate()) { game.status='draw'; result='Ничья: пат.'; }
   else if(chess.isDraw() || chess.history().length>=1000) { game.status='draw'; result='Ничья.'; }
   if(!result) return false;
-  if(game.status==='white_win'){completedLevels.add(level+1);store?.markWin(level+1);}
+  if(playerWon()){completedLevels.add(level+1);store?.markWin(level+1);}
   thinking=false; premove=[]; draw(); setPhase('finished'); reveal('resign-wrap',false); status(result); snapshot(); return true;
 }
 function resignAvailable() { return phase==='playing' && game && Date.now()-Date.parse(game.started_at)>=60000; }
 function updateResign() { reveal('resign-wrap',!!resignAvailable()); }
 const timer=setInterval(updateResign,1000);
 async function botMove() {
-  if(!game || phase!=='playing' || chess.turn()!=='b' || chess.isGameOver() || thinking) return;
+  if(!game || phase!=='playing' || chess.turn()===playerColor() || chess.isGameOver() || thinking) return;
   const current=++generation; thinking=true; status(!engine && level===5 ? 'Загружаем полную сеть Stockfish (около 75 МБ)…' : 'Stockfish думает…');
   try {
     if(!engine) engine=createStockfish(level);
@@ -235,7 +237,7 @@ async function botMove() {
     if(!finishIfNeeded()) {
       snapshot();
       const queued=premove.shift();
-      if(queued && validPremove(chess,queued,'w')) { play(normalizePremove(chess,queued)); return; }
+      if(queued && validPremove(chess,queued,playerColor())) { play(normalizePremove(chess,queued)); return; }
       if(queued) { premove=[]; draw(); }
       status(historyIndex!==null ? `Просмотр позиции: ход ${historyIndex} из ${chess.history().length}.` : queued ? 'Предварительный ход отменён: он больше невозможен.' : chess.isCheck()?'Шах! Ваш ход.':'Ваш ход.');
     }
@@ -245,19 +247,19 @@ async function botMove() {
   }
 }
 function play(move) {
-  if(!game || phase!=='playing' || thinking || chess.turn()!=='w') return;
+  if(!game || phase!=='playing' || thinking || chess.turn()!==playerColor()) return;
   try { last=chess.move(move); } catch { return; }
   selected=null; promotion=null; reveal('promotion',false); draw(last); history(); sound.play(last);
   if(!finishIfNeeded()) { snapshot(); void botMove(); }
 }
 function attempt(from,to) {
-  const moves=(chess.turn()==='w'&&!premove.length?chess.moves({square:from,verbose:true}):premoveTargets(projected(),from,'w')).filter(m=>m.to===to);
+  const moves=(chess.turn()===playerColor()&&!premove.length?chess.moves({square:from,verbose:true}):premoveTargets(projected(),from,playerColor())).filter(m=>m.to===to);
   if(!moves.length) return false;
-  if(chess.turn()!=='w' && premove.length>=20){status('Можно добавить не более 20 предварительных ходов.');return true;}
+  if(chess.turn()!==playerColor() && premove.length>=20){status('Можно добавить не более 20 предварительных ходов.');return true;}
   if(moves.some(m=>m.promotion)) {
-    promotion={from,to,premove:chess.turn()!=='w'}; reveal('promotion',true); const options=$('promotion-options'); options.replaceChildren();
-    for(const type of ['q','r','b','n']) { const button=document.createElement('button'); button.type='button'; button.setAttribute('aria-label',names[type]); const img=document.createElement('img'); img.src=piece('w',type); img.alt=''; button.append(img); button.addEventListener('click',()=>{ if(!promotion)return; const choice=promotion; promotion=null; reveal('promotion',false); if(choice.premove && chess.turn()!=='w') { if(premove.length>=20)return; premove.push({from:choice.from,to:choice.to,promotion:type}); selected=null; draw(); status('Предварительный ход готов. До 20 ходов; пустая клетка отменяет очередь.'); } else play({from:choice.from,to:choice.to,promotion:type}); }); options.append(button); } options.firstElementChild.focus();
-  } else if(chess.turn()!=='w') { if(premove.length>=20){status('Можно добавить не более 20 предварительных ходов.');return true;} premove.push({from,to}); selected=null; draw(); status('Предварительный ход готов. До 20 ходов; пустая клетка отменяет очередь.'); } else play({from,to});
+    promotion={from,to,premove:chess.turn()!==playerColor()}; reveal('promotion',true); const options=$('promotion-options'); options.replaceChildren();
+    for(const type of ['q','r','b','n']) { const button=document.createElement('button'); button.type='button'; button.setAttribute('aria-label',names[type]); const img=document.createElement('img'); img.src=piece(playerColor(),type); img.alt=''; button.append(img); button.addEventListener('click',()=>{ if(!promotion)return; const choice=promotion; promotion=null; reveal('promotion',false); if(choice.premove && chess.turn()!==playerColor()) { if(premove.length>=20)return; premove.push({from:choice.from,to:choice.to,promotion:type}); selected=null; draw(); status('Предварительный ход готов. До 20 ходов; пустая клетка отменяет очередь.'); } else play({from:choice.from,to:choice.to,promotion:type}); }); options.append(button); } options.firstElementChild.focus();
+  } else if(chess.turn()!==playerColor()) { if(premove.length>=20){status('Можно добавить не более 20 предварительных ходов.');return true;} premove.push({from,to}); selected=null; draw(); status('Предварительный ход готов. До 20 ходов; пустая клетка отменяет очередь.'); } else play({from,to});
   return true;
 }
 board.addEventListener('click',event=>{
@@ -265,13 +267,13 @@ board.addEventListener('click',event=>{
   const square=event.target.closest('[data-square]')?.dataset.square; if(!square) return;
   sound.prime();
   if(selected && attempt(selected,square)) return;
-  if(premove.length && !projected().get(square)) { premove=[]; selected=null; draw(); status(chess.turn()==='w'?'Ваш ход.':'Ход бота.'); return; }
-  selected=projected().get(square)?.color==='w' && selected!==square?square:null; draw(); boardView.cell(square)?.focus();
+  if(premove.length && !projected().get(square)) { premove=[]; selected=null; draw(); status(chess.turn()===playerColor()?'Ваш ход.':'Ход бота.'); return; }
+  selected=projected().get(square)?.color===playerColor() && selected!==square?square:null; draw(); boardView.cell(square)?.focus();
 });
-board.addEventListener('pointerdown',event=>{ if(event.button===2 && premove.length) { premove=[]; selected=null; draw(); status('Ход бота.'); } if(event.button!==0||phase!=='playing'||promotion||historyIndex!==null) return; const cell=event.target.closest('[data-square]'); if(cell && projected().get(cell.dataset.square)?.color==='w') drag={from:cell.dataset.square,x:event.clientX,y:event.clientY,pointer:event.pointerId,ghost:null,cell}; });
+board.addEventListener('pointerdown',event=>{ if(event.button===2 && premove.length) { premove=[]; selected=null; draw(); status('Ход бота.'); } if(event.button!==0||phase!=='playing'||promotion||historyIndex!==null) return; const cell=event.target.closest('[data-square]'); if(cell && projected().get(cell.dataset.square)?.color===playerColor()) drag={from:cell.dataset.square,x:event.clientX,y:event.clientY,pointer:event.pointerId,ghost:null,cell}; });
 board.addEventListener('pointermove',event=>{
   if(!drag||drag.pointer!==event.pointerId) return;
-  if(!drag.ghost && Math.hypot(event.clientX-drag.x,event.clientY-drag.y)>5) { board.setPointerCapture?.(event.pointerId); selected=drag.from; draw(); drag.ghost=document.createElement('img'); drag.ghost.className='drag-ghost'; drag.ghost.src=piece('w',projected().get(drag.from).type); drag.ghost.alt=''; drag.ghost.style.setProperty('--drag-size',`${drag.cell.getBoundingClientRect().width}px`); drag.cell.classList.add('dragging'); document.body.append(drag.ghost); }
+  if(!drag.ghost && Math.hypot(event.clientX-drag.x,event.clientY-drag.y)>5) { board.setPointerCapture?.(event.pointerId); selected=drag.from; draw(); drag.ghost=document.createElement('img'); drag.ghost.className='drag-ghost'; drag.ghost.src=piece(playerColor(),projected().get(drag.from).type); drag.ghost.alt=''; drag.ghost.style.setProperty('--drag-size',`${drag.cell.getBoundingClientRect().width}px`); drag.cell.classList.add('dragging'); document.body.append(drag.ghost); }
   if(drag.ghost) drag.ghost.style.transform=`translate3d(${event.clientX}px,${event.clientY}px,0) translate(-50%,-50%)`;
 });
 function cancelDrag() { if(!drag)return; drag.ghost?.remove(); drag.cell.classList.remove('dragging'); drag=null; }
@@ -281,17 +283,17 @@ function endDrag(event,cancel=false) {
   suppressClick=true; setTimeout(()=>{suppressClick=false;},0); if(!target || !attempt(d.from,target)) { selected=null; draw(); }
 }
 board.addEventListener('pointerup',event=>endDrag(event)); board.addEventListener('pointercancel',event=>endDrag(event,true));
-document.addEventListener('keydown',event=>{ if(event.key==='Escape' && premove.length) { premove=[]; selected=null; draw(); status(chess.turn()==='w'?'Ваш ход.':'Ход бота.'); } });
+document.addEventListener('keydown',event=>{ if(event.key==='Escape' && premove.length) { premove=[]; selected=null; draw(); status(chess.turn()===playerColor()?'Ваш ход.':'Ход бота.'); } });
 $('toggle-moves').addEventListener('click',()=>{ const toggle=$('toggle-moves'), expanded=toggle.getAttribute('aria-expanded')!=='true'; toggle.setAttribute('aria-expanded',String(expanded)); $('history-content').classList.toggle('is-collapsed',!expanded); $('history-content').inert=!expanded; });
 $('resign-button').addEventListener('click',()=>{ if(resignAvailable()) $('resign-dialog').showModal(); });
 $('resign-cancel').addEventListener('click',()=>$('resign-dialog').close());
-$('resign-confirm').addEventListener('click',()=>{ $('resign-dialog').close(); if(!resignAvailable()) return; ++generation; engine?.destroy(); engine=null; thinking=false; premove=[]; cancelDrag(); draw(); game.status='black_win'; snapshot(); setPhase('finished'); status('Вы сдались. ЯР не изменился.'); updateResign(); });
+$('resign-confirm').addEventListener('click',()=>{ $('resign-dialog').close(); if(!resignAvailable()) return; ++generation; engine?.destroy(); engine=null; thinking=false; premove=[]; cancelDrag(); draw(); game.status=playerColor()==='w'?'black_win':'white_win'; snapshot(); setPhase('finished'); status('Вы сдались. ЯР не изменился.'); updateResign(); });
 $('return-button').addEventListener('click',()=>void returnToSelection());
 async function returnToSelection() {
   if(phase!=='playing' && phase!=='finished') return;
   if(phase==='playing' && !confirm('Вернуться к выбору? Текущая партия будет удалена.')) return;
   const current=++generation; engine?.destroy(); engine=null; thinking=false; premove=[]; cancelDrag(); annotations.clear();
-  const passed=game?.status==='white_win'; if(game) { if(phase==='finished') store?.finish(game.id); else store?.remove(game.id); }
+  const passed=playerWon(); if(game) { if(phase==='finished') store?.finish(game.id); else store?.remove(game.id); }
   reveal('promotion',false); reveal('retry-wrap',false); promotion=null;
   const target=$('target-board');
   if(!motion.matches && pageVisible && !document.hidden && target.animate) {
@@ -318,8 +320,8 @@ $('retry-bot').addEventListener('click',()=>{ reveal('retry-wrap',false); void b
 async function launch() {
   if(phase!=='choose'||!userId||!store) return;
   sound.prime(); const current=++generation;
-  game={id:crypto.randomUUID(),level:level+1,moves:[],status:'active',started_at:new Date().toISOString(),updated_at:new Date().toISOString()};
-  chess=new Chess(); selected=null; premove=[]; historyIndex=null; annotations.clear(); last=null; draw(); history(); snapshot();
+  game={id:crypto.randomUUID(),player_color:Math.random()<.5?'w':'b',level:level+1,moves:[],status:'active',started_at:new Date().toISOString(),updated_at:new Date().toISOString()};
+  chess=new Chess(); selected=null; premove=[]; historyIndex=null; annotations.clear(); last=null; board.classList.toggle('black',playerColor()==='b'); draw(); history(); snapshot();
   fadeEntryIntoLaunch(); setPhase('launching'); status('Готовим доску…');
   if(!motion.matches) {
     const scene=stages[level]; let chosen=null, restoreBoard=null;
@@ -357,16 +359,17 @@ async function launch() {
       // Keep the completed flyer opaque while the live board is laid out.
       // Replace them together in the next paint, without an opacity crossfade.
       $('target-board').style.visibility='hidden';
-      shell.classList.add('board-arrival'); setPhase('playing'); updateResign(); status('Ваш ход. Вы играете белыми.');
+      shell.classList.add('board-arrival'); setPhase('playing'); updateResign(); status(playerColor()==='w'?'Ваш ход. Вы играете белыми.':'Вы играете чёрными. Ход бота.');
       await nextFrame(); $('target-board').style.visibility=''; flyer.remove(); animation?.cancel(); restoreMiniature();
       requestAnimationFrame(()=>shell.classList.remove('board-arrival'));
     } else {
-      restoreMiniature(); setPhase('playing'); updateResign(); status('Ваш ход. Вы играете белыми.');
+      restoreMiniature(); setPhase('playing'); updateResign(); status(playerColor()==='w'?'Ваш ход. Вы играете белыми.':'Вы играете чёрными. Ход бота.');
     }
   } else {
     if(current!==generation || destroyed) return;
-    setPhase('playing'); updateResign(); status('Ваш ход. Вы играете белыми.');
+    setPhase('playing'); updateResign(); status(playerColor()==='w'?'Ваш ход. Вы играете белыми.':'Вы играете чёрными. Ход бота.');
   }
+  if(current===generation && phase==='playing' && playerColor()==='b') void botMove();
 }
 $('bot-play').addEventListener('click',()=>void launch());
 async function restore(id) {
@@ -376,8 +379,8 @@ async function restore(id) {
   try {
     if(!Number.isInteger(row.level) || row.level<1 || row.level>6 || !Array.isArray(row.moves) || row.moves.length>1000 || !Number.isFinite(Date.parse(row.started_at))) throw Error('invalid save');
     const restored=new Chess(); for(const move of row.moves) { if(restored.isGameOver()) throw Error('invalid save'); restored.move(move); }
-    game=row; chess=restored; level=row.level-1; carouselPosition=level; carouselVelocity=0; showLevel(); draw(); history(); setPhase('playing'); updateResign();
-    if(!finishIfNeeded()) { status(chess.turn()==='w'?'Партия восстановлена. Ваш ход.':'Партия восстановлена. Ход бота.'); if(chess.turn()==='b') void botMove(); }
+    game=row; chess=restored; level=row.level-1; carouselPosition=level; carouselVelocity=0; showLevel(); board.classList.toggle('black',playerColor()==='b'); draw(); history(); setPhase('playing'); updateResign();
+    if(!finishIfNeeded()) { status(chess.turn()===playerColor()?'Партия восстановлена. Ваш ход.':'Партия восстановлена. Ход бота.'); if(chess.turn()!==playerColor()) void botMove(); }
   } catch { game=null; status('Не удалось восстановить партию. Можно начать новую.'); }
 }
 showLevel(); draw(); startOrbit(); if(pageVisible) animateEntry(); $('bot-play').disabled=true;
