@@ -1,5 +1,5 @@
 const key='shahmat.piece-set';
-export const pieceNames={cburnett:'Стандарт',classic:'Классика',angular:'Геометрия',rounded:'Мягкие'};
+export const pieceNames={cburnett:'Стандарт',regent:'Регент',turnier:'Турнир',courtyard:'Двор',manor:'Усадьба'};
 export function validPieceSet(value){return Object.hasOwn(pieceNames,value)?value:'cburnett';}
 export function selectedPieceSet(){try{return validPieceSet(localStorage.getItem(key));}catch{return 'cburnett';}}
 export function pieceSrcFor(set,color,type){return `/pieces/${validPieceSet(set)}/${color}${type.toUpperCase()}.svg`;}
@@ -14,11 +14,13 @@ export function renderPiecePreview(node,set){
 function swapImage(img,next,animate){
  const old=img.getAttribute('src');if(old===next)return;const win=img.ownerDocument.defaultView,rect=img.getBoundingClientRect();
  const visible=animate&&img.isConnected&&rect.width>0&&rect.height>0&&rect.bottom>0&&rect.top<win.innerHeight&&rect.right>0&&rect.left<win.innerWidth&&!win.matchMedia('(prefers-reduced-motion: reduce)').matches&&img.animate;
- let ghost;if(visible){ghost=img.cloneNode();ghost.dataset.pieceFixed='';ghost.removeAttribute('id');ghost.setAttribute('aria-hidden','true');Object.assign(ghost.style,{position:'fixed',left:rect.left+'px',top:rect.top+'px',width:rect.width+'px',height:rect.height+'px',margin:'0',zIndex:'9999',pointerEvents:'none',objectFit:getComputedStyle(img).objectFit});img.ownerDocument.body.append(ghost);}
+ // Never duplicate the old image in the document: hidden entrance pieces and
+ // clipped avatars must not be projected over the interface during a change.
+ img.getAnimations?.().filter(animation=>animation.id==='piece-set-fade').forEach(animation=>animation.cancel());
  img.setAttribute('src',next);
- if(ghost){const animation=ghost.animate([{opacity:1},{opacity:0}],{duration:320,easing:'ease-out'});animation.finished.catch(()=>{}).finally(()=>ghost.remove());img.animate([{opacity:0},{opacity:1}],{duration:320,easing:'ease-out'});}
+ if(visible){const animation=img.animate([{opacity:0},{opacity:1}],{duration:220,easing:'ease-out'});animation.id='piece-set-fade';}
 }
-function updateImage(img,animate=false){if(img.matches('[data-piece-fixed]')||img.closest?.('[data-piece-preview]'))return;const src=img.getAttribute('src');const match=src?.match(/^\/pieces\/(?:cburnett|classic|angular|rounded)\/([wb])([KQRBNP])\.svg$/);if(match)swapImage(img,pieceSrc(match[1],match[2]),animate);}
+function updateImage(img,animate=false){if(img.matches('[data-piece-fixed]')||img.closest?.('[data-piece-preview]'))return;const src=img.getAttribute('src');const match=src?.match(/^\/pieces\/(?:cburnett|classic|angular|rounded|regent|turnier|courtyard|manor)\/([wb])([KQRBNP])\.svg$/);if(match)swapImage(img,pieceSrc(match[1],match[2]),animate);}
 function updateTree(node){if(node.nodeType!==1)return;if(node.matches?.('[data-board-set]'))renderPiecePreview(node,node.dataset.boardSet);node.querySelectorAll?.('[data-board-set]').forEach(el=>renderPiecePreview(el,el.dataset.boardSet));if(node.tagName==='IMG')updateImage(node);node.querySelectorAll?.('img').forEach(img=>updateImage(img));}
 export function installPieceTheme(){
  if(typeof document==='undefined')return;
