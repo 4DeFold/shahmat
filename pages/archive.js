@@ -5,7 +5,7 @@ import {createClient} from '@supabase/supabase-js';
 import {createBoardAnnotations} from './board-annotations.js';
 import Lenis from 'lenis';
 import {createMemberBoard} from './member-board.js';
-import {createMoveHistory,historyTransition} from './move-history.js';
+import {createMoveHistory,historyTransition,historyKeyTarget} from './move-history.js';
 import './game-theme.js';
 const $=id=>document.getElementById(id), client=createClient('https://eswyxbyddkajysogtglp.supabase.co','sb_publishable_w9pinHWr8XK5F9CflsSJmQ_4KFMKzHS');
 const reduced=()=>window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -27,7 +27,7 @@ function draw(transitions=[]){const shown=new Chess();chess.history().slice(0,in
 function showHistory(next){if(!current)return;annotations.clear();const old=index;index=Math.max(0,Math.min(chess.history().length,next));draw(historyTransition(chess,old,index));}
 function setThreat(code,down){if(!['KeyQ','KeyE'].includes(code))return;if(down&&(!visible||!current))return;if(down)threatKeys.add(code);else threatKeys.delete(code);if(current)draw();}
 for(const type of ['keydown','keyup'])document.addEventListener(type,e=>{if(!['KeyQ','KeyE'].includes(e.code))return;if(type==='keydown'&&(e.ctrlKey||e.metaKey||e.altKey||e.target.closest?.('input,textarea,select,[contenteditable]:not([contenteditable=false])')))return;setThreat(e.code,type==='keydown');});window.addEventListener('blur',()=>{setThreat('KeyQ',false);setThreat('KeyE',false);});
-function key(key,code){if(!visible||!current)return false;const d=code==='KeyA'||key==='ArrowLeft'?-1:code==='KeyD'||key==='ArrowRight'?1:0;if(!d)return false;showHistory(index+d);return true;}
+function key(key,code){if(!visible||!current)return false;const target=historyKeyTarget(key,code,index,chess.history().length);if(target===null)return false;showHistory(target);return true;}
 for(const [id,fn] of [['history-first',()=>0],['history-prev',()=>index-1],['history-next',()=>index+1],['history-last',()=>chess.history().length]])$(id).addEventListener('click',()=>showHistory(fn()));
 $('archive-back').addEventListener('click',close);$('archive-more').addEventListener('click',()=>load(false));$('archive-modes').addEventListener('click',e=>{const b=e.target.closest('[data-mode]');if(!b||b.dataset.mode===mode)return;mode=b.dataset.mode;for(const button of $('archive-modes').children)button.setAttribute('aria-pressed',String(button===b));void load();});
 document.addEventListener('keydown',e=>{if(!e.ctrlKey&&!e.metaKey&&!e.altKey&&!e.shiftKey&&!e.target.closest('input,textarea,select,[contenteditable]')&&key(e.key,e.code))e.preventDefault();});

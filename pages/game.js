@@ -43,7 +43,7 @@ if (window.parent !== window) {
   window.addEventListener('message', event => {
     if (event.origin !== window.location.origin || event.source !== window.parent) return;
     if (event.data?.type === 'shahmat-threat-key') { ui.setThreat(event.data.code,!!event.data.down); return; }
-    if (event.data?.type === 'shahmat-history-key' && typeof event.data.key === 'string') { ui.navigateHistory(event.data.key); return; }
+    if (event.data?.type === 'shahmat-history-key' && typeof event.data.key === 'string') { ui.navigateHistory(event.data.key,event.data.code); return; }
     if (event.data?.type === 'shahmat-profile-updated') { ui.setPlayerName(event.data.username); document.getElementById('player-profile-trigger').dataset.profileName=event.data.username; ui.setPlayerAvatar(event.data.avatar); return; }
     if (event.data?.type === 'shahmat-rank-unit') { ui.setRatingUnit(event.data.value); return; }
     if (event.data?.type === 'shahmat-online') { updateOnline(event.data.count); return; }

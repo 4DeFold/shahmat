@@ -1,5 +1,14 @@
 import {pieceSrc as themedPieceSrc} from './piece-theme.js';
 import { Chess } from 'chess.js';
+// Return the target ply, or null for keys that do not navigate history.
+export function historyKeyTarget(key, code, index, length) {
+  const physical = {KeyA:'a', KeyD:'d', KeyW:'w', KeyS:'s'}[code] || key.toLowerCase();
+  if (physical === 'arrowdown' || physical === 's') return 0;
+  if (physical === 'arrowup' || physical === 'w') return length;
+  if (physical === 'arrowleft' || physical === 'a') return Math.max(0, index - 1);
+  if (physical === 'arrowright' || physical === 'd') return Math.min(length, index + 1);
+  return null;
+}
 // Follow stable piece identities through the score, including en passant,
 // castling and promotion, so jumps of any distance can be animated in reverse.
 export function historyTransition(chess, fromPly, toPly) {

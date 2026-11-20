@@ -82,9 +82,13 @@ try {
   snapshot = { ...snapshot, moves:['e4','e5'], turn:'w', version:2 };
   await game.locator('[data-square=f3] img:not(.premove-ghost)').waitFor();
   assert.equal(snapshot.moves.at(-1), 'Nf3');
-  await game.locator('#history-first').click();
-  assert.equal(await game.locator('[data-square=e2] img').count(), 1);
-  await game.locator('#history-last').click();
+  await page.locator('#nav-play').focus();
+  for (const [down,up] of [['s','w'],['ArrowDown','ArrowUp']]) {
+    await page.keyboard.press(down); await game.locator('#history-first:disabled').waitFor();
+    assert.equal(await game.locator('[data-square=e2] img').count(), 1);
+    await page.keyboard.press(up); await game.locator('#history-last:disabled').waitFor();
+  }
+  await game.locator('#board').click();await page.keyboard.press('s');await game.locator('#history-first:disabled').waitFor();await page.keyboard.press('w');await game.locator('#history-last:disabled').waitFor();
   if(await game.locator('#toggle-moves').isVisible()){await game.locator('#toggle-moves').click(); assert.equal(await game.locator('#history-content').getAttribute('aria-hidden'), 'true'); assert.equal(await game.locator('#history-content').evaluate(el => el.getBoundingClientRect().height), 0);}else {assert.equal(await game.locator('#move-list').isVisible(),false);assert.equal(await game.locator('#history-prev').isVisible(),true);}
 
   for (const size of [{ width:280,height:653 }, { width:390,height:844 }, { width:768,height:1024 }, { width:1440,height:900 }, { width:2560,height:1080 }]) {

@@ -5,7 +5,7 @@ import { premoveTargets, validPremove, normalizePremove, projectPremoves } from 
 import { createBoardAnnotations } from './board-annotations.js';
 import { createClient } from '@supabase/supabase-js';
 import { createMemberBoard } from './member-board.js';
-import { createMoveHistory, historyTransition } from './move-history.js';
+import { createMoveHistory, historyTransition, historyKeyTarget } from './move-history.js';
 import { createGameSound } from './game-sound.js';
 import { createStockfish, BOT_LEVELS } from './stockfish-engine.js';
 import { createBotStorage } from './bot-storage.js';
@@ -198,7 +198,7 @@ function showHistory(index) {
  const length=chess.history().length,old=historyIndex??length; historyIndex=index>=length?null:Math.max(0,index); selected=null; annotations.clear();draw(null,historyTransition(chess,old,historyIndex??length));history();
  status(historyIndex!==null?`Просмотр позиции: ход ${historyIndex} из ${length}.`:phase==='finished'?'Партия завершена.':chess.turn()==='w'?'Ваш ход.':'Ход бота.');
 }
-function navigateHistory(key) { if(!pageVisible || !['playing','finished'].includes(phase) || promotion || document.querySelector('dialog[open]'))return false;const delta=key==='ArrowLeft'||key.toLowerCase()==='a'?-1:key==='ArrowRight'||key.toLowerCase()==='d'?1:0;if(!delta)return false;showHistory((historyIndex??chess.history().length)+delta);return true; }
+function navigateHistory(key,code='') { if(!pageVisible || !['playing','finished'].includes(phase) || promotion || document.querySelector('dialog[open]'))return false;const length=chess.history().length,target=historyKeyTarget(key,code,historyIndex??length,length);if(target===null)return false;showHistory(target);return true; }
 function handleNavigation(key,code='') {
  const physical=code==='KeyA'?'a':code==='KeyD'?'d':key;
  if(pageVisible && phase==='choose' && !document.querySelector('dialog[open]')) {
@@ -206,7 +206,7 @@ function handleNavigation(key,code='') {
   if(physical==='ArrowRight'||physical.toLowerCase()==='d') { switchLevel(level+1); return true; }
   if(physical==='Enter' && !$('bot-play').disabled) { $('bot-play').click(); return true; }
  }
- return navigateHistory(physical);
+ return navigateHistory(key,code);
 }
 for(const [id,fn] of [['history-first',()=>0],['history-prev',()=>(historyIndex??chess.history().length)-1],['history-next',()=>(historyIndex??chess.history().length)+1],['history-last',()=>chess.history().length]]) $(id).addEventListener('click',()=>showHistory(fn()));
 document.addEventListener('keydown',event=>{if(event.defaultPrevented||event.ctrlKey||event.altKey||event.metaKey||event.shiftKey||event.target.closest?.('input,textarea,select,[contenteditable]:not([contenteditable=false])'))return;if(event.key==='Enter' && event.target.closest?.('button,a'))return;if(handleNavigation(event.key,event.code))event.preventDefault();});

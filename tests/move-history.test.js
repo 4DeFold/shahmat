@@ -6,3 +6,16 @@ test('history movement maps piece identities through jumps, captures and castlin
  const jump=historyTransition(c,0,7); assert.ok(jump.some(x=>x.from==='g1'&&x.to==='f3')); assert.ok(jump.some(x=>x.from==='e1'&&x.to==='g1'));
  const e=new Chess();['e4','a6','e5','d5','exd6'].forEach(m=>e.move(m));assert.ok(historyTransition(e,3,5).some(x=>x.from==='e5'&&x.to==='d6'));
 });
+
+test('history shortcuts jump to start/end and preserve single-step navigation', async () => {
+  const {historyKeyTarget} = await import('../pages/move-history.js');
+  for (const [key,code,target] of [
+    ['ArrowDown','ArrowDown',0], ['ы','KeyS',0], ['s','KeyS',0],
+    ['ArrowUp','ArrowUp',9], ['ц','KeyW',9], ['w','KeyW',9],
+    ['ArrowLeft','ArrowLeft',3], ['ф','KeyA',3], ['ArrowRight','ArrowRight',5], ['в','KeyD',5],
+  ]) assert.equal(historyKeyTarget(key,code,4,9), target);
+  assert.equal(historyKeyTarget('ArrowLeft','ArrowLeft',0,9),0);
+  assert.equal(historyKeyTarget('ArrowRight','ArrowRight',9,9),9);
+  assert.equal(historyKeyTarget('x','KeyX',4,9),null);
+  assert.equal(historyKeyTarget('w','KeyW',0,0),0);
+});

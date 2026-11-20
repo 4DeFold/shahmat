@@ -5,7 +5,7 @@ import {renderCaptures,renderThreats} from './board-insights.js';
 import { premoveTargets, validPremove, normalizePremove, projectPremoves } from './premove.js';
 import { createBoardAnnotations } from './board-annotations.js';
 import { createMemberBoard } from './member-board.js';
-import { createMoveHistory, historyTransition } from './move-history.js';
+import { createMoveHistory, historyTransition, historyKeyTarget } from './move-history.js';
 import { createGameSound } from './game-sound.js';
 import { createRollingClock } from './rolling-clock.js';
 import { retryMessage } from './match-api.js';
@@ -349,10 +349,10 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   board.addEventListener('pointerdown', event => { if(event.button === 2 && premove.length) { premove=[]; selected=null; renderBoard(); statusGame(); } });
   const onPremoveKey = event => { if(event.key === 'Escape' && premove.length) { premove=[]; selected=null; renderBoard(); statusGame(); } };
   document.addEventListener('keydown', onPremoveKey);
-  function navigateHistory(key) {
+  function navigateHistory(key, code = '') {
     if (!isVisible() || !snapshot || !['active','finished'].includes(phase) || pending || document.querySelector('dialog[open]')) return false;
-    const delta = key === 'ArrowLeft' || key.toLowerCase() === 'a' ? -1 : key === 'ArrowRight' || key.toLowerCase() === 'd' ? 1 : 0;
-    if (!delta) return false; showHistory((historyIndex ?? chess.history().length) + delta); return true;
+    const length = chess.history().length, target = historyKeyTarget(key, code, historyIndex ?? length, length);
+    if (target === null) return false; showHistory(target); return true;
   }
   function setThreat(code,down) { if(!['KeyQ','KeyE'].includes(code))return; if(down && (!isVisible()||!snapshot||!['active','finished'].includes(phase)))return; if(down)threatKeys.add(code);else threatKeys.delete(code);renderBoard(); }
 
@@ -362,7 +362,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   document.addEventListener('keydown',onThreatDown); document.addEventListener('keyup',onThreatUp); win.addEventListener('blur',clearThreats);
   const onHistoryKey = event => {
     if (event.defaultPrevented || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey || event.target.closest?.('input, textarea, select, [contenteditable]:not([contenteditable=false]), [role=textbox]') || document.querySelector('dialog[open]') || pending) return;
-    if (navigateHistory(event.code === 'KeyA' ? 'a' : event.code === 'KeyD' ? 'd' : event.key)) event.preventDefault();
+    if (navigateHistory(event.key, event.code)) event.preventDefault();
   };
   document.addEventListener('keydown', onHistoryKey);
   start.addEventListener('pointerdown', () => sound.prime());
