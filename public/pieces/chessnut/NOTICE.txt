@@ -1,0 +1,7 @@
+Chessnut pieces by Alexis Luengas
+Copyright 2015 Alexis Luengas
+Licensed under Apache License, Version 2.0; see LICENSE.txt.
+Source: https://github.com/lichess-org/lila/tree/63ce12333414a2762f2f042e18e3dd528845adda/public/piece/chessnut
+Original project: https://github.com/LexLuengas/chessnut-pieces
+Lichess attribution: https://github.com/lichess-org/lila/blob/63ce12333414a2762f2f042e18e3dd528845adda/COPYING.md
+Modification: changed near-white black-piece detail to pure white.

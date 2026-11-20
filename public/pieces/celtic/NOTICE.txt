@@ -1,0 +1,7 @@
+celtic chess pieces by Maurizio Monge
+Copyright (c) Maurizio Monge
+Licensed under the MIT License; see LICENSE.txt.
+Source: https://github.com/lichess-org/lila/tree/63ce12333414a2762f2f042e18e3dd528845adda/public/piece/celtic
+Original project: https://github.com/maurimo/chess-art
+Lichess attribution: https://github.com/lichess-org/lila/blob/63ce12333414a2762f2f042e18e3dd528845adda/COPYING.md
+Modified: recoloured the gradients to solid black or white, changed black-piece interior strokes to white while keeping their outer boundaries black, and made translucent decoration opaque.

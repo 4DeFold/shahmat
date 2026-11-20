@@ -28,17 +28,17 @@ test('all board avatars and account icons use the same set', async () => {
   }
 });
 
-test('the original sets each contain a complete monochrome 45-unit set', async () => {
-  for (const set of ['regent', 'turnier', 'courtyard', 'manor']) {
+test('licensed Lichess sets are complete and recoloured only black and white', async () => {
+  for (const set of ['chessnut', 'fantasy', 'spatial', 'celtic']) {
     const files = (await readdir(`public/pieces/${set}`)).filter(name => name.endsWith('.svg'));
     assert.equal(files.length, 12);
     for (const color of ['w', 'b']) for (const type of ['K', 'Q', 'B', 'N', 'R', 'P']) {
       const svg = await readFile(`public/pieces/${set}/${color}${type}.svg`, 'utf8');
-      assert.match(svg, /viewBox="0 0 45 45"/);
-      assert.match(svg, /stroke-width="1\.5"/);
-      assert.doesNotMatch(svg, /filter|shadow|#[a-f\d]{6}/i);
-      assert.match(svg, /#000/);
-      assert.match(svg, /#fff/);
+      assert.match(svg, /<svg\b/);
+      assert.doesNotMatch(svg, /<script\b|<foreignObject\b|filter|shadow/i);
+      for (const color of svg.match(/#[a-f\d]{3,6}\b/gi) || []) assert.ok(['#000','#fff'].includes(color.toLowerCase()), `${set}: ${color}`);
     }
+    assert.match(await readFile(`public/pieces/${set}/LICENSE.txt`, 'utf8'), set === 'chessnut' ? /Apache License/ : /MIT License/);
+    assert.match(await readFile(`public/pieces/${set}/NOTICE.txt`, 'utf8'), /Modification|Modified/);
   }
 });

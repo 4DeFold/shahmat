@@ -3,8 +3,9 @@
   <section class="rank-setting" id="rank-setting" aria-labelledby="rank-setting-title">
     <div class="rank-setting-line"><span id="rank-setting-title">Показать очки ранга в</span>
       <fieldset class="rank-unit-options" id="rank-unit-options"><legend class="visually-hidden">Показать очки ранга в</legend>
-        <label><input type="radio" name="rank-unit" value="yar" checked><span>Яры</span></label>
-        <label><input type="radio" name="rank-unit" value="elo"><span>Эло</span></label>
+        <input type="radio" name="rank-unit" value="yar" checked hidden>
+        <input type="radio" name="rank-unit" value="elo" hidden>
+        <button type="button" id="rank-unit-swap" aria-label="Показаны Яры. Переключить на Эло"><span class="rank-swap-clip" aria-hidden="true"><span class="rank-swap-track"><span>Яры</span><span>Эло</span></span></span></button>
       </fieldset>
       <button type="button" id="rank-info-button" class="rank-info-button" aria-label="Что такое яры и чем они отличаются от Эло?" aria-expanded="false" aria-controls="rank-info">?</button>
     </div>
@@ -15,11 +16,12 @@
     <p>Выбери набор фигур для досок и профиля.</p>
     <fieldset class="piece-options" data-piece-preview><legend class="visually-hidden">Набор фигур</legend>
       <label><input type="radio" name="piece-set" value="cburnett" checked><span class="piece-option"><span class="piece-preview-board" data-board-set="cburnett" aria-hidden="true"></span><strong>Стандарт</strong></span></label>
-      <label><input type="radio" name="piece-set" value="regent"><span class="piece-option"><span class="piece-preview-board" data-board-set="regent" aria-hidden="true"></span><strong>Регент</strong></span></label>
-      <label><input type="radio" name="piece-set" value="turnier"><span class="piece-option"><span class="piece-preview-board" data-board-set="turnier" aria-hidden="true"></span><strong>Турнир</strong></span></label>
-      <label><input type="radio" name="piece-set" value="courtyard"><span class="piece-option"><span class="piece-preview-board" data-board-set="courtyard" aria-hidden="true"></span><strong>Двор</strong></span></label>
-      <label><input type="radio" name="piece-set" value="manor"><span class="piece-option"><span class="piece-preview-board" data-board-set="manor" aria-hidden="true"></span><strong>Усадьба</strong></span></label>
+      <label><input type="radio" name="piece-set" value="chessnut"><span class="piece-option"><span class="piece-preview-board" data-board-set="chessnut" aria-hidden="true"></span><strong>Chessnut</strong></span></label>
+      <label><input type="radio" name="piece-set" value="fantasy"><span class="piece-option"><span class="piece-preview-board" data-board-set="fantasy" aria-hidden="true"></span><strong>Fantasy</strong></span></label>
+      <label><input type="radio" name="piece-set" value="spatial"><span class="piece-option"><span class="piece-preview-board" data-board-set="spatial" aria-hidden="true"></span><strong>Spatial</strong></span></label>
+      <label><input type="radio" name="piece-set" value="celtic"><span class="piece-option"><span class="piece-preview-board" data-board-set="celtic" aria-hidden="true"></span><strong>Celtic</strong></span></label>
     </fieldset>
+    <p class="piece-credits">Стандарт — Colin M. L. Burnett, <a href="/pieces/cburnett/COPYING.txt" target="_blank" rel="noopener">GPL-2.0-or-later</a>; Chessnut — Alexis Luengas, <a href="/pieces/chessnut/LICENSE.txt" target="_blank" rel="noopener">Apache 2.0</a>; Fantasy, Spatial и Celtic — Maurizio Monge, <a href="/pieces/fantasy/LICENSE.txt" target="_blank" rel="noopener">MIT</a>. Цвета изменены на чёрный и белый. <a href="/pieces/chessnut/NOTICE.txt" target="_blank" rel="noopener">Источники</a> · <a href="/pieces/fantasy/NOTICE.txt" target="_blank" rel="noopener">Fantasy</a> · <a href="/pieces/spatial/NOTICE.txt" target="_blank" rel="noopener">Spatial</a> · <a href="/pieces/celtic/NOTICE.txt" target="_blank" rel="noopener">Celtic</a>.</p>
   </section>
   <section class="settings-palettes" aria-labelledby="settings-palette-heading">
     <h3 id="settings-palette-heading">Палитры<span>.</span></h3>

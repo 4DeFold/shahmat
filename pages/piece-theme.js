@@ -1,5 +1,5 @@
 const key='shahmat.piece-set';
-export const pieceNames={cburnett:'Стандарт',regent:'Регент',turnier:'Турнир',courtyard:'Двор',manor:'Усадьба'};
+export const pieceNames={cburnett:'Стандарт',chessnut:'Chessnut',fantasy:'Fantasy',spatial:'Spatial',celtic:'Celtic'};
 export function validPieceSet(value){return Object.hasOwn(pieceNames,value)?value:'cburnett';}
 export function selectedPieceSet(){try{return validPieceSet(localStorage.getItem(key));}catch{return 'cburnett';}}
 export function pieceSrcFor(set,color,type){return `/pieces/${validPieceSet(set)}/${color}${type.toUpperCase()}.svg`;}
@@ -20,7 +20,7 @@ function swapImage(img,next,animate){
  img.setAttribute('src',next);
  if(visible){const animation=img.animate([{opacity:0},{opacity:1}],{duration:220,easing:'ease-out'});animation.id='piece-set-fade';}
 }
-function updateImage(img,animate=false){if(img.matches('[data-piece-fixed]')||img.closest?.('[data-piece-preview]'))return;const src=img.getAttribute('src');const match=src?.match(/^\/pieces\/(?:cburnett|classic|angular|rounded|regent|turnier|courtyard|manor)\/([wb])([KQRBNP])\.svg$/);if(match)swapImage(img,pieceSrc(match[1],match[2]),animate);}
+function updateImage(img,animate=false){if(img.matches('[data-piece-fixed]')||img.closest?.('[data-piece-preview]'))return;const src=img.getAttribute('src');const match=src?.match(/^\/pieces\/(?:cburnett|classic|angular|rounded|regent|turnier|courtyard|manor|chessnut|fantasy|spatial|celtic)\/([wb])([KQRBNP])\.svg$/);if(match)swapImage(img,pieceSrc(match[1],match[2]),animate);}
 function updateTree(node){if(node.nodeType!==1)return;if(node.matches?.('[data-board-set]'))renderPiecePreview(node,node.dataset.boardSet);node.querySelectorAll?.('[data-board-set]').forEach(el=>renderPiecePreview(el,el.dataset.boardSet));if(node.tagName==='IMG')updateImage(node);node.querySelectorAll?.('img').forEach(img=>updateImage(img));}
 export function installPieceTheme(){
  if(typeof document==='undefined')return;

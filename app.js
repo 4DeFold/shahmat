@@ -35,6 +35,8 @@ const landing = document.querySelector('.landing');
 function applyRankUnit(value) {
   rankUnit = value === 'elo' ? 'elo' : 'yar';
   document.querySelectorAll('#rank-unit-options input').forEach(input => { input.checked = input.value === rankUnit; });
+  const swap=$('rank-unit-swap');
+  if (swap) swap.setAttribute('aria-label', rankUnit === 'yar' ? 'Показаны Яры. Переключить на Эло' : 'Показано Эло. Переключить на Яры');
   ratingView?.setUnit(rankUnit);
   $('member-game-frame')?.contentWindow?.postMessage({ type:'shahmat-rank-unit', value:rankUnit }, window.location.origin);
 }
@@ -845,6 +847,9 @@ $('page-content').addEventListener('wheel', event => {
   state.frame = window.requestAnimationFrame(tick);
 }, { passive:false });
 $('page-content').addEventListener('pointerdown', event => { if (event.target.closest('#palette-scroll')) stopPaletteScroll(); });
+$('page-content').addEventListener('click', event => {
+  if (event.target.closest('#rank-unit-swap')) { applyRankUnit(rankUnit === 'yar' ? 'elo' : 'yar'); recordAppearance(); }
+});
 $('page-content').addEventListener('change', event => {
   if (event.target.matches('#rank-unit-options input[name="rank-unit"]')) { applyRankUnit(event.target.value); recordAppearance(); }
   if (event.target.matches('#dashboard-palettes input[name="dashboard-palette"]') && event.target.value !== selectedPalette) {
