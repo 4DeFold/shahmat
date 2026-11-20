@@ -27,7 +27,7 @@ try {
    await page.locator('#rank-info').waitFor({state:'visible',timeout:1500});
    await page.mouse.move(0,0); await page.locator('#rank-info').waitFor({state:'hidden'});
   } else { await page.locator('#rank-setting-title').tap(); assert.equal(await page.locator('#rank-info').isVisible(),true); }
-  await page.locator('label:has(input[name=rank-unit][value=elo])').click();
+  await page.locator('#rank-unit-swap').click();
   await page.waitForFunction(()=>localStorage.getItem('shahmat.appearance.12345678-1234-1234-1234-123456789012')?.includes('"rankUnit":"elo"'));
   await page.waitForTimeout(300); await page.goto(`${base}/rating`); await page.locator('.rating-row').first().waitFor();
   assert.match(await page.locator('.rating-unit').innerText(),/ЭЛО/);
@@ -40,7 +40,7 @@ try {
   const nameBox=await frame.locator('#player-name').boundingBox(), ratingBox=await frame.locator('#player-rating').boundingBox();
   assert.ok(Math.abs(nameBox.y-ratingBox.y)<5 && ratingBox.x>=nameBox.x+nameBox.width-1, 'rating sits next to the username');
   await page.evaluate(()=>document.querySelector('[data-page=settings]').click()); await page.locator('#rank-setting').waitFor({state:'visible'});
-  await page.locator('label:has(input[name=rank-unit][value=yar])').click();
+  await page.locator('#rank-unit-swap').click();
   await page.evaluate(()=>document.querySelector('#nav-play').click());
   await frame.locator('#player-rating').filter({hasText:'ЯР'}).waitFor();
   assert.match((await frame.locator('#player-rating').innerText()).replace(/\s/g,''),/1200ЯР/);

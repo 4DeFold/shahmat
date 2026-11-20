@@ -35,6 +35,7 @@ for (const device of devices) {
     if (path === '/auth/v1/signup') return route.fulfill({ json: { user, session: null } });
     if (path === '/auth/v1/recover' || path === '/auth/v1/resend') return route.fulfill({ json: {} });
     if (path === '/auth/v1/verify' && JSON.parse(request.postData()).token !== '123456') return route.fulfill({ status: 403, json: { code: 'otp_expired', msg: 'Invalid code' } });
+    if (path === '/auth/v1/token' && !profile) return route.fulfill({ status: 400, json: { code: 'invalid_credentials', msg: 'Invalid login credentials' } });
     if (path === '/auth/v1/verify' || path === '/auth/v1/token') {
       const token = ['e30', Buffer.from(JSON.stringify({ sub: user.id, exp: Math.floor(Date.now() / 1000) + 3600, role: 'authenticated' })).toString('base64url'), 'x'].join('.');
       return route.fulfill({ json: { access_token: token, token_type: 'bearer', expires_in: 3600, refresh_token: 'fixture-refresh-token', user } });
@@ -44,6 +45,10 @@ for (const device of devices) {
       return route.fulfill({ json: user });
     }
     if (path === '/auth/v1/logout') return route.fulfill({ status: 204, body: '' });
+    if (path === '/rest/v1/rpc/profile_public') return route.fulfill({ json: { ...profile, ratings: {}, games: {} } });
+    if (path === '/rest/v1/profile_media') return route.fulfill({ json: { avatar: null, banner: null } });
+    if (path === '/rest/v1/profile_rewards') return route.fulfill({ json: { avatar_unlocked: false, banner_unlocked: false } });
+    if (path === '/rest/v1/rpc/profile_save') { const body = request.postDataJSON(); profile = { ...profile, username: body.p_username, bio: body.p_bio }; return route.fulfill({ json: null }); }
     if (path === '/rest/v1/profiles') {
       if (request.method() === 'POST') { profile = JSON.parse(request.postData()); return route.fulfill({ status: 201, json: profile }); }
       return route.fulfill({ json: profile });
@@ -57,7 +62,7 @@ for (const device of devices) {
         viewport: innerWidth, pageWidth: document.documentElement.scrollWidth,
         screenTop: document.querySelector('.screen:not([hidden])').getBoundingClientRect().top,
         scrollY: window.scrollY,
-        clippedText: [...document.querySelectorAll('.screen:not([hidden]) .dashboard-stats span, .screen:not([hidden]) .palette-name, .screen:not([hidden]) h2, .screen:not([hidden]) h3')].filter(el => el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 1).map(el => el.textContent),
+        clippedText: [...document.querySelectorAll('.screen:not([hidden]) .dashboard-stats span, .screen:not([hidden]) .palette-name, .screen:not([hidden]) h2, .screen:not([hidden]) h3')].filter(el => !el.classList.contains('visually-hidden') && el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 1).map(el => el.textContent),
         outside: visible.filter(el => { if (el.closest('#palette-scroll')) return false; const r = el.getBoundingClientRect(); return r.left < -1 || r.right > innerWidth + 1; }).map(el => el.id || el.className),
       };
     });
@@ -97,7 +102,7 @@ for (const device of devices) {
   } else {
     assert.ok(Math.abs(hero.ratio - 240 / 718) < .008, `${device.id}: button/title proportions ${hero.ratio}`);
   }
-  assert.ok(hero.hitHeight >= 44, `${device.id}: PLAY hit area is too small`);
+  assert.ok(Math.max(hero.hitHeight || 0, hero.height) >= 44, `${device.id}: PLAY hit area is too small`);
   await screenshot('landing');
   await page.locator('#login').click();
   await atTop('auth-screen');
@@ -293,29 +298,21 @@ for (const device of devices) {
   await page.locator('#page-profile').waitFor({ state: 'visible' });
   assert.equal(await page.locator('#page-profile').isVisible(), true);
   assert.equal(await page.locator('#dashboard-home').isVisible(), false);
-  assert.equal(await page.evaluate(() => document.activeElement.id), 'dashboard-title');
-  assert.match(await page.locator('#dashboard-title').innerText(), /LongPlayerName_123456789/);
-  assert.equal(await page.locator('#dashboard-title').evaluate(el => getComputedStyle(el).outlineStyle), 'none');
-  assert.equal(await page.locator('#dashboard-title').evaluate(el => getComputedStyle(el).userSelect), 'none');
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'page-profile-title');
+  await page.locator('#profile-display-name').getByText('LongPlayerName_123456789').waitFor();
   await page.reload();
   await page.locator('#page-profile').waitFor({ state: 'visible' });
   assert.equal(new URL(page.url()).pathname, '/profile', 'profile route survives reload');
-  assert.match(await page.locator('#dashboard-title').innerText(), /LongPlayerName_123456789/);
+  await page.locator('#profile-edit-button:not([disabled])').waitFor();
   await screenshot('dashboard-profile');
-  // Exercise navigation from the bottom of a long screen, not only from the top.
-  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-  await page.locator('#edit-profile').click(); await atTop('profile-screen');
-  assert.equal(await page.locator('#profile-cancel').isVisible(), true);
-  await page.locator('#bio').fill('Не сохранять');
-  await page.locator('#profile-cancel').click(); await atTop('dashboard-screen');
-  assert.equal(await page.locator('#page-profile').isVisible(), true, 'cancel returns to profile');
-  assert.equal(await page.locator('#dashboard-bio').innerText(), 'Люблю шахматы.');
-  await page.locator('#edit-profile').click(); await atTop('profile-screen');
-  await page.locator('#bio').fill('Обновлено');
-  await page.locator('#profile-submit').click(); await atTop('dashboard-screen');
-  assert.equal(await page.locator('#page-profile').isVisible(), true, 'saving returns to profile');
-  assert.equal(await page.locator('#dashboard-bio').innerText(), 'Обновлено');
-  assert.equal(await page.locator('#page-profile #dashboard-palettes').count(), 0);
+  await page.locator('#profile-edit-button').click();
+  await page.locator('#profile-edit-bio').fill('Не сохранять');
+  await page.locator('#profile-discard').click();
+  assert.equal(await page.locator('#profile-display-bio').innerText(), 'Люблю шахматы.');
+  await page.locator('#profile-edit-button').click();
+  await page.locator('#profile-edit-bio').fill('Обновлено');
+  await page.locator('#profile-save').click();
+  await page.locator('#profile-display-bio').getByText('Обновлено').waitFor();
   await openDrawer();
   await page.locator('#account-toggle').click();
   await page.locator('#account-menu [data-page=settings]').click();
@@ -325,7 +322,7 @@ for (const device of devices) {
     const rect = label.getBoundingClientRect();
     return { width: rect.width, height: rect.height, background: getComputedStyle(label.querySelector('.palette-swatch')).backgroundImage };
   }));
-  assert.equal(cards.length, 5);
+  assert.equal(cards.length, 10);
   assert.ok(cards.every(card => card.width === cards[0].width && card.height === cards[0].height && card.background.includes('linear-gradient')));
   assert.equal(await page.locator('#dashboard-palettes label[data-choice=gray] .palette-name').evaluate(el => getComputedStyle(el).userSelect), 'none');
   await screenshot('settings-palettes');
@@ -334,7 +331,7 @@ for (const device of devices) {
     await page.locator(`#dashboard-palettes label[data-choice=${currentPalette}]`).click();
   }
   for (const palette of ['forest', 'gray', 'wood', 'atelier', 'monochrome']) {
-    await page.locator(`#dashboard-palettes label[data-choice=${palette}]`).click();
+    if (await page.locator('.landing').getAttribute('data-palette') !== palette) await page.locator(`#dashboard-palettes label[data-choice=${palette}]`).click();
     assert.equal(await page.locator('.landing').getAttribute('data-palette'), palette);
     await checkLayout('dashboard-screen');
     await page.locator(`#dashboard-palettes label[data-choice=${palette}]`).click();

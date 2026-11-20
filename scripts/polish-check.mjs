@@ -26,9 +26,9 @@ try {
   await page.locator('[data-rating-mode=rapid]').click();await page.waitForFunction(()=>document.querySelector('.rating-score')?.textContent==='900');
   samples=await page.evaluate(async()=>{const a=document.querySelector('.rating-score');const out=[];for(let i=0;i<15;i++){await new Promise(requestAnimationFrame);out.push(a.dataset.animated);}return out;});assert.ok(samples.filter(Boolean).every(x=>parse(x)>=900&&parse(x)<=1200),JSON.stringify(samples));
   await page.goto(base+'/bot'); const bot=page.frameLocator('#bot-game-frame');await bot.locator('#bot-app[data-phase=playing]').waitFor();const board=await bot.locator('#board').boundingBox();if(size.width===390)assert.ok(board.width>size.width*.9,`board should be wide: ${board.width}`);
-  await page.goto(base+'/archive');const frame=page.frameLocator('#archive-frame');await frame.locator('.archive-card.is-ready').first().waitFor();const before=await frame.locator('.archive-card.is-ready').count();assert.ok(before<30,`off-screen cards stay unloaded: ${before}`);
-  const last=frame.locator('.archive-card').last();await last.scrollIntoViewIfNeeded();await last.waitFor({state:'visible',timeout:12000});assert.ok((await frame.locator('.archive-card.is-ready').count())>before);
+  await page.goto(base+'/archive');const frame=page.frameLocator('#archive-frame');await frame.locator('.archive-card.is-ready').first().waitFor();const before=await frame.locator('.archive-card.is-ready').count();assert.equal(before,30,'archive cards render without relying on intersection observers');
+  const last=frame.locator('.archive-card').last();await last.scrollIntoViewIfNeeded();await last.waitFor({state:'visible',timeout:12000});assert.equal(await frame.locator('.archive-card.is-ready').count(),before);
   await page.close();
  }
- console.log('✓ Current-to-target tickers, wide mobile bot board, sequential archive reveal and scroll');
+ console.log('✓ Current-to-target tickers, wide mobile bot board, archive rendering and scroll');
 }finally{await browser.close();}

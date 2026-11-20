@@ -21,7 +21,7 @@
 .profile-portrait-star { position:absolute; right:0; bottom:5px; display:grid; place-items:center; width:27px; height:27px; border:4px solid var(--page-background); border-radius:50%; background:var(--foreground); color:var(--page-background); font-size:11px; }
 .profile-identity-copy { min-width:0; padding-top:22px; }
 .profile-identity-line { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
-.profile-identity h3 { margin:0; font:400 clamp(26px,3vw,39px)/1.05 'Playfair Display',serif; letter-spacing:-.035em; }
+.profile-identity h3 { margin:0; overflow-wrap:anywhere; font:400 clamp(26px,3vw,39px)/1.05 'Playfair Display',serif; letter-spacing:-.035em; }
 .profile-player-tag { border:1px solid color-mix(in srgb,var(--foreground) 25%,transparent); padding:6px 8px; border-radius:30px; opacity:.65; font-size:9px; }
 .profile-identity-copy p { margin:9px 0 0; font:15px/1.5 'Charis SIL',serif; opacity:.68; }
 .profile-identity-aside { display:grid; gap:7px; margin:20px 0 0 auto; text-align:right; opacity:.45; white-space:nowrap; }
