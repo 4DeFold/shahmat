@@ -73,3 +73,23 @@ test('replay uses 0.5–3 second moves, one second at mate, then fades pieces to
   assert.equal(d.querySelector('.demo-board.demo-fading'),null);
  }finally{lobby.destroy();w.close()}
 });
+
+test('bottom step navigation shows progression and never skips a selection',async()=>{
+ const dom=new JSDOM(html,{url:'https://example.com',pretendToBeVisual:true}),d=dom.window.document;
+ const lobby=createPlayLobby({document:d,client:{rpc:async()=>({data:[]})},onChoose:()=>true});
+ try{
+  const nav=d.getElementById('lobby-nav'),k=nav.querySelector('[data-step=kinds]'),m=nav.querySelector('[data-step=modes]'),t=nav.querySelector('[data-step=controls]');
+  assert.equal(k.getAttribute('aria-current'),'step');assert.equal(m.disabled,true);assert.equal(t.disabled,true);
+  d.querySelector('[data-kind=rated]').click();assert.equal(m.getAttribute('aria-current'),'step');assert.equal(k.disabled,false);assert.equal(t.disabled,true);
+  d.querySelectorAll('#lobby-stage .choice-card')[1].click();assert.equal(t.getAttribute('aria-current'),'step');
+  m.click();assert.equal(m.getAttribute('aria-current'),'step');assert.equal(t.disabled,true);
+  k.click();assert.equal(k.getAttribute('aria-current'),'step');assert.equal(m.disabled,true);
+ }finally{lobby.destroy();dom.window.close();}
+});
+
+test('pixel reveal follows the cursor and fades the trail',async()=>{
+ const {pixelIntensity}=await import('../pages/pixel-blast.js');
+ const points=[{x:20,y:50,time:100},{x:180,y:50,time:900}];
+ assert.ok(pixelIntensity(180,50,points,1000)>pixelIntensity(20,50,points,1000)*2);
+ assert.equal(pixelIntensity(20,50,points,1800),0);
+});

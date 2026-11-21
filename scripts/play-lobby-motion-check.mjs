@@ -22,13 +22,19 @@ try {
   });
   await page.goto(`${base}/pages/game.html`);
   const kind=page.locator('#lobby-stage [data-kind=rated]');await kind.waitFor({state:'visible'});
-  assert.equal(await kind.locator('.lobby-pixels i').count(),32);
   await kind.hover();
   if(motion==='no-preference'){
-   await page.waitForTimeout(400);
-   const state=await kind.evaluate(el=>({spotlight:parseFloat(getComputedStyle(el,'::before').opacity),pixels:parseFloat(getComputedStyle(el.querySelector('.lobby-pixels')).opacity),paused:getComputedStyle(el.querySelector('.lobby-pixels i')).animationPlayState,mouse:el.style.getPropertyValue('--mx')}));
-   assert.ok(state.spotlight>.5&&state.pixels>.5&&state.paused==='running'&&state.mouse.endsWith('px'),JSON.stringify(state));
-  }
+   const box=await kind.boundingBox(), y=box.y+box.height*.5;
+   await page.mouse.move(box.x+box.width*.2,y);await page.waitForTimeout(350);
+   await kind.locator('canvas.lobby-pixels').waitFor();
+   await page.mouse.move(box.x+box.width*.8,y);await page.waitForTimeout(1050);
+   const state=await kind.evaluate(el=>{
+    const canvas=el.querySelector('canvas.lobby-pixels'),ctx=canvas.getContext('2d'),w=canvas.width,h=canvas.height;
+    const sum=(cx)=>{const x=Math.floor(w*cx),y=Math.floor(h*.5),r=Math.floor(Math.min(w,h)*.12),data=ctx.getImageData(x-r,y-r,r*2,r*2).data;let n=0;for(let i=3;i<data.length;i+=4)n+=data[i];return n;};
+    return {spotlight:parseFloat(getComputedStyle(el,'::before').opacity),left:sum(.2),right:sum(.8),mouse:el.style.getPropertyValue('--mx')};
+   });
+   assert.ok(state.spotlight>.5&&state.right>state.left*2&&state.right>100&&state.mouse.endsWith('px'),JSON.stringify(state));
+  }else assert.equal(await kind.locator('canvas.lobby-pixels').count(),0);
   await kind.click();await page.locator('#lobby-stage .choice-card').first().waitFor();
   assert.equal(await page.locator('#lobby-stage .choice-card').count(),5);
   if(motion==='no-preference'){
@@ -37,8 +43,12 @@ try {
   }else assert.equal(await page.locator('.lobby-ghost').count(),0);
   assert.equal(await page.locator('#lobby-stage .choice-card').nth(2).locator('svg g').getAttribute('stroke-width'),'1.05');
   await page.locator('#lobby-stage .choice-card').nth(1).click();await page.locator('#lobby-stage .time-card').first().waitFor();
-  assert.equal(await page.locator('#lobby-stage .time-card .lobby-pixels i').count(),128);
+  assert.equal(await page.locator('#lobby-nav [aria-current=step]').textContent(),'Время');
   await page.locator('#lobby-back').click();await page.locator('#lobby-stage .choice-card').nth(1).waitFor();
+  assert.equal(await page.locator('.lobby-ghost').count(),0,'back must remove the outgoing layer');
+  assert.equal(await page.locator('#lobby-nav [aria-current=step]').textContent(),'Режим');
+  await page.locator('#lobby-nav [data-step=kinds]').click();assert.equal(await page.locator('#lobby-stage .kind-card').count(),2);
+  assert.equal(await page.locator('#lobby-nav [data-step=modes]').isDisabled(),true);
   await page.close();
  }
  console.log(`✓ ${name}: pixel hover, press ripple, stage transitions and reduced motion`);

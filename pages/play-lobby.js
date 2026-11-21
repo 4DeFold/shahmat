@@ -1,5 +1,6 @@
 import {Chess} from 'chess.js';
 import {pieceSrc} from './piece-theme.js';
+import {createPixelBlast} from './pixel-blast.js';
 
 export const controls = {
   bullet:['1+0','1+1','2+0','2+1'], blitz:['3+0','3+2','5+0','5+3'],
@@ -43,7 +44,8 @@ export function createOnlineCount(element, win) {
 
 export function createPlayLobby({document,client,onChoose,onOpenBoard}) {
  const win=document.defaultView, root=document.getElementById('play-lobby'), shell=document.getElementById('member-game');
- const stage=document.getElementById('lobby-stage'), back=document.getElementById('lobby-back');
+ const stage=document.getElementById('lobby-stage'), back=document.getElementById('lobby-back'), nav=document.getElementById('lobby-nav');
+ const pixels=createPixelBlast(win);
  let screen='kinds',kind='rated',mode=null, timers=[], demoGames=[], fetching=null, visible=true, disposed=false, active=false;
  let counts=null, counters=[], pollTimer=null, pollInFlight=false, pollGeneration=0;
  const reduced=()=>win.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -115,18 +117,6 @@ export function createPlayLobby({document,client,onChoose,onOpenBoard}) {
  }
  function stopPolling(){pollGeneration++;if(pollTimer!==null)win.clearInterval(pollTimer);pollTimer=null;counts=null;}
  function startPolling(){if(!active||!visible||root.hidden||disposed||pollTimer!==null)return;void poll();pollTimer=win.setInterval(poll,2000);}
- // One contained layer per card: cursor spotlight + a small, CSS-animated
- // pixel field, inspired by Magic Bento and Pixel Blast, without a WebGL
- // context per button. Decorative nodes never intercept input.
- function decorate(card) {
-  const pixels=document.createElement('span');pixels.className='lobby-pixels';pixels.setAttribute('aria-hidden','true');
-  for(let i=0;i<32;i++){
-   const pixel=document.createElement('i');
-   pixel.style.setProperty('--px',`${5+((i*37)%91)}%`);pixel.style.setProperty('--py',`${4+((i*61)%90)}%`);
-   pixel.style.setProperty('--pd',`${(i%8)*-0.19}s`);pixel.style.setProperty('--ps',`${2+(i%3)}px`);pixels.append(pixel);
-  }
-  card.prepend(pixels);
- }
  let ghost=null, ghostTimer=null;
  function clearGhost(){if(ghostTimer!==null)win.clearTimeout(ghostTimer);ghostTimer=null;ghost?.remove();ghost=null;}
  function transitionGhost(){
@@ -147,38 +137,46 @@ export function createPlayLobby({document,client,onChoose,onOpenBoard}) {
   const r=card.getBoundingClientRect();if(!r.width||!r.height)return;
   const x=Math.max(0,Math.min(r.width,event.clientX-r.left)),y=Math.max(0,Math.min(r.height,event.clientY-r.top));
   card.style.setProperty('--mx',`${x}px`);card.style.setProperty('--my',`${y}px`);
+  pixels.move(card,event);
   card.style.setProperty('--tilt-x',`${(0.5-y/r.height)*3}deg`);card.style.setProperty('--tilt-y',`${(x/r.width-0.5)*3}deg`);
  };
  stage.addEventListener('pointermove',spotlight);back.addEventListener('pointermove',spotlight);
- decorate(back);
+ stage.addEventListener('pointerout',event=>{const card=event.target.closest('.lobby-card');if(card&&!card.contains(event.relatedTarget))pixels.leave(card);});
+ back.addEventListener('pointerleave',()=>pixels.leave(back));
+ stage.addEventListener('focusin',event=>{const card=event.target.closest('.lobby-card');if(card)pixels.focus(card);});
+ stage.addEventListener('focusout',event=>{const card=event.target.closest('.lobby-card');if(card)pixels.leave(card);});
+ back.addEventListener('focus',()=>pixels.focus(back));back.addEventListener('blur',()=>pixels.leave(back));
  stage.addEventListener('click',event=>{const card=event.target.closest('.lobby-card');if(card&&!card.disabled)ripple(card,event);},true);
- function show(next) {
-  transitionGhost();clear();counters.forEach(x=>x.counter.destroy());counters=[];screen=next;shell.classList.add('lobby-open');root.hidden=false;back.hidden=screen==='kinds';
+ function show(next, {backwards=false} = {}) {
+  pixels.clear();if(backwards)clearGhost();else transitionGhost();clear();counters.forEach(x=>x.counter.destroy());counters=[];screen=next;shell.classList.add('lobby-open');root.hidden=false;back.hidden=screen==='kinds';
+  const steps=['kinds','modes','controls'],current=steps.indexOf(screen);
+  for(const button of nav.querySelectorAll('button')){const index=steps.indexOf(button.dataset.step);button.disabled=index>current;if(index===current)button.setAttribute('aria-current','step');else button.removeAttribute('aria-current');}
   stage.className=`lobby-stage stage-${screen}`;stage.replaceChildren();
   if(screen==='kinds'){
    for(const [key,label] of [['friendly','Товарищеские'],['rated','Ранговые']]){
     const button=document.createElement('button');button.type='button';button.className='kind-card lobby-card';button.dataset.kind=key;
     button.innerHTML=`<span class="demo-frame"><span class="demo-delta demo-black"></span><span class="demo-board" aria-hidden="true"></span><span class="demo-delta demo-white"></span></span><strong>${label}</strong>`;
-    decorate(button);countFor(button,row=>row.kind===key);button.addEventListener('click',()=>{kind=key;show('modes');});stage.append(button);
+    countFor(button,row=>row.kind===key);button.addEventListener('click',()=>{kind=key;show('modes');});stage.append(button);
    }
    if(demoGames.length)startDemos();else void load();
   } else if(screen==='modes'){
    for(const [key,data] of Object.entries(info)){
     const button=document.createElement('button');button.type='button';button.className='choice-card lobby-card';button.innerHTML=`<span class="choice-icon">${data.icon}</span><strong>${data.name}</strong>`;
-    decorate(button);countFor(button,row=>row.kind===kind&&row.mode===key);button.addEventListener('click',()=>{mode=key;show('controls');});stage.append(button);
+    countFor(button,row=>row.kind===kind&&row.mode===key);button.addEventListener('click',()=>{mode=key;show('controls');});stage.append(button);
    }
-   const custom=document.createElement('button');custom.type='button';custom.disabled=true;custom.className='choice-card lobby-card';custom.innerHTML=`<span class="choice-icon">${icon('<path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4"/>')}</span><strong>Кастом</strong>`;decorate(custom);countFor(custom,()=>false);stage.append(custom);
+   const custom=document.createElement('button');custom.type='button';custom.disabled=true;custom.className='choice-card lobby-card';custom.innerHTML=`<span class="choice-icon">${icon('<path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4"/>')}</span><strong>Кастом</strong>`;countFor(custom,()=>false);stage.append(custom);
   } else {
    for(const control of controls[mode]){
     const button=document.createElement('button');button.type='button';button.className='choice-card time-card lobby-card';button.innerHTML=`<strong>${control}</strong>`;
-    decorate(button);countFor(button,row=>row.kind===kind&&row.mode===mode&&row.control===control.replace(/\+0$/,''));
+    countFor(button,row=>row.kind===kind&&row.mode===mode&&row.control===control.replace(/\+0$/,''));
     button.addEventListener('click',()=>{if(onChoose({mode,kind,timeControl:control}))openBoard();});stage.append(button);
    }
   }
   updateCounts();startPolling();
  }
- function openBoard(){if(!root.hidden)transitionGhost();clear();stopPolling();root.hidden=true;shell.classList.remove('lobby-open');onOpenBoard?.();}
- back.addEventListener('click',event=>{ripple(back,event);show(screen==='controls'?'modes':'kinds');});
+ function openBoard(){pixels.clear();if(!root.hidden)transitionGhost();clear();stopPolling();root.hidden=true;shell.classList.remove('lobby-open');onOpenBoard?.();}
+ back.addEventListener('click',event=>{ripple(back,event);show(screen==='controls'?'modes':'kinds',{backwards:true});});
+ nav.addEventListener('click',event=>{const button=event.target.closest('button[data-step]');if(!button||button.disabled||button.dataset.step===screen)return;show(button.dataset.step,{backwards:true});});
  show('kinds');
- return {activate(){active=true;startPolling();return load();},show,openBoard,setVisible(value){visible=value;if(visible&&!root.hidden){if(screen==='kinds'){void load();startDemos();}startPolling();}else{clear();stopPolling();}},destroy(){disposed=true;clear();clearGhost();stopPolling();counters.forEach(x=>x.counter.destroy());}};
+ return {activate(){active=true;startPolling();return load();},show,openBoard,setVisible(value){visible=value;if(visible&&!root.hidden){if(screen==='kinds'){void load();startDemos();}startPolling();}else{pixels.clear();clear();stopPolling();}},destroy(){disposed=true;pixels.destroy();clear();clearGhost();stopPolling();counters.forEach(x=>x.counter.destroy());}};
 }

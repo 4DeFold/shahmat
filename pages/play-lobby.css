@@ -7,9 +7,9 @@
 #member-game:not(.lobby-open) .mode-summary:not([hidden]) {display:block}
 @keyframes rail-in {from{opacity:0;transform:translateX(100%)}to{opacity:1;transform:none}}
 @keyframes game-in {from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
-.play-lobby {height:100%;min-height:0;box-sizing:border-box;padding:clamp(16px,3.2vw,46px) clamp(20px,5vw,70px);display:flex;overflow:hidden;color:var(--ink)}
+.play-lobby {position:relative;z-index:1;flex-direction:column;height:100%;min-height:0;box-sizing:border-box;padding:clamp(16px,3.2vw,46px) clamp(20px,5vw,70px);display:flex;overflow:hidden;color:var(--ink)}
 .play-lobby[hidden] {display:none}
-.lobby-content {display:flex;flex-direction:column;align-items:center;justify-content:center;gap:clamp(12px,2vh,20px);width:100%;min-height:0}
+.lobby-content {flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:clamp(12px,2vh,20px);width:100%;min-height:0}
 .lobby-stage {width:100%;max-width:1200px;min-height:0;display:grid;align-items:stretch;justify-items:stretch;gap:clamp(10px,1.8vw,24px)}
 .stage-kinds {grid-template-columns:repeat(2,minmax(0,1fr));justify-items:center}
 .stage-modes {grid-template-columns:repeat(5,minmax(0,1fr))}
@@ -43,7 +43,7 @@
  .lobby-content {gap:8px}
  .lobby-stage {gap:8px}
  .stage-kinds {height:100%;grid-template-columns:1fr;grid-template-rows:repeat(2,minmax(0,1fr));align-items:center;justify-items:center}
- .kind-card {--card-padding:8px;width:min(100%,calc(min(48vw, (100dvh - 110px) / 2 - 42px, 200px) + 2 * var(--card-padding)));gap:5px}
+ .kind-card {--card-padding:8px;width:min(100%,calc(min(48vw, (100dvh - 170px) / 2 - 42px, 200px) + 2 * var(--card-padding)));gap:5px}
  .kind-card strong {font-size:clamp(15px,4vw,20px)}
  .demo-delta {font-size:11px}
  .stage-modes,.stage-controls {height:100%;grid-template-columns:1fr}
@@ -63,19 +63,25 @@
 :is(.lobby-card,.lobby-back)::before {content:"";position:absolute;inset:0;z-index:0;pointer-events:none;opacity:0;background:radial-gradient(220px circle at var(--mx) var(--my),color-mix(in srgb,var(--accent) 28%,transparent),transparent 72%);transition:opacity .3s ease}
 :is(.lobby-card,.lobby-back)::after {content:"";position:absolute;inset:0;z-index:5;pointer-events:none;opacity:0;border:1px solid transparent;background:radial-gradient(180px circle at var(--mx) var(--my),var(--accent),transparent 70%) border-box;mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0);mask-composite:exclude;transition:opacity .3s ease}
 :is(.lobby-card,.lobby-back):focus-visible::before,:is(.lobby-card,.lobby-back):focus-visible::after {opacity:.8}
-.lobby-card > :not(.lobby-pixels):not(.lobby-ripple) {position:relative;z-index:2}
-.lobby-pixels {position:absolute!important;inset:0;z-index:1;pointer-events:none;opacity:0;transition:opacity .35s ease}
-.lobby-pixels i {position:absolute;left:var(--px);top:var(--py);width:var(--ps);height:var(--ps);background:var(--accent);box-shadow:0 0 7px var(--accent);opacity:0;transform:scale(.3);animation:pixel-blast 1.65s ease-in-out var(--pd) infinite alternate;animation-play-state:paused}
-@keyframes pixel-blast {0%{opacity:.05;transform:scale(.3) translateY(3px)}55%{opacity:.5;transform:scale(1)}100%{opacity:.15;transform:scale(.6) translateY(-5px)}}
-@media(hover:hover) and (prefers-reduced-motion:no-preference){:is(.lobby-card:not(:disabled),.lobby-back):hover::before,:is(.lobby-card:not(:disabled),.lobby-back):hover::after{opacity:.85}:is(.lobby-card:not(:disabled),.lobby-back):hover .lobby-pixels{opacity:.8}:is(.lobby-card:not(:disabled),.lobby-back):hover .lobby-pixels i{animation-play-state:running}}
-:is(.lobby-card,.lobby-back):focus-visible .lobby-pixels {opacity:.65}:is(.lobby-card,.lobby-back):focus-visible .lobby-pixels i{animation-play-state:running}
+.lobby-card > :not(.lobby-pixels):not(.lobby-ripple) {position:relative;z-index:4}.lobby-card > .demo-frame {z-index:2}
+canvas.lobby-pixels {position:absolute!important;inset:0;width:100%;height:100%;z-index:3;pointer-events:none}
 :is(.lobby-card:not(:disabled),.lobby-back):active {transform:scale(.96);transition:transform .12s cubic-bezier(.2,.9,.3,1)}
 .lobby-ripple {position:absolute;z-index:6;pointer-events:none;width:20px;height:20px;margin:-10px;border:1px solid var(--accent);border-radius:50%;box-shadow:0 0 18px var(--accent),inset 0 0 10px var(--accent);animation:lobby-ripple .55s cubic-bezier(.12,.7,.2,1) forwards}
 @keyframes lobby-ripple {from{opacity:.8;transform:scale(.25)}to{opacity:0;transform:scale(30)}}
-.lobby-ghost {position:absolute!important;z-index:12;pointer-events:none!important;max-width:none!important;animation:lobby-depart .52s cubic-bezier(.4,0,.2,1) forwards;transform-origin:center}
+.lobby-ghost {position:absolute!important;z-index:0;pointer-events:none!important;max-width:none!important;animation:lobby-depart .52s cubic-bezier(.4,0,.2,1) forwards;transform-origin:center}
 .lobby-ghost * {pointer-events:none!important}.lobby-ghost .lobby-card{animation:none;transform:none}
 @keyframes lobby-depart {0%{opacity:1;transform:scale(1);filter:blur(0)}100%{opacity:0;transform:translateY(-16px) scale(.97);filter:blur(6px)}}
 .demo-square img {transition:opacity .36s ease,transform .36s ease}
 .demo-board.demo-fading .demo-square img {opacity:0;transform:scale(.9)}
 .demo-delta {transition:opacity .3s ease}
 @media(prefers-reduced-motion:reduce){:is(.lobby-card,.lobby-back)::before,:is(.lobby-card,.lobby-back)::after,.lobby-pixels,.lobby-ripple{display:none}:is(.lobby-card:not(:disabled),.lobby-back):active{transform:none}.demo-square img,.demo-delta{transition:none}.lobby-card{filter:none}}
+
+/* Sibling Focus Nav: padding keeps the hover area connected between steps. */
+.lobby-nav {display:flex;align-items:center;justify-content:center;flex:none;min-height:44px;width:100%}
+.lobby-nav button {appearance:none;border:0;background:transparent;color:var(--ink);font:600 12px system-ui,sans-serif;min-height:44px;padding:0 12px;cursor:pointer;transition:opacity .2s ease,color .2s ease}
+.lobby-nav button[aria-current="step"] {color:var(--accent)}
+.lobby-nav button:disabled {opacity:.35;cursor:default}
+.lobby-nav:has(> button:hover:not(:disabled)) > button:not(:hover),.lobby-nav:has(> button:focus-visible) > button:not(:focus-visible) {opacity:.3}
+.lobby-nav button:focus-visible {outline:2px solid var(--accent);outline-offset:-4px}
+@media(max-height:450px){.lobby-nav,.lobby-nav button{min-height:32px}}
+@media(prefers-reduced-motion:reduce){.lobby-nav button{transition:none}}
