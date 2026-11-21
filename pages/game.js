@@ -31,7 +31,7 @@ const ownProfileCard=createProfileCard(document.getElementById('member-game'),su
 const updateOnline = createOnlineCounter(document);
 let stopOnline = null, stopHeartbeat = null;
 // A preloaded embedded game stays paused until its parent shows the view.
-if (window.parent !== window) ui.hide();
+if (window.parent !== window) { lobby.setVisible(false); ui.hide(); }
 let cachedId = null;
 try { cachedId = cachedUserId(window.localStorage); if (cachedId) { const local = JSON.parse(localStorage.getItem(`shahmat.appearance.${cachedId}`) || 'null'); const session = JSON.parse(localStorage.getItem('sb-eswyxbyddkajysogtglp-auth-token') || 'null'); ui.setRatingUnit(local?.rankUnit || session?.user?.user_metadata?.rank_unit); } } catch { /* Storage may be blocked. */ }
 startSessionMonitor({

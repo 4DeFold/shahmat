@@ -25,3 +25,24 @@ test('friendly and rated queues and controls are isolated; friendly finishes nev
   await assert.rejects(db.query('select * from play_demo_games()'),/unauthorized/);
  } finally{await db.close()}
 });
+
+test('pool counts include fresh searchers and online players in unexpired games only',async()=>{
+ const db=await PGlite.create();try {
+  await db.exec("create role anon;create role authenticated;create role service_role;create schema auth;create table auth.users(id uuid primary key,raw_user_meta_data jsonb default '{}');create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;");
+  for(const f of (await readdir('supabase/migrations')).filter(f=>f.endsWith('.sql')).sort())await db.exec(await readFile('supabase/migrations/'+f,'utf8'));
+  for(const id of ids)await db.query('insert into auth.users(id) values($1)',[id]);
+  await assert.rejects(db.query('select * from play_lobby_online_counts()'),/unauthorized/);
+  await db.exec(`set request.jwt.claim.sub='${ids[0]}'`);
+  await db.query("insert into online_queue(user_id,mode,game_kind,time_control,heartbeat_at) values ($1,'blitz','rated','3+2',now()),($2,'rapid','friendly','10',now()-interval '31 seconds')",[ids[0],ids[1]]);
+  await db.query("insert into online_games(white_id,black_id,mode,game_kind,time_control,white_ms,black_ms) values($1,$2,'rapid','friendly','10',600000,600000)",[ids[1],ids[2]]);
+  await db.query("insert into online_presence(user_id,last_seen) values($1,now()),($2,now()-interval '61 seconds')",[ids[1],ids[2]]);
+  let rows=(await db.query('select * from play_lobby_online_counts() order by game_kind')).rows;
+  assert.deepEqual(rows.map(r=>[r.game_kind,r.mode,r.time_control,Number(r.online)]),[['friendly','rapid','10',1],['rated','blitz','3+2',1]]);
+  await db.query("update online_presence set last_seen=now() where user_id=$1",[ids[2]]);
+  await db.query("update online_queue set heartbeat_at=now() where user_id=$1",[ids[1]]); // Duplicate user is counted once per pool.
+  rows=(await db.query("select online from play_lobby_online_counts() where game_kind='friendly'")).rows;assert.equal(Number(rows[0].online),2);
+  await db.exec("update online_games set turn_started_at=now()-interval '11 minutes'");
+  rows=(await db.query("select online from play_lobby_online_counts() where game_kind='friendly'")).rows;assert.equal(Number(rows[0].online),1);
+  assert.equal((await db.query("select has_function_privilege('anon','public.play_lobby_online_counts()','execute') allowed")).rows[0].allowed,false);
+ }finally{await db.close()}
+});
