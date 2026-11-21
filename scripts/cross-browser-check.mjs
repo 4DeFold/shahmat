@@ -77,7 +77,7 @@ for(const name of requested){
      await page.locator('.rating-row').first().waitFor();await page.waitForFunction(()=>document.querySelectorAll('.rating-row .rating-avatar')[1]?.getAttribute('src')==='/pieces/chessnut/wN.svg');
      for(const image of await page.locator('.rating-row .rating-avatar').all()) {const box=await image.boundingBox();const expected=viewport.width<=700?30:36;assert.ok(Math.abs(box.width-expected)<1&&Math.abs(box.height-expected)<1,`${name}: avatar ${JSON.stringify(box)}`);}
     }
-    if(route==='profile')await page.locator('#profile-display-name').getByText('Alice').waitFor();
+    if(route==='profile'){await page.locator('#profile-display-name').getByText('Alice').waitFor();await page.waitForLoadState('networkidle');}
    }
    await page.goto(`${base}/game`);let f=page.frameLocator('#member-game-frame');await f.locator('#board .square').first().waitFor();assert.equal(await f.locator('#board .square').count(),64);await checkBoardLayout(f,'online');
    await page.goto(`${base}/archive`);f=page.frameLocator('#archive-frame');await f.locator('.archive-card').first().click();await f.locator('#archive-detail').waitFor({state:'visible'});assert.equal(await f.locator('#board .square').count(),64);await checkBoardLayout(f,'archive');
