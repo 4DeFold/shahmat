@@ -193,6 +193,22 @@ export function createPlayLobby({document,client,onChoose,onOpenBoard}) {
   card.style.setProperty('--mx',`${x}px`);card.style.setProperty('--my',`${y}px`);
   card.style.setProperty('--tilt-x',`${(0.5-y/r.height)*3}deg`);card.style.setProperty('--tilt-y',`${(x/r.width-0.5)*3}deg`);
  };
+ // Track the edge light on every card in proximity, including disabled options.
+ // Tilt stays on hover; the border highlight can follow the cursor between cards.
+ const specular=event=>{
+  if(reduced()||event.pointerType==='touch')return;
+  for(const card of stage.children){
+   const r=card.getBoundingClientRect();if(!r.width||!r.height)continue;
+   const dx=event.clientX-(r.left+r.width/2),dy=event.clientY-(r.top+r.height/2);
+   const distance=Math.hypot(Math.max(r.left-event.clientX,0,event.clientX-r.right),Math.max(r.top-event.clientY,0,event.clientY-r.bottom));
+   card.style.setProperty('--shine-angle',`${Math.atan2(dx,-dy)*180/Math.PI}deg`);
+   card.style.setProperty('--shine-opacity',String(.35+.65*Math.max(0,1-distance/250)));
+   card.style.setProperty('--tilt-x',`${(0.5-Math.max(0,Math.min(r.height,event.clientY-r.top))/r.height)*3}deg`);
+   card.style.setProperty('--tilt-y',`${(Math.max(0,Math.min(r.width,event.clientX-r.left))/r.width-0.5)*3}deg`);
+  }
+ };
+ const resetSpecular=()=>{for(const card of stage.children)card.style.removeProperty('--shine-opacity');};
+ root.addEventListener('pointermove',specular);root.addEventListener('pointerleave',resetSpecular);
  stage.addEventListener('pointermove',spotlight);back.addEventListener('pointermove',spotlight);
  function show(next, {backwards=false, source=null} = {}) {
   clearTransitions();const wasHidden=back.hidden, showBack=next!=='kinds';
@@ -226,5 +242,5 @@ export function createPlayLobby({document,client,onChoose,onOpenBoard}) {
  back.addEventListener('click',()=>show(screen==='controls'?'modes':'kinds',{backwards:true}));
  const onResize=()=>clearTransitions();win.addEventListener('resize',onResize);
  show('kinds');
- return {activate(){active=true;startPolling();return load();},show,openBoard,setVisible(value){visible=value;if(visible&&!root.hidden){if(screen==='kinds'){void load();startDemos();}startPolling();}else{clearTransitions();clear();stopPolling();}},destroy(){disposed=true;win.removeEventListener('resize',onResize);clear();clearTransitions();stopPolling();counters.forEach(x=>x.counter.destroy());}};
+ return {activate(){active=true;startPolling();return load();},show,openBoard,setVisible(value){visible=value;if(visible&&!root.hidden){if(screen==='kinds'){void load();startDemos();}startPolling();}else{clearTransitions();clear();stopPolling();}},destroy(){disposed=true;root.removeEventListener('pointermove',specular);root.removeEventListener('pointerleave',resetSpecular);win.removeEventListener('resize',onResize);clear();clearTransitions();stopPolling();counters.forEach(x=>x.counter.destroy());}};
 }

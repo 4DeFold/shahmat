@@ -18,7 +18,7 @@
 .stage-initial .lobby-card{animation:lobby-arrive .65s cubic-bezier(.16,1,.3,1) backwards}.stage-initial .lobby-card:nth-child(2){animation-delay:35ms}
 @keyframes lobby-arrive {from{opacity:0;transform:translateY(22px) scale(.94) rotateX(-5deg);filter:blur(5px)}to{opacity:1;transform:none;filter:blur(0)}}
 .lobby-card:focus-visible,.lobby-back:focus-visible,.lobby-change:focus-visible {outline:2px solid var(--accent);outline-offset:3px}
-@media(hover:hover) and (prefers-reduced-motion:no-preference){.lobby-card:not(:disabled):hover{transform:perspective(900px) translateY(-4px) rotateX(var(--tilt-x,0deg)) rotateY(var(--tilt-y,0deg)) scale(1.01);border-color:var(--ink);box-shadow:0 18px 36px #0003}}
+@media(hover:hover) and (prefers-reduced-motion:no-preference){.lobby-card:hover{transform:perspective(900px) translateY(-4px) rotateX(var(--tilt-x,0deg)) rotateY(var(--tilt-y,0deg)) scale(1.01);border-color:var(--ink);box-shadow:0 18px 36px #0003}}
 .lobby-back,.lobby-change {font:600 13px system-ui,sans-serif;color:var(--ink);background:transparent;border:1px solid var(--line);padding:10px 14px;cursor:pointer;white-space:nowrap}
 .lobby-back[hidden] {display:none}
 .lobby-back:hover,.lobby-change:hover {background:var(--surface-alt)}
@@ -60,14 +60,17 @@
 /* The cursor spotlight remains behind the card contents. */
 .lobby-card,.lobby-back {position:relative;isolation:isolate;overflow:hidden;--mx:50%;--my:50%}
 :is(.lobby-card,.lobby-back)::before {content:"";position:absolute;inset:0;z-index:0;pointer-events:none;opacity:0;background:radial-gradient(220px circle at var(--mx) var(--my),color-mix(in srgb,var(--accent) 28%,transparent),transparent 72%);transition:opacity .3s ease}
-:is(.lobby-card,.lobby-back)::after {content:"";position:absolute;inset:0;z-index:5;pointer-events:none;opacity:0;border:1px solid transparent;background:radial-gradient(180px circle at var(--mx) var(--my),var(--accent),transparent 70%) border-box;mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0);mask-composite:exclude;transition:opacity .3s ease}
-:is(.lobby-card,.lobby-back):focus-visible::before,:is(.lobby-card,.lobby-back):focus-visible::after {opacity:.8}
+.lobby-back::after {content:"";position:absolute;inset:0;z-index:5;pointer-events:none;opacity:0;border:1px solid transparent;background:radial-gradient(180px circle at var(--mx) var(--my),var(--accent),transparent 70%) border-box;mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0);mask-composite:exclude;transition:opacity .3s ease}
+/* Specular-style edge: a narrow, cursor-directed highlight over the base border. */
+.lobby-card::after {content:"";position:absolute;inset:0;z-index:5;pointer-events:none;border:1px solid transparent;background:conic-gradient(from calc(var(--shine-angle, 45deg) - 46deg) at 50% 50%, transparent 0deg, color-mix(in srgb, var(--ink) 90%, transparent) 46deg, transparent 92deg) border-box;mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0);mask-composite:exclude;opacity:var(--shine-opacity,.35);transition:opacity .2s ease}
+:is(.lobby-card,.lobby-back):focus-visible::before,.lobby-back:focus-visible::after {opacity:.8}
+.lobby-card:focus-visible::after {opacity:1}
 .lobby-card > * {position:relative;z-index:4}.lobby-card > .demo-frame {z-index:2}
-@media(hover:hover) and (prefers-reduced-motion:no-preference){:is(.lobby-card:not(:disabled),.lobby-back):hover::before,:is(.lobby-card:not(:disabled),.lobby-back):hover::after{opacity:.85}}
+@media(hover:hover) and (prefers-reduced-motion:no-preference){:is(.lobby-card:not(:disabled),.lobby-back):hover::before,.lobby-back:hover::after{opacity:.85}}
 :is(.lobby-card:not(:disabled),.lobby-back):active {transform:scale(.96);transition:transform .12s cubic-bezier(.2,.9,.3,1)}
 .lobby-ghost {position:absolute!important;z-index:0;pointer-events:none!important;max-width:none!important}
 .lobby-ghost * {pointer-events:none!important}.lobby-ghost .lobby-card{animation:none;transform:none}
 .demo-square img {transition:opacity .36s ease,transform .36s ease}
 .demo-board.demo-fading .demo-square img {opacity:0;transform:scale(.9)}
 .demo-delta {transition:opacity .3s ease}
-@media(prefers-reduced-motion:reduce){:is(.lobby-card,.lobby-back)::before,:is(.lobby-card,.lobby-back)::after{display:none}:is(.lobby-card:not(:disabled),.lobby-back):active{transform:none}.demo-square img,.demo-delta{transition:none}.lobby-card{filter:none}}
+@media(prefers-reduced-motion:reduce){:is(.lobby-card,.lobby-back)::before,.lobby-back::after{display:none}.lobby-card::after{transition:none}:is(.lobby-card:not(:disabled),.lobby-back):active{transform:none}.demo-square img,.demo-delta{transition:none}.lobby-card{filter:none}}

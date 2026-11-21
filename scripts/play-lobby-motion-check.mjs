@@ -22,6 +22,14 @@ try {
   });
   await page.goto(`${base}/pages/game.html`);
   const kind=page.locator('#lobby-stage [data-kind=rated]');await kind.waitFor({state:'visible'});
+  const checkCardEffect=async card=>{
+   await page.waitForTimeout(800);
+   await card.hover({position:{x:12,y:12}});await page.waitForTimeout(350);
+   const state=await card.evaluate(el=>({angle:el.style.getPropertyValue('--shine-angle'),opacity:parseFloat(getComputedStyle(el,'::after').opacity),background:getComputedStyle(el,'::after').backgroundImage,transform:getComputedStyle(el).transform}));
+   assert.match(state.background,/conic-gradient/);
+   if(motion==='no-preference'){assert.match(state.angle,/deg$/);assert.ok(state.opacity>.8,JSON.stringify(state));assert.match(state.transform,/matrix3d/,JSON.stringify(state));}
+   else {assert.equal(state.angle,'');assert.equal(state.transform,'none');}
+  };
   await kind.hover();
   if(motion==='no-preference'){
    await page.waitForTimeout(350);
@@ -43,8 +51,10 @@ try {
    assert.match(morph.incoming[0].transform,/translate/);assert.match(morph.chosen.at(-1).transform,/scale\(1.13/);
    assert.match(morph.sibling.at(-1).filter,/blur/);assert.ok(morph.back.length>=2);
   }else assert.equal(await page.locator('.lobby-ghost').count(),0);
+  await checkCardEffect(page.locator('#lobby-stage .choice-card').nth(1));
   assert.equal(await page.locator('#lobby-stage .choice-card').nth(2).locator('svg g').getAttribute('stroke-width'),'1.05');
   await page.locator('#lobby-stage .choice-card').nth(1).click();await page.locator('#lobby-stage .time-card').first().waitFor();
+  await checkCardEffect(page.locator('#lobby-stage .time-card').first());
   await page.locator('#lobby-back').click();await page.locator('#lobby-stage .choice-card').nth(1).waitFor();
   if(motion==='no-preference'){
    const reverse=await page.evaluate(()=>{const ghost=document.querySelector('.lobby-ghost'),target=document.querySelector('#lobby-stage [data-mode=blitz]');return {count:ghost?.children.length,z:getComputedStyle(ghost).zIndex,root:getComputedStyle(document.querySelector('#play-lobby')).zIndex,frames:ghost?.children[0].getAnimations()[0]?.effect.getKeyframes(),target:target?.getAnimations()[0]?.effect.getKeyframes()};});
@@ -53,6 +63,7 @@ try {
   await page.locator('#lobby-back').click();await page.locator('#lobby-stage .kind-card').first().waitFor();
   assert.equal(await page.locator('#lobby-back').isHidden(),true);
   if(motion==='no-preference')assert.equal(await page.locator('.lobby-back[aria-hidden=true]').count(),1);
+  await checkCardEffect(page.locator('#lobby-stage .kind-card').first());
   assert.equal(await page.locator('#lobby-nav, .lobby-pixels, .lobby-ripple').count(),0);
   await page.close();
  }

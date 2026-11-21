@@ -100,3 +100,18 @@ test('selected card fans out, back gathers to the selected parent and back butto
   assert.ok(d.querySelector('.lobby-back[aria-hidden=true]'));assert.equal(d.getElementById('lobby-nav'),null);
  }finally{lobby.destroy();w.close()}
 });
+
+test('specular edge and 3D tilt follow the pointer on every lobby stage',()=>{
+ const dom=new JSDOM(html,{url:'https://example.com',pretendToBeVisual:true}),w=dom.window,d=w.document;
+ w.matchMedia=()=>({matches:false});
+ w.HTMLElement.prototype.getBoundingClientRect=function(){return {left:100,top:100,right:300,bottom:300,width:200,height:200}};
+ const lobby=createPlayLobby({document:d,client:{rpc:async()=>({data:[]})},onChoose:()=>true});
+ try{
+  for(const next of [null,()=>d.querySelector('[data-kind=rated]').click(),()=>d.querySelector('[data-mode=blitz]').click()]){
+   next?.();const root=d.getElementById('play-lobby'),cards=[...d.querySelectorAll('#lobby-stage .lobby-card')];
+   root.dispatchEvent(new w.MouseEvent('pointermove',{bubbles:true,clientX:150,clientY:100}));
+   for(const card of cards){assert.notEqual(card.style.getPropertyValue('--shine-angle'),'');assert.equal(card.style.getPropertyValue('--shine-opacity'),'1');assert.notEqual(card.style.getPropertyValue('--tilt-x'),'0deg');}
+   root.dispatchEvent(new w.MouseEvent('pointerleave'));for(const card of cards)assert.equal(card.style.getPropertyValue('--shine-opacity'),'');
+  }
+ }finally{lobby.destroy();w.close()}
+});
