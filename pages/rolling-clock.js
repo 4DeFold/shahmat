@@ -7,10 +7,12 @@ export function createRollingClock(element, reducedMotion = () => false) {
   element.replaceChildren(accessible, display);
   let previous = null, columns = new Map();
   // FLIP the card's visual box when its content or responsive width changes.
-  // ResizeObserver runs before paint, so the new layout need not jump first.
+  // Defer layout reads and animation writes outside ResizeObserver delivery.
+  // WebKit otherwise reports undelivered resize notifications during clock updates.
   const card = element.closest('.clock');
-  let cardRect = null, sizeAnimation = null;
-  const observer = card && win.ResizeObserver ? new win.ResizeObserver(() => {
+  let cardRect = null, sizeAnimation = null, resizeFrame = null;
+  function animateCardResize() {
+    resizeFrame = null;
     let from = cardRect;
     if (sizeAnimation && cardRect && win.DOMMatrixReadOnly) {
       const transform = win.getComputedStyle(card).transform;
@@ -36,6 +38,9 @@ export function createRollingClock(element, reducedMotion = () => false) {
       animation.finished?.catch(() => {}).finally(() => { if (sizeAnimation === animation) sizeAnimation = null; });
     }
     cardRect = next;
+  }
+  const observer = card && win.ResizeObserver ? new win.ResizeObserver(() => {
+    if (resizeFrame === null) resizeFrame = win.requestAnimationFrame(animateCardResize);
   }) : null;
   observer?.observe(card);
 
@@ -89,5 +94,5 @@ export function createRollingClock(element, reducedMotion = () => false) {
     element.style.setProperty('--clock-digits', String(value.length));
     previous = value;
   }
-  return { update, destroy() { observer?.disconnect(); sizeAnimation?.cancel(); for (const column of columns.values()) column.animation?.cancel(); } };
+  return { update, destroy() { observer?.disconnect(); if (resizeFrame !== null) win.cancelAnimationFrame(resizeFrame); sizeAnimation?.cancel(); for (const column of columns.values()) column.animation?.cancel(); } };
 }
