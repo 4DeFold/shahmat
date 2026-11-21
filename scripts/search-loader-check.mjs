@@ -16,7 +16,7 @@ try{for(const viewport of [{width:390,height:844},{width:1440,height:900}])for(c
   if(path==='/functions/v1/matchplay')return fulfill({json:req.postDataJSON()?.action==='search'?{state:'searching'}:{game:null}});
   return fulfill({json:[]});
  });
- await page.goto(base+'/pages/game.html');await page.locator('[data-kind=rated]').click();await page.locator('.choice-card').nth(1).click();await page.locator('.time-card').nth(0).click();await page.locator('#start-search:not([disabled])').waitFor();
+ await page.goto(base+'/pages/game.html');await page.locator('#lobby-stage [data-kind=rated]').click();await page.locator('#lobby-stage .choice-card').nth(1).click();await page.locator('#lobby-stage .time-card').nth(0).click();await page.locator('#start-search:not([disabled])').waitFor();
  assert.equal(await page.locator('#search-loader').isHidden(),true);
  await page.evaluate(()=>{document.documentElement.style.setProperty('--accent','#c24d23');document.documentElement.style.setProperty('--surface','#f2e9de');});
  await page.locator('#start-search').click();const loader=page.locator('#search-loader');await loader.locator('canvas').waitFor({state:'visible'});await page.waitForFunction(()=>document.querySelector('#search-loader').classList.contains('is-visible'));

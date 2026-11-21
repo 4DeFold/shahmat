@@ -9,8 +9,9 @@ const icon = body => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
 const info = {
  bullet:{name:'Пуля',icon:icon('<path d="M7 19 5 17l9-9c2-2 4-3 6-3 0 2-1 4-3 6l-9 9Z"/><path d="m8 14 3 3M5 19l-2 2"/>')},
  blitz:{name:'Блиц',icon:icon('<path d="M12 22c-4 0-7-3-7-7 0-3 2-6 4-8 0 3 2 3 2 3 1-3 2-5 4-7 0 4 4 6 4 12 0 4-3 7-7 7Z"/><path d="M9 18c0-2 1-3 3-5 0 3 3 3 3 5a3 3 0 0 1-6 0Z"/>')},
- rapid:{name:'Рапид',icon:icon('<path d="M10 12C8 9 6 4 7 2c1-1 3 2 5 6 1-3 2-6 3-5 2 1 0 5 0 7 3 0 5 2 5 5 0 1-1 2-2 2h-1c1 2 0 4-2 4H7c-3 0-4-2-3-4 1-3 3-4 6-5Z"/><path d="M8 17c1 1 2 1 3 1M16 13h.01M4 17c-2 0-2-2 0-2"/>')},
- classical:{name:'Классика',icon:icon('<path d="M4 14c0-4 3-7 8-7s8 3 8 7H4Z"/><path d="M3 14h18c1 0 2 1 2 2s-1 2-2 2h-2l-1 3h-2l-1-3H9l-1 3H6l-1-3H4c-2 0-3-1-3-2s1-2 2-2ZM10 7l-2 7m6-7 2 7M8 11h8M20 12c2-1 3 0 3 2"/>')},
+ // Rabbit and turtle: Lucide Icons, ISC license; see licenses/lucide-icons.txt.
+ rapid:{name:'Рапид',icon:icon('<g stroke-width="1.05"><path d="M13 16a3 3 0 0 1 2.24 5"/><path d="M18 12h.01"/><path d="M18 21h-8a4 4 0 0 1-4-4 7 7 0 0 1 7-7h.2L9.6 6.4a1 1 0 1 1 2.8-2.8L15.8 7h.2c3.3 0 6 2.7 6 6v1a2 2 0 0 1-2 2h-1a3 3 0 0 0-3 3"/><path d="M20 8.54V4a2 2 0 1 0-4 0v3"/><path d="M7.612 12.524a3 3 0 1 0-1.6 4.3"/></g>')},
+ classical:{name:'Классика',icon:icon('<g stroke-width="1.05"><path d="m12 10 2 4v3a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-3a8 8 0 1 0-16 0v3a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-3l2-4h4Z"/><path d="M4.82 7.9 8 10M15.18 7.9 12 10M16.93 10H20a2 2 0 0 1 0 4H2"/></g>')},
 };
 export function lastThree(moves) {
   if (!Array.isArray(moves) || moves.length < 3) return null;
@@ -21,6 +22,8 @@ export function lastThree(moves) {
     return {fen:before.fen(), moves:moves.slice(-3)};
   } catch {return null;}
 }
+
+export const demoMoveDelay = (random = Math.random) => 500 + Math.floor(random() * 2501);
 
 // Count Up-style cubic ease-out, including interrupted changes and reduced motion.
 export function createOnlineCount(element, win) {
@@ -46,7 +49,7 @@ export function createPlayLobby({document,client,onChoose,onOpenBoard}) {
  const reduced=()=>win.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
  const clear=()=>{timers.forEach(id=>win.clearTimeout(id));timers=[];};
  const later=(fn,ms)=>{const id=win.setTimeout(()=>{timers=timers.filter(t=>t!==id);fn();},ms);timers.push(id);};
- const randomDelay=()=>1000+Math.floor(Math.random()*4001);
+ const randomDelay=()=>demoMoveDelay();
  function renderBoard(element,chess,move) {
   const frag=document.createDocumentFragment(),mate=chess.isCheckmate();
   for(let r=8;r>=1;r--)for(let f=0;f<8;f++){
@@ -59,12 +62,13 @@ export function createPlayLobby({document,client,onChoose,onOpenBoard}) {
   }
   element.replaceChildren(frag);
  }
- function runDemo(card) {
+ function runDemo(card, fading=false) {
   if(!visible||screen!=='kinds'||disposed||!demoGames.length)return;
   const board=card.querySelector('.demo-board'),white=card.querySelector('.demo-white'),black=card.querySelector('.demo-black');
   const game=demoGames[Math.floor(Math.random()*demoGames.length)],chess=new Chess(game.fen);let index=0;
   white.textContent='';black.textContent='';white.className='demo-delta demo-white';black.className='demo-delta demo-black';
   renderBoard(board,chess,null);
+  if(fading && !reduced()){void board.offsetWidth;board.classList.remove('demo-fading');}else board.classList.remove('demo-fading');
   const next=()=>{
    if(!visible||screen!=='kinds'||disposed)return;
    let move;try{move=chess.move(game.moves[index++]);}catch{return;}
@@ -74,7 +78,11 @@ export function createPlayLobby({document,client,onChoose,onOpenBoard}) {
     const winner=chess.turn()==='w'?'black':'white',n=2+Math.floor(Math.random()*49),rated=card.dataset.kind==='rated';
     for(const [el,color] of [[white,'white'],[black,'black']]){const won=color===winner;el.textContent=rated?`${won?'+':'−'}${n} ЯР`:'0 ЯР';el.className=`demo-delta demo-${color} is-visible ${rated?(won?'positive':'negative'):'neutral'}`;}
    }
-   later(()=>runDemo(card),3000+Math.random()*2000);
+   later(()=>{
+    if(reduced()){runDemo(card);return;}
+    board.classList.add('demo-fading');white.classList.remove('is-visible');black.classList.remove('is-visible');
+    later(()=>runDemo(card,true),360);
+   },1000);
   };
   later(next,randomDelay());
  }
@@ -107,33 +115,70 @@ export function createPlayLobby({document,client,onChoose,onOpenBoard}) {
  }
  function stopPolling(){pollGeneration++;if(pollTimer!==null)win.clearInterval(pollTimer);pollTimer=null;counts=null;}
  function startPolling(){if(!active||!visible||root.hidden||disposed||pollTimer!==null)return;void poll();pollTimer=win.setInterval(poll,2000);}
+ // One contained layer per card: cursor spotlight + a small, CSS-animated
+ // pixel field, inspired by Magic Bento and Pixel Blast, without a WebGL
+ // context per button. Decorative nodes never intercept input.
+ function decorate(card) {
+  const pixels=document.createElement('span');pixels.className='lobby-pixels';pixels.setAttribute('aria-hidden','true');
+  for(let i=0;i<32;i++){
+   const pixel=document.createElement('i');
+   pixel.style.setProperty('--px',`${5+((i*37)%91)}%`);pixel.style.setProperty('--py',`${4+((i*61)%90)}%`);
+   pixel.style.setProperty('--pd',`${(i%8)*-0.19}s`);pixel.style.setProperty('--ps',`${2+(i%3)}px`);pixels.append(pixel);
+  }
+  card.prepend(pixels);
+ }
+ let ghost=null, ghostTimer=null;
+ function clearGhost(){if(ghostTimer!==null)win.clearTimeout(ghostTimer);ghostTimer=null;ghost?.remove();ghost=null;}
+ function transitionGhost(){
+  clearGhost();if(reduced()||root.hidden||!stage.children.length||!stage.animate)return;
+  const rect=stage.getBoundingClientRect(),outer=shell.getBoundingClientRect();
+  ghost=stage.cloneNode(true);ghost.removeAttribute('id');ghost.classList.add('lobby-ghost');ghost.setAttribute('aria-hidden','true');ghost.inert=true;
+  Object.assign(ghost.style,{left:`${rect.left-outer.left}px`,top:`${rect.top-outer.top}px`,width:`${rect.width}px`,height:`${rect.height}px`});
+  shell.append(ghost);ghostTimer=win.setTimeout(clearGhost,560);
+ }
+ function ripple(card,event){
+  if(reduced()||!card)return;
+  const rect=card.getBoundingClientRect(),x=event.detail?event.clientX-rect.left:rect.width/2,y=event.detail?event.clientY-rect.top:rect.height/2;
+  const ring=document.createElement('span');ring.className='lobby-ripple';ring.setAttribute('aria-hidden','true');ring.style.left=`${x}px`;ring.style.top=`${y}px`;card.append(ring);
+  ring.addEventListener('animationend',()=>ring.remove(),{once:true});
+ }
+ const spotlight=event=>{
+  if(reduced()||event.pointerType==='touch')return;const card=event.currentTarget===back?back:event.target.closest('.lobby-card');if(!card||card.disabled)return;
+  const r=card.getBoundingClientRect();if(!r.width||!r.height)return;
+  const x=Math.max(0,Math.min(r.width,event.clientX-r.left)),y=Math.max(0,Math.min(r.height,event.clientY-r.top));
+  card.style.setProperty('--mx',`${x}px`);card.style.setProperty('--my',`${y}px`);
+  card.style.setProperty('--tilt-x',`${(0.5-y/r.height)*3}deg`);card.style.setProperty('--tilt-y',`${(x/r.width-0.5)*3}deg`);
+ };
+ stage.addEventListener('pointermove',spotlight);back.addEventListener('pointermove',spotlight);
+ decorate(back);
+ stage.addEventListener('click',event=>{const card=event.target.closest('.lobby-card');if(card&&!card.disabled)ripple(card,event);},true);
  function show(next) {
-  clear();counters.forEach(x=>x.counter.destroy());counters=[];screen=next;shell.classList.add('lobby-open');root.hidden=false;back.hidden=screen==='kinds';
+  transitionGhost();clear();counters.forEach(x=>x.counter.destroy());counters=[];screen=next;shell.classList.add('lobby-open');root.hidden=false;back.hidden=screen==='kinds';
   stage.className=`lobby-stage stage-${screen}`;stage.replaceChildren();
   if(screen==='kinds'){
    for(const [key,label] of [['friendly','Товарищеские'],['rated','Ранговые']]){
     const button=document.createElement('button');button.type='button';button.className='kind-card lobby-card';button.dataset.kind=key;
     button.innerHTML=`<span class="demo-frame"><span class="demo-delta demo-black"></span><span class="demo-board" aria-hidden="true"></span><span class="demo-delta demo-white"></span></span><strong>${label}</strong>`;
-    countFor(button,row=>row.kind===key);button.addEventListener('click',()=>{kind=key;show('modes');});stage.append(button);
+    decorate(button);countFor(button,row=>row.kind===key);button.addEventListener('click',()=>{kind=key;show('modes');});stage.append(button);
    }
    if(demoGames.length)startDemos();else void load();
   } else if(screen==='modes'){
    for(const [key,data] of Object.entries(info)){
     const button=document.createElement('button');button.type='button';button.className='choice-card lobby-card';button.innerHTML=`<span class="choice-icon">${data.icon}</span><strong>${data.name}</strong>`;
-    countFor(button,row=>row.kind===kind&&row.mode===key);button.addEventListener('click',()=>{mode=key;show('controls');});stage.append(button);
+    decorate(button);countFor(button,row=>row.kind===kind&&row.mode===key);button.addEventListener('click',()=>{mode=key;show('controls');});stage.append(button);
    }
-   const custom=document.createElement('button');custom.type='button';custom.disabled=true;custom.className='choice-card lobby-card';custom.innerHTML=`<span class="choice-icon">${icon('<path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4"/>')}</span><strong>Кастом</strong>`;countFor(custom,()=>false);stage.append(custom);
+   const custom=document.createElement('button');custom.type='button';custom.disabled=true;custom.className='choice-card lobby-card';custom.innerHTML=`<span class="choice-icon">${icon('<path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4"/>')}</span><strong>Кастом</strong>`;decorate(custom);countFor(custom,()=>false);stage.append(custom);
   } else {
    for(const control of controls[mode]){
     const button=document.createElement('button');button.type='button';button.className='choice-card time-card lobby-card';button.innerHTML=`<strong>${control}</strong>`;
-    countFor(button,row=>row.kind===kind&&row.mode===mode&&row.control===control.replace(/\+0$/,''));
+    decorate(button);countFor(button,row=>row.kind===kind&&row.mode===mode&&row.control===control.replace(/\+0$/,''));
     button.addEventListener('click',()=>{if(onChoose({mode,kind,timeControl:control}))openBoard();});stage.append(button);
    }
   }
   updateCounts();startPolling();
  }
- function openBoard(){clear();stopPolling();root.hidden=true;shell.classList.remove('lobby-open');onOpenBoard?.();}
- back.addEventListener('click',()=>show(screen==='controls'?'modes':'kinds'));
+ function openBoard(){if(!root.hidden)transitionGhost();clear();stopPolling();root.hidden=true;shell.classList.remove('lobby-open');onOpenBoard?.();}
+ back.addEventListener('click',event=>{ripple(back,event);show(screen==='controls'?'modes':'kinds');});
  show('kinds');
- return {activate(){active=true;startPolling();return load();},show,openBoard,setVisible(value){visible=value;if(visible&&!root.hidden){if(screen==='kinds'){void load();startDemos();}startPolling();}else{clear();stopPolling();}},destroy(){disposed=true;clear();stopPolling();counters.forEach(x=>x.counter.destroy());}};
+ return {activate(){active=true;startPolling();return load();},show,openBoard,setVisible(value){visible=value;if(visible&&!root.hidden){if(screen==='kinds'){void load();startDemos();}startPolling();}else{clear();stopPolling();}},destroy(){disposed=true;clear();clearGhost();stopPolling();counters.forEach(x=>x.counter.destroy());}};
 }

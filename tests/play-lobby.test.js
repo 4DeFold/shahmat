@@ -58,3 +58,18 @@ test('online count animates from its visible value, supports interruptions and r
  c.set(20);callbacks.shift()(500);assert.equal(el.textContent,'14');callbacks.shift()(1400);assert.equal(el.textContent,'20');
  reduce=true;c.set(2);assert.equal(el.textContent,'2');c.set(null);assert.equal(el.textContent,'—');c.destroy();d.defaultView.close();
 });
+
+test('replay uses 0.5–3 second moves, one second at mate, then fades pieces to the next game',async()=>{
+ const {demoMoveDelay}=await import('../pages/play-lobby.js');assert.equal(demoMoveDelay(()=>0),500);assert.equal(demoMoveDelay(()=>0.999999),3000);
+ const dom=new JSDOM(html,{url:'https://example.com',pretendToBeVisual:true}),w=dom.window,d=w.document;
+ let jobs=[],id=0;w.setTimeout=(fn,ms)=>{jobs.push({id:++id,fn,ms});return id};w.clearTimeout=n=>{jobs=jobs.filter(j=>j.id!==n)};
+ const lobby=createPlayLobby({document:d,client:{rpc:async name=>({data:name==='play_demo_games'?[{moves:['f3','e5','g4','Qh4#']}]:[]})},onChoose:()=>true});
+ try {
+  await lobby.activate();assert.ok(jobs.every(job=>job.ms>=500&&job.ms<=3000));
+  while(!d.querySelector('.demo-square.check')){const job=jobs.shift();assert.ok(job);job.fn();}
+  const mate=jobs.findIndex(j=>j.ms===1000);assert.notEqual(mate,-1);
+  const job=jobs.splice(mate,1)[0];job.fn();assert.ok(d.querySelector('.demo-board.demo-fading'));
+  const fade=jobs.findIndex(j=>j.ms===360);assert.notEqual(fade,-1);jobs.splice(fade,1)[0].fn();
+  assert.equal(d.querySelector('.demo-board.demo-fading'),null);
+ }finally{lobby.destroy();w.close()}
+});

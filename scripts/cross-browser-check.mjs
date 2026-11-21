@@ -83,16 +83,16 @@ for(const name of requested){
     if(route==='profile'){await page.locator('#profile-display-name').getByText('Alice').waitFor();await page.waitForLoadState('networkidle');}
    }
    await page.goto(`${base}/game`);let f=page.frameLocator('#member-game-frame');
-   await f.locator('.kind-card').first().waitFor();
-   assert.equal(await f.locator('.kind-card').count(),2);
-   const rects=await f.locator('.kind-card').evaluateAll(els=>els.map(e=>{const r=e.getBoundingClientRect();return {top:r.top,bottom:r.bottom,left:r.left,right:r.right,height:innerHeight,width:innerWidth}}));
+   await f.locator('#lobby-stage .kind-card').first().waitFor();
+   assert.equal(await f.locator('#lobby-stage .kind-card').count(),2);
+   const rects=await f.locator('#lobby-stage .kind-card').evaluateAll(els=>els.map(e=>{const r=e.getBoundingClientRect();return {top:r.top,bottom:r.bottom,left:r.left,right:r.right,height:innerHeight,width:innerWidth}}));
    for(const r of rects)assert.ok(r.top>=0&&r.left>=0&&r.bottom<=r.height+1&&r.right<=r.width+1,`${name} lobby overflow ${JSON.stringify(rects)}`);
    if(viewport.width<=700)assert.ok(rects[0].bottom<=rects[1].top+1,`${name} mobile cards stacked`);
-   await f.locator('[data-kind=rated] .lobby-online-value').getByText('7').waitFor();
-   await press(f.locator('[data-kind=rated]'));assert.equal(await f.locator('.choice-card').count(),5);assert.ok(await f.locator('.choice-card:disabled').isDisabled());
-   const checkLobbyFit=async()=>{const boxes=await f.locator('.choice-card, #lobby-back').evaluateAll(els=>els.map(e=>{const r=e.getBoundingClientRect();return {top:r.top,bottom:r.bottom,left:r.left,right:r.right,height:innerHeight,width:innerWidth}}));for(const r of boxes)assert.ok(r.top>=0&&r.left>=0&&r.bottom<=r.height+1&&r.right<=r.width+1,`${name} choice overflow ${JSON.stringify(boxes)}`);assert.ok(boxes.at(-1).top>=Math.max(...boxes.slice(0,-1).map(b=>b.bottom))-1,'back below cards');};
-   await checkLobbyFit();assert.equal(await f.locator('.choice-icon svg').count(),5);
-   await press(f.locator('.choice-card').nth(1));assert.equal(await f.locator('.time-card').count(),4);await checkLobbyFit();assert.equal(await f.locator('.time-card .choice-icon').count(),0);await f.locator('.time-card').first().locator('.lobby-online-value').getByText('7').waitFor();await press(f.locator('.time-card').nth(0));
+   await f.locator('#lobby-stage [data-kind=rated] .lobby-online-value').getByText('7').waitFor();
+   await press(f.locator('#lobby-stage [data-kind=rated]'));assert.equal(await f.locator('#lobby-stage .choice-card').count(),5);assert.ok(await f.locator('#lobby-stage .choice-card:disabled').isDisabled());
+   const checkLobbyFit=async()=>{const boxes=await f.locator('#lobby-stage .choice-card, #lobby-back').evaluateAll(els=>els.map(e=>{const r=e.getBoundingClientRect();return {top:r.top,bottom:r.bottom,left:r.left,right:r.right,height:innerHeight,width:innerWidth}}));for(const r of boxes)assert.ok(r.top>=0&&r.left>=0&&r.bottom<=r.height+1&&r.right<=r.width+1,`${name} choice overflow ${JSON.stringify(boxes)}`);assert.ok(boxes.at(-1).top>=Math.max(...boxes.slice(0,-1).map(b=>b.bottom))-1,'back below cards');};
+   await checkLobbyFit();assert.equal(await f.locator('#lobby-stage .choice-icon svg').count(),5);
+   await press(f.locator('#lobby-stage .choice-card').nth(1));assert.equal(await f.locator('#lobby-stage .time-card').count(),4);await checkLobbyFit();assert.equal(await f.locator('#lobby-stage .time-card .choice-icon').count(),0);await f.locator('#lobby-stage .time-card').first().locator('.lobby-online-value').getByText('7').waitFor();await press(f.locator('#lobby-stage .time-card').nth(0));
    await f.locator('#board .square').first().waitFor({state:'visible'});assert.equal(await f.locator('#board .square').count(),64);await checkBoardLayout(f,'online');
    await page.goto(`${base}/archive`);f=page.frameLocator('#archive-frame');await f.locator('[data-count=total]').getByText('24').waitFor();assert.equal(await f.locator('[data-count=blitz]').textContent(),'16');await f.locator('.archive-card').first().click();assert.equal(await f.locator('#archive-stats').isVisible(),false);await f.locator('#archive-detail').waitFor({state:'visible'});assert.equal(await f.locator('#board .square').count(),64);await checkBoardLayout(f,'archive');assert.equal(await f.locator('#black-name').textContent(),'Бот 1 уровень');assert.match(await f.locator('#archive-top-avatar').getAttribute('src'),/bP\.svg$/);
    await page.goto(`${base}/watch`);f=page.frameLocator('#watch-frame');await f.locator('[data-game-id=fixture]').click();await f.locator('#white-name').getByText('Alice').waitFor();await checkBoardLayout(f,'watch');assert.equal(await f.locator('#white-captured img').count(),1);assert.equal(await f.locator('#black-captured img').count(),1);await f.locator('#history-prev').click();assert.equal(await f.locator('[data-square=g1] .piece').count(),1);
