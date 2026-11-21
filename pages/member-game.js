@@ -12,8 +12,8 @@ import { createRollingClock } from './rolling-clock.js';
 import { retryMessage } from './match-api.js';
 import { createClockSync } from './clock-sync.js';
 
-const times = { blitz: 180000, rapid: 600000, classical: 3600000 };
-const modeLabels = { blitz:'Блиц · 3 мин', rapid:'Рапид · 10 мин', classical:'Классика · 1 час' };
+const times = { bullet: 60000, blitz: 180000, rapid: 600000, classical: 3600000 };
+const modeLabels = { bullet:'Пуля · 1 мин', blitz:'Блиц · 3 мин', rapid:'Рапид · 10 мин', classical:'Классика · 1 час' };
 const names = { k:'король', q:'ферзь', r:'ладья', b:'слон', n:'конь', p:'пешка' };
 const files = 'abcdefgh';
 const pieceSrc = (color, type) => themedPieceSrc(color,type);
@@ -38,7 +38,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   function setAvatar(who, value, set) { const img = $(`${who}-avatar-image`); if(!img)return; const custom=typeof value==='string' && /^data:image\/(?:png|jpeg);base64,/.test(value); if(who==='opponent')setPublicPiece(img,set,'b');else {delete img.dataset.pieceFixed;img.src=themedPieceSrc('w','n');}if(custom)img.src=value; img.classList.toggle('custom-profile-avatar',custom); }
   function renderRatings() {
     for (const who of ['player','opponent']) {
-      const data=who === 'player' ? (scores?.self || ownScore) : scores?.opponent; const rating = $(who + '-rating'); if (rating) rating.textContent = format(data?.[rankUnit]); const badge=$(who+'-top-status'); if(badge){const place=Number(data?.topPlace);badge.hidden=!(place>=1&&place<=5);badge.textContent=badge.hidden?'':`Топ ${place}`;} const img=$(who+'-avatar-image');if(img)img.parentElement.style.backgroundColor=profileAvatarColor(data?.palette);
+      const data=who === 'player' ? (scores?.self || ownScore) : scores?.opponent; const rating = $(who + '-rating'); if (rating) rating.textContent = data && data[rankUnit] == null ? '(калибровка)' : format(data?.[rankUnit]); const badge=$(who+'-top-status'); if(badge){const place=Number(data?.topPlace);badge.hidden=!(place>=1&&place<=5);badge.textContent=badge.hidden?'':`Топ ${place}`;} const img=$(who+'-avatar-image');if(img)img.parentElement.style.backgroundColor=profileAvatarColor(data?.palette);
     }
   }
   function loadRatings(game) {

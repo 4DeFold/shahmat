@@ -35,11 +35,13 @@ test('board opens at starting position, modes are explicit and a real request st
   assert.equal(app.$('player-clock').getAttribute('aria-label'), '00:00');
   assert.equal(app.$('opponent-clock').getAttribute('aria-label'), '00:00');
   assert.equal(app.$('board').querySelector('[data-square=e2] img').getAttribute('src'), '/pieces/cburnett/wP.svg');
-  assert.deepEqual([...app.$('mode-list').querySelectorAll('input')].map(input => input.value), ['blitz','rapid','classical']);
+  assert.deepEqual([...app.$('mode-list').querySelectorAll('input')].map(input => input.value), ['bullet','blitz','rapid','classical']);
   assert.equal(app.$('start-search').disabled, true); assert.equal(app.$('start-search').hidden, true);
   assert.equal(app.$('search-loader').hidden, true);
   await app.ui.open(A);
   assert.equal(app.$('player-color'), null);
+  const bullet = app.$('mode-list').querySelector('[value=bullet]'); bullet.checked = true; bullet.dispatchEvent(new app.dom.window.Event('change', { bubbles:true }));
+  assert.equal(app.$('player-clock').getAttribute('aria-label'), '01:00');
   const rapid = app.$('mode-list').querySelector('[value=rapid]'); rapid.checked = true; rapid.dispatchEvent(new app.dom.window.Event('change', { bubbles:true }));
   assert.equal(app.$('player-clock').getAttribute('aria-label'), '10:00'); assert.equal(app.$('start-search').disabled, false); assert.equal(app.$('start-search').hidden, false);
   app.$('start-search').click(); await flush();
