@@ -20,7 +20,7 @@ for(const name of requested){
  const args=name==='chromium' && process.env.CHROMIUM_EXTRA_ARGS ? process.env.CHROMIUM_EXTRA_ARGS.split(' ') : [];
  const browser=await engines[name].launch({headless:true,...(executablePath?{executablePath}:{}),args});
  try{
-  for(const viewport of [{width:1440,height:900},{width:390,height:844}]){
+  for(const viewport of [{width:1440,height:900},{width:390,height:844},{width:320,height:568},{width:844,height:390}]){
    const touch=viewport.width<=700 && name!=='firefox';
    const context=await browser.newContext({viewport,hasTouch:touch,reducedMotion:'reduce'}),page=await context.newPage(),errors=[];
    const press=locator=>touch?locator.tap():locator.click();
@@ -29,12 +29,13 @@ for(const name of requested){
      const frame=board.closest('.board-frame'),wrap=frame.closest('.board-wrap, .board-section');
      const rect=el=>{const r=el.getBoundingClientRect();return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height}};
      const avatars=[...wrap.querySelectorAll('.player-row .avatar')];
-     const rows=[...wrap.querySelectorAll('.player-row')];return {board:rect(board),frame:rect(frame),avatars:avatars.map(rect),info:rows.map(row=>({name:rect(row.querySelector('.player-info > :first-child')), captures:rect(row.querySelector('.captured-pieces'))})),border:getComputedStyle(board).borderTopWidth,padding:getComputedStyle(frame).paddingTop,radius:avatars.map(a=>getComputedStyle(a).borderRadius)};
+     const rows=[...wrap.querySelectorAll('.player-row')];return {board:rect(board),frame:rect(frame),avatars:avatars.map(rect),info:rows.map(row=>({name:rect(row.querySelector('.player-info > :first-child')), captures:rect(row.querySelector('.captured-pieces'))})),border:getComputedStyle(board).borderTopWidth,padding:getComputedStyle(frame).paddingTop,radius:avatars.map(a=>getComputedStyle(a).borderRadius),avatarBorders:avatars.map(a=>getComputedStyle(a).borderTopWidth),outlines:avatars.map(a=>getComputedStyle(a,'::after').content)};
     });
-    const {board,frame,avatars,info,border,padding,radius}=geometry;
+    const {board,frame,avatars,info,border,padding,radius,avatarBorders,outlines}=geometry;
     assert.equal(border,'0px',`${name} ${label} border`);assert.equal(padding,'0px',`${name} ${label} frame padding`);
     assert.equal(avatars.length,2,`${name} ${label} avatars`);
-    assert.ok(radius.every(r=>r==='0px'),`${name} ${label} avatar corners`);
+    assert.ok(radius.every(r=>r==='0px')&&avatarBorders.every(x=>x==='0px')&&outlines.every(x=>x==='none'),`${name} ${label} avatar corners and border`);
+    avatars.forEach(avatar=>assert.ok(Math.abs(avatar.width-frame.width/12)<1&&Math.abs(avatar.height-frame.width/12)<1,`${name} ${label} avatar 1/12 of board ${JSON.stringify(geometry)}`));
     info.forEach((part,i)=>{const middle=(avatars[i].top+avatars[i].bottom)/2;assert.ok(part.name.bottom<=middle+1&&part.captures.top>=middle-1,`${name} ${label} two-line layout ${JSON.stringify(geometry)}`);});
     assert.ok(Math.abs(frame.width-board.width)<1,`${name} ${label} board fills frame`);
     assert.ok(Math.abs(avatars[0].left-frame.left)<1&&Math.abs(avatars[1].left-frame.left)<1,`${name} ${label} aligned edges ${JSON.stringify(geometry)}`);
