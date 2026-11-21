@@ -8,9 +8,9 @@ import { createMemberGame, formatClock } from '../pages/member-game.js';
 const html = await readFile('pages/game.html', 'utf8');
 const A = 'a', B = 'b';
 const flush = () => new Promise(resolve => setTimeout(resolve, 10));
-function setup(api, now = () => 0) {
+function setup(api, now = () => 0, options = {}) {
   const dom = new JSDOM(html, { url: 'https://example.com/pages/game.html' });
-  const ui = createMemberGame({ document: dom.window.document, api, now });
+  const ui = createMemberGame({ document: dom.window.document, api, now, ...options });
   return { dom, ui, $: id => dom.window.document.getElementById(id), close() { ui.destroy(); dom.window.close(); } };
 }
 function game({ moves = [], turn = 'w', version = moves.length, status = 'active', result = null, reason = null } = {}) {
@@ -606,4 +606,24 @@ test('newly matched and restored games start silently',async t=>{
  await app.ui.open(A);const blitz=app.$('mode-list').querySelector('[value=blitz]');blitz.checked=true;blitz.dispatchEvent(new app.dom.window.Event('change',{bubbles:true}));app.$('start-search').click();await flush();
  assert.equal(plays.length,0,'matching is silent');
  const restored=setup(async()=>({game:game()}));t.after(()=>restored.close());restored.dom.window.Audio=app.dom.window.Audio;await restored.ui.open(A);await flush();assert.equal(plays.length,0,'restoring a game is silent');
+});
+
+
+test('own rating follows selected mode and ignores stale responses', async () => {
+  let resolveBlitz;
+  const app=setup(async () => ({game:null}), () => 0, {ownRatingForMode: mode => {
+    if(mode==='blitz') return new Promise(resolve=>{resolveBlitz=resolve;});
+    return Promise.resolve({yar:mode==='rapid'?988:972,elo:1000});
+  }});
+  try {
+    await app.ui.open(A); await flush();
+    assert.match(app.$('player-rating').textContent,/972/);
+    for(const mode of ['blitz','rapid']) {
+      const input=app.$('mode-list').querySelector(`[value=${mode}]`); input.checked=true;
+      input.dispatchEvent(new app.dom.window.Event('change',{bubbles:true}));
+    }
+    await flush(); assert.match(app.$('player-rating').textContent,/988/);
+    resolveBlitz({yar:1200,elo:1000}); await flush();
+    assert.match(app.$('player-rating').textContent,/988/);
+  } finally {app.close();}
 });

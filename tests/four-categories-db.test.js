@@ -33,5 +33,9 @@ test('four categories, weighted calibration, control isolation, increment and bu
  await db.exec('reset role');
  await db.query("update online_games set status='finished',result='white_win',finished_at=clock_timestamp() where id=$1",[g.id]);
  assert.equal((await db.query("select count(*)::int n from yar_history where game_id=$1 and mode='bullet'",[g.id])).rows[0].n,2);
+ await db.exec('set role authenticated');
+ assert.equal((await db.query('select my_archive_stats() s')).rows[0].s.bullet,1);
+ const archive=(await db.query('select * from my_archive_ratings($1::uuid[])',[[g.id]])).rows[0]; assert.equal(Number(archive.white_yar),3000); assert.equal(Number(archive.black_yar),1000);
+ await db.exec('reset role');
  } finally {await db.close()}
 });
