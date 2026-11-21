@@ -74,22 +74,29 @@ test('replay uses 0.5–3 second moves, one second at mate, then fades pieces to
  }finally{lobby.destroy();w.close()}
 });
 
-test('bottom step navigation shows progression and never skips a selection',async()=>{
- const dom=new JSDOM(html,{url:'https://example.com',pretendToBeVisual:true}),d=dom.window.document;
+test('selected card fans out, back gathers to the selected parent and back button fades away',async()=>{
+ const dom=new JSDOM(html,{url:'https://example.com',pretendToBeVisual:true}),w=dom.window,d=w.document,records=[];
+ w.matchMedia=()=>({matches:false});
+ w.HTMLElement.prototype.animate=function(frames,options){const animation={cancel(){},onfinish:null};records.push({element:this,frames,options});return animation;};
+ w.HTMLElement.prototype.getBoundingClientRect=function(){
+  const parent=this.parentElement, index=parent?[...parent.children].indexOf(this):0;
+  const left=this.dataset.kind==='rated'?500:this.classList.contains('choice-card')?100+index*120:100;
+  const width=this.classList.contains('kind-card')?300:100, height=this.classList.contains('kind-card')?300:180,top=100;
+  return {left,top,width,height,right:left+width,bottom:top+height};
+ };
  const lobby=createPlayLobby({document:d,client:{rpc:async()=>({data:[]})},onChoose:()=>true});
  try{
-  const nav=d.getElementById('lobby-nav'),k=nav.querySelector('[data-step=kinds]'),m=nav.querySelector('[data-step=modes]'),t=nav.querySelector('[data-step=controls]');
-  assert.equal(k.getAttribute('aria-current'),'step');assert.equal(m.disabled,true);assert.equal(t.disabled,true);
-  d.querySelector('[data-kind=rated]').click();assert.equal(m.getAttribute('aria-current'),'step');assert.equal(k.disabled,false);assert.equal(t.disabled,true);
-  d.querySelectorAll('#lobby-stage .choice-card')[1].click();assert.equal(t.getAttribute('aria-current'),'step');
-  m.click();assert.equal(m.getAttribute('aria-current'),'step');assert.equal(t.disabled,true);
-  k.click();assert.equal(k.getAttribute('aria-current'),'step');assert.equal(m.disabled,true);
- }finally{lobby.destroy();dom.window.close();}
-});
-
-test('pixel reveal follows the cursor and fades the trail',async()=>{
- const {pixelIntensity}=await import('../pages/pixel-blast.js');
- const points=[{x:20,y:50,time:100},{x:180,y:50,time:900}];
- assert.ok(pixelIntensity(180,50,points,1000)>pixelIntensity(20,50,points,1000)*2);
- assert.equal(pixelIntensity(20,50,points,1800),0);
+  d.querySelector('#lobby-stage [data-kind=rated]').click();
+  const ghost=d.querySelector('.lobby-ghost'),chosen=records.find(r=>r.element===ghost.querySelector('[data-kind=rated]'));
+  const sibling=records.find(r=>r.element===ghost.querySelector('[data-kind=friendly]'));
+  assert.match(chosen.frames.at(-1).transform,/scale\(1.13/);assert.match(sibling.frames.at(-1).filter,/blur/);
+  const entering=records.find(r=>r.element===d.querySelector('#lobby-stage .choice-card'));
+  assert.match(entering.frames[0].transform,/translate/);assert.ok(records.some(r=>r.element.id==='lobby-back'&&r.frames[0].opacity===0));
+  d.querySelector('#lobby-stage [data-mode=blitz]').click();d.getElementById('lobby-back').click();
+  const reverse=d.querySelector('.lobby-ghost'),reverseRecord=records.find(r=>r.element===reverse.firstElementChild);
+  assert.equal(reverse.children.length,4);assert.match(reverseRecord.frames.at(-1).transform,/translate/);
+  const target=d.querySelector('#lobby-stage [data-mode=blitz]');assert.ok(records.some(r=>r.element===target&&r.frames.length===3));
+  d.getElementById('lobby-back').click();assert.equal(d.getElementById('lobby-back').hidden,true);
+  assert.ok(d.querySelector('.lobby-back[aria-hidden=true]'));assert.equal(d.getElementById('lobby-nav'),null);
+ }finally{lobby.destroy();w.close()}
 });

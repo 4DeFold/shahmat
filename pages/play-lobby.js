@@ -1,6 +1,5 @@
 import {Chess} from 'chess.js';
 import {pieceSrc} from './piece-theme.js';
-import {createPixelBlast} from './pixel-blast.js';
 
 export const controls = {
   bullet:['1+0','1+1','2+0','2+1'], blitz:['3+0','3+2','5+0','5+3'],
@@ -44,8 +43,7 @@ export function createOnlineCount(element, win) {
 
 export function createPlayLobby({document,client,onChoose,onOpenBoard}) {
  const win=document.defaultView, root=document.getElementById('play-lobby'), shell=document.getElementById('member-game');
- const stage=document.getElementById('lobby-stage'), back=document.getElementById('lobby-back'), nav=document.getElementById('lobby-nav');
- const pixels=createPixelBlast(win);
+ const stage=document.getElementById('lobby-stage'), back=document.getElementById('lobby-back');
  let screen='kinds',kind='rated',mode=null, timers=[], demoGames=[], fetching=null, visible=true, disposed=false, active=false;
  let counts=null, counters=[], pollTimer=null, pollInFlight=false, pollGeneration=0;
  const reduced=()=>win.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -117,52 +115,102 @@ export function createPlayLobby({document,client,onChoose,onOpenBoard}) {
  }
  function stopPolling(){pollGeneration++;if(pollTimer!==null)win.clearInterval(pollTimer);pollTimer=null;counts=null;}
  function startPolling(){if(!active||!visible||root.hidden||disposed||pollTimer!==null)return;void poll();pollTimer=win.setInterval(poll,2000);}
- let ghost=null, ghostTimer=null;
- function clearGhost(){if(ghostTimer!==null)win.clearTimeout(ghostTimer);ghostTimer=null;ghost?.remove();ghost=null;}
- function transitionGhost(){
-  clearGhost();if(reduced()||root.hidden||!stage.children.length||!stage.animate)return;
+ // Shared-element transitions: the old stage stays beneath the real controls.
+ // Geometry is measured before/after the render, so both desktop and stacked
+ // mobile cards animate from/to the selected card without blocking input.
+ let ghost=null,ghostTimer=null,backGhost=null,backGhostTimer=null,animations=[];
+ function clearTransitions(){
+  for(const animation of animations)animation.cancel();animations=[];
+  if(ghostTimer!==null)win.clearTimeout(ghostTimer);ghostTimer=null;ghost?.remove();ghost=null;
+  if(backGhostTimer!==null)win.clearTimeout(backGhostTimer);backGhostTimer=null;backGhost?.remove();backGhost=null;
+ }
+ function animate(element,frames,options){
+  if(!element?.animate)return;
+  const animation=element.animate(frames,{fill:'both',...options});animations.push(animation);
+  animation.onfinish=()=>{animations=animations.filter(item=>item!==animation);if(!element.closest('.lobby-ghost')&&element!==backGhost)animation.cancel();};
+ }
+ function snapshotStage(source){
+  if(reduced()||root.hidden||!stage.children.length||!stage.animate)return null;
+  const cards=[...stage.children],rects=cards.map(card=>card.getBoundingClientRect());
   const rect=stage.getBoundingClientRect(),outer=shell.getBoundingClientRect();
   ghost=stage.cloneNode(true);ghost.removeAttribute('id');ghost.classList.add('lobby-ghost');ghost.setAttribute('aria-hidden','true');ghost.inert=true;
   Object.assign(ghost.style,{left:`${rect.left-outer.left}px`,top:`${rect.top-outer.top}px`,width:`${rect.width}px`,height:`${rect.height}px`});
-  shell.append(ghost);ghostTimer=win.setTimeout(clearGhost,560);
+  shell.append(ghost);ghostTimer=win.setTimeout(()=>{ghost?.remove();ghost=null;ghostTimer=null;},900);
+  return {cards:[...ghost.children],rects,index:cards.indexOf(source)};
  }
- function ripple(card,event){
-  if(reduced()||!card)return;
-  const rect=card.getBoundingClientRect(),x=event.detail?event.clientX-rect.left:rect.width/2,y=event.detail?event.clientY-rect.top:rect.height/2;
-  const ring=document.createElement('span');ring.className='lobby-ripple';ring.setAttribute('aria-hidden','true');ring.style.left=`${x}px`;ring.style.top=`${y}px`;card.append(ring);
-  ring.addEventListener('animationend',()=>ring.remove(),{once:true});
+ function rectTransform(from,to){
+  const dx=to.left+to.width/2-from.left-from.width/2,dy=to.top+to.height/2-from.top-from.height/2;
+  return `translate(${dx}px, ${dy}px) scale(${to.width/Math.max(from.width,1)}, ${to.height/Math.max(from.height,1)})`;
+ }
+ function animateStage(snapshot,backwards,next){
+  if(!snapshot)return;
+  const cards=[...stage.children],ease='cubic-bezier(.22,1,.36,1)';
+  if(backwards){
+   const parent=next==='kinds'?stage.querySelector(`[data-kind="${kind}"]`):stage.querySelector(`[data-mode="${mode}"]`);
+   if(!parent)return;
+   const target=parent.getBoundingClientRect();
+   snapshot.cards.forEach((card,i)=>animate(card,[
+    {transform:'none',opacity:1,filter:'blur(0px)'},
+    {transform:rectTransform(snapshot.rects[i],target),opacity:0,filter:'blur(9px)'}
+   ],{duration:560,easing:ease}));
+   cards.forEach(card=>animate(card,card===parent?[
+    {opacity:0,transform:'scale(.9)',filter:'blur(10px)',offset:0},
+    {opacity:0,transform:'scale(.94)',filter:'blur(8px)',offset:.38},
+    {opacity:1,transform:'none',filter:'blur(0px)',offset:1}
+   ]:[{opacity:0,transform:'scale(.97)',filter:'blur(8px)'},{opacity:1,transform:'none',filter:'blur(0px)'}],
+   {duration:card===parent?650:400,delay:card===parent?0:260,easing:ease}));
+  }else if(snapshot.index>=0){
+   const origin=snapshot.rects[snapshot.index];
+   snapshot.cards.forEach((card,i)=>animate(card,i===snapshot.index?[
+    {opacity:1,transform:'none',filter:'blur(0px)'},
+    {opacity:0,transform:'scale(1.13)',filter:'blur(12px)'}
+   ]:[{opacity:1,transform:'none',filter:'blur(0px)'},{opacity:0,transform:'scale(.96)',filter:'blur(9px)'}],
+   {duration:i===snapshot.index?390:300,easing:ease}));
+   cards.forEach((card,i)=>{
+    const end=card.getBoundingClientRect();
+    animate(card,[{transform:rectTransform(end,origin),opacity:0,filter:'blur(12px)'},
+     {transform:'none',opacity:1,filter:'blur(0px)'}],
+    {duration:620,delay:75+i*18,easing:ease});
+   });
+  }
+ }
+ function animateBack(previousHidden,nextHidden){
+  if(reduced()||!back.animate||previousHidden===nextHidden)return;
+  const ease='cubic-bezier(.22,1,.36,1)';
+  if(!nextHidden){animate(back,[{opacity:0,transform:'translateY(10px) scale(.96)',filter:'blur(4px)'},{opacity:1,transform:'none',filter:'blur(0px)'}],{duration:380,delay:120,easing:ease});return;}
+  // The actual button is hidden immediately for layout; its inert copy fades out.
+  const rect=back.getBoundingClientRect(),outer=shell.getBoundingClientRect();
+  backGhost=back.cloneNode(true);backGhost.removeAttribute('id');backGhost.removeAttribute('hidden');backGhost.setAttribute('aria-hidden','true');backGhost.tabIndex=-1;
+  Object.assign(backGhost.style,{position:'absolute',pointerEvents:'none',zIndex:'2',margin:'0',left:`${rect.left-outer.left}px`,top:`${rect.top-outer.top}px`,width:`${rect.width}px`,height:`${rect.height}px`});
+  shell.append(backGhost);
+  animate(backGhost,[{opacity:1,transform:'none',filter:'blur(0px)'},{opacity:0,transform:'translateY(-8px) scale(.96)',filter:'blur(4px)'}],{duration:280,easing:ease});
+  backGhostTimer=win.setTimeout(()=>{backGhost?.remove();backGhost=null;backGhostTimer=null;},300);
  }
  const spotlight=event=>{
   if(reduced()||event.pointerType==='touch')return;const card=event.currentTarget===back?back:event.target.closest('.lobby-card');if(!card||card.disabled)return;
   const r=card.getBoundingClientRect();if(!r.width||!r.height)return;
   const x=Math.max(0,Math.min(r.width,event.clientX-r.left)),y=Math.max(0,Math.min(r.height,event.clientY-r.top));
   card.style.setProperty('--mx',`${x}px`);card.style.setProperty('--my',`${y}px`);
-  pixels.move(card,event);
   card.style.setProperty('--tilt-x',`${(0.5-y/r.height)*3}deg`);card.style.setProperty('--tilt-y',`${(x/r.width-0.5)*3}deg`);
  };
  stage.addEventListener('pointermove',spotlight);back.addEventListener('pointermove',spotlight);
- stage.addEventListener('pointerout',event=>{const card=event.target.closest('.lobby-card');if(card&&!card.contains(event.relatedTarget))pixels.leave(card);});
- back.addEventListener('pointerleave',()=>pixels.leave(back));
- stage.addEventListener('focusin',event=>{const card=event.target.closest('.lobby-card');if(card)pixels.focus(card);});
- stage.addEventListener('focusout',event=>{const card=event.target.closest('.lobby-card');if(card)pixels.leave(card);});
- back.addEventListener('focus',()=>pixels.focus(back));back.addEventListener('blur',()=>pixels.leave(back));
- stage.addEventListener('click',event=>{const card=event.target.closest('.lobby-card');if(card&&!card.disabled)ripple(card,event);},true);
- function show(next, {backwards=false} = {}) {
-  pixels.clear();if(backwards)clearGhost();else transitionGhost();clear();counters.forEach(x=>x.counter.destroy());counters=[];screen=next;shell.classList.add('lobby-open');root.hidden=false;back.hidden=screen==='kinds';
-  const steps=['kinds','modes','controls'],current=steps.indexOf(screen);
-  for(const button of nav.querySelectorAll('button')){const index=steps.indexOf(button.dataset.step);button.disabled=index>current;if(index===current)button.setAttribute('aria-current','step');else button.removeAttribute('aria-current');}
-  stage.className=`lobby-stage stage-${screen}`;stage.replaceChildren();
+ function show(next, {backwards=false, source=null} = {}) {
+  clearTransitions();const wasHidden=back.hidden, showBack=next!=='kinds';
+  const snapshot=snapshotStage(source);if(!showBack&&snapshot)animateBack(wasHidden,true);
+  clear();counters.forEach(x=>x.counter.destroy());counters=[];screen=next;shell.classList.add('lobby-open');root.hidden=false;back.hidden=!showBack;
+  const first=!stage.children.length;stage.className=`lobby-stage stage-${screen}${first?' stage-initial':''}`;stage.replaceChildren();
+  if(showBack)animateBack(wasHidden,false);
   if(screen==='kinds'){
    for(const [key,label] of [['friendly','Товарищеские'],['rated','Ранговые']]){
     const button=document.createElement('button');button.type='button';button.className='kind-card lobby-card';button.dataset.kind=key;
     button.innerHTML=`<span class="demo-frame"><span class="demo-delta demo-black"></span><span class="demo-board" aria-hidden="true"></span><span class="demo-delta demo-white"></span></span><strong>${label}</strong>`;
-    countFor(button,row=>row.kind===key);button.addEventListener('click',()=>{kind=key;show('modes');});stage.append(button);
+    countFor(button,row=>row.kind===key);button.addEventListener('click',()=>{kind=key;show('modes',{source:button});});stage.append(button);
    }
    if(demoGames.length)startDemos();else void load();
   } else if(screen==='modes'){
    for(const [key,data] of Object.entries(info)){
-    const button=document.createElement('button');button.type='button';button.className='choice-card lobby-card';button.innerHTML=`<span class="choice-icon">${data.icon}</span><strong>${data.name}</strong>`;
-    countFor(button,row=>row.kind===kind&&row.mode===key);button.addEventListener('click',()=>{mode=key;show('controls');});stage.append(button);
+    const button=document.createElement('button');button.type='button';button.className='choice-card lobby-card';button.dataset.mode=key;button.innerHTML=`<span class="choice-icon">${data.icon}</span><strong>${data.name}</strong>`;
+    countFor(button,row=>row.kind===kind&&row.mode===key);button.addEventListener('click',()=>{mode=key;show('controls',{source:button});});stage.append(button);
    }
    const custom=document.createElement('button');custom.type='button';custom.disabled=true;custom.className='choice-card lobby-card';custom.innerHTML=`<span class="choice-icon">${icon('<path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4"/>')}</span><strong>Кастом</strong>`;countFor(custom,()=>false);stage.append(custom);
   } else {
@@ -172,11 +220,11 @@ export function createPlayLobby({document,client,onChoose,onOpenBoard}) {
     button.addEventListener('click',()=>{if(onChoose({mode,kind,timeControl:control}))openBoard();});stage.append(button);
    }
   }
-  updateCounts();startPolling();
+  updateCounts();startPolling();animateStage(snapshot,backwards,next);
  }
- function openBoard(){pixels.clear();if(!root.hidden)transitionGhost();clear();stopPolling();root.hidden=true;shell.classList.remove('lobby-open');onOpenBoard?.();}
- back.addEventListener('click',event=>{ripple(back,event);show(screen==='controls'?'modes':'kinds',{backwards:true});});
- nav.addEventListener('click',event=>{const button=event.target.closest('button[data-step]');if(!button||button.disabled||button.dataset.step===screen)return;show(button.dataset.step,{backwards:true});});
+ function openBoard(){clearTransitions();clear();stopPolling();root.hidden=true;shell.classList.remove('lobby-open');onOpenBoard?.();}
+ back.addEventListener('click',()=>show(screen==='controls'?'modes':'kinds',{backwards:true}));
+ const onResize=()=>clearTransitions();win.addEventListener('resize',onResize);
  show('kinds');
- return {activate(){active=true;startPolling();return load();},show,openBoard,setVisible(value){visible=value;if(visible&&!root.hidden){if(screen==='kinds'){void load();startDemos();}startPolling();}else{pixels.clear();clear();stopPolling();}},destroy(){disposed=true;pixels.destroy();clear();clearGhost();stopPolling();counters.forEach(x=>x.counter.destroy());}};
+ return {activate(){active=true;startPolling();return load();},show,openBoard,setVisible(value){visible=value;if(visible&&!root.hidden){if(screen==='kinds'){void load();startDemos();}startPolling();}else{clearTransitions();clear();stopPolling();}},destroy(){disposed=true;win.removeEventListener('resize',onResize);clear();clearTransitions();stopPolling();counters.forEach(x=>x.counter.destroy());}};
 }

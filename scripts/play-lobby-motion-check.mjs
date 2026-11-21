@@ -24,32 +24,37 @@ try {
   const kind=page.locator('#lobby-stage [data-kind=rated]');await kind.waitFor({state:'visible'});
   await kind.hover();
   if(motion==='no-preference'){
-   const box=await kind.boundingBox(), y=box.y+box.height*.5;
-   await page.mouse.move(box.x+box.width*.2,y);await page.waitForTimeout(350);
-   await kind.locator('canvas.lobby-pixels').waitFor();
-   await page.mouse.move(box.x+box.width*.8,y);await page.waitForTimeout(1050);
-   const state=await kind.evaluate(el=>{
-    const canvas=el.querySelector('canvas.lobby-pixels'),ctx=canvas.getContext('2d'),w=canvas.width,h=canvas.height;
-    const sum=(cx)=>{const x=Math.floor(w*cx),y=Math.floor(h*.5),r=Math.floor(Math.min(w,h)*.12),data=ctx.getImageData(x-r,y-r,r*2,r*2).data;let n=0;for(let i=3;i<data.length;i+=4)n+=data[i];return n;};
-    return {spotlight:parseFloat(getComputedStyle(el,'::before').opacity),left:sum(.2),right:sum(.8),mouse:el.style.getPropertyValue('--mx')};
-   });
-   assert.ok(state.spotlight>.5&&state.right>state.left*2&&state.right>100&&state.mouse.endsWith('px'),JSON.stringify(state));
-  }else assert.equal(await kind.locator('canvas.lobby-pixels').count(),0);
+   await page.waitForTimeout(350);
+   const state=await kind.evaluate(el=>({spotlight:parseFloat(getComputedStyle(el,'::before').opacity),mouse:el.style.getPropertyValue('--mx')}));
+   assert.ok(state.spotlight>.5&&state.mouse.endsWith('px'),JSON.stringify(state));
+  }
+  assert.equal(await page.locator('#lobby-nav, .lobby-pixels, .lobby-ripple').count(),0);
   await kind.click();await page.locator('#lobby-stage .choice-card').first().waitFor();
   assert.equal(await page.locator('#lobby-stage .choice-card').count(),5);
   if(motion==='no-preference'){
-   assert.equal(await page.locator('.lobby-ghost[aria-hidden=true]').count(),1);
-   assert.ok(await page.locator('.lobby-ghost .lobby-ripple').count()>0);
+   const morph=await page.evaluate(()=>{
+    const ghost=document.querySelector('.lobby-ghost'),incoming=document.querySelector('#lobby-stage .choice-card'),back=document.querySelector('#lobby-back');
+    const chosen=ghost?.querySelector('[data-kind=rated]'),sibling=ghost?.querySelector('[data-kind=friendly]');
+    const frames=el=>el?.getAnimations()[0]?.effect.getKeyframes()||[];
+    return {ghost:!!ghost,ghostZ:getComputedStyle(ghost).zIndex,rootZ:getComputedStyle(document.querySelector('#play-lobby')).zIndex,
+      incoming:frames(incoming),chosen:frames(chosen),sibling:frames(sibling),back:frames(back)};
+   });
+   assert.ok(morph.ghost&&Number(morph.ghostZ)<Number(morph.rootZ),JSON.stringify(morph));
+   assert.match(morph.incoming[0].transform,/translate/);assert.match(morph.chosen.at(-1).transform,/scale\(1.13/);
+   assert.match(morph.sibling.at(-1).filter,/blur/);assert.ok(morph.back.length>=2);
   }else assert.equal(await page.locator('.lobby-ghost').count(),0);
   assert.equal(await page.locator('#lobby-stage .choice-card').nth(2).locator('svg g').getAttribute('stroke-width'),'1.05');
   await page.locator('#lobby-stage .choice-card').nth(1).click();await page.locator('#lobby-stage .time-card').first().waitFor();
-  assert.equal(await page.locator('#lobby-nav [aria-current=step]').textContent(),'Время');
   await page.locator('#lobby-back').click();await page.locator('#lobby-stage .choice-card').nth(1).waitFor();
-  assert.equal(await page.locator('.lobby-ghost').count(),0,'back must remove the outgoing layer');
-  assert.equal(await page.locator('#lobby-nav [aria-current=step]').textContent(),'Режим');
-  await page.locator('#lobby-nav [data-step=kinds]').click();assert.equal(await page.locator('#lobby-stage .kind-card').count(),2);
-  assert.equal(await page.locator('#lobby-nav [data-step=modes]').isDisabled(),true);
+  if(motion==='no-preference'){
+   const reverse=await page.evaluate(()=>{const ghost=document.querySelector('.lobby-ghost'),target=document.querySelector('#lobby-stage [data-mode=blitz]');return {count:ghost?.children.length,z:getComputedStyle(ghost).zIndex,root:getComputedStyle(document.querySelector('#play-lobby')).zIndex,frames:ghost?.children[0].getAnimations()[0]?.effect.getKeyframes(),target:target?.getAnimations()[0]?.effect.getKeyframes()};});
+   assert.equal(reverse.count,4);assert.ok(Number(reverse.z)<Number(reverse.root));assert.match(reverse.frames.at(-1).transform,/translate/);assert.ok(reverse.target.length>=3);
+  }else assert.equal(await page.locator('.lobby-ghost').count(),0);
+  await page.locator('#lobby-back').click();await page.locator('#lobby-stage .kind-card').first().waitFor();
+  assert.equal(await page.locator('#lobby-back').isHidden(),true);
+  if(motion==='no-preference')assert.equal(await page.locator('.lobby-back[aria-hidden=true]').count(),1);
+  assert.equal(await page.locator('#lobby-nav, .lobby-pixels, .lobby-ripple').count(),0);
   await page.close();
  }
- console.log(`✓ ${name}: pixel hover, press ripple, stage transitions and reduced motion`);
+ console.log(`✓ ${name}: spotlight, shared-element transitions, back button and reduced motion`);
 }finally{await browser.close()}
