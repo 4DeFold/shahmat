@@ -7,6 +7,7 @@ import { chooseBotMove } from '../pages/bot.js';
 import { premoveTargets, validPremove, normalizePremove, projectPremoves } from '../pages/premove.js';
 import { createBoardAnnotations } from '../pages/board-annotations.js';
 import { createGameSound } from '../pages/game-sound.js';
+import { renderCaptures } from '../pages/board-insights.js';
 
 const html = await readFile('pages/play.html', 'utf8');
 const source = (await readFile('pages/play.js', 'utf8')).replace(/^import .*;\n/gm, '') + '\nwindow.testGame = game; window.testRender = render;';
@@ -25,7 +26,7 @@ function setup({ saved = null, storageError = false, memberId = null, now = null
   dom.window.themedPieceSrc = (color,type) => `/pieces/cburnett/${color}${type.toUpperCase()}.svg`;
   dom.window.Chess = Chess;
   dom.window.chooseBotMove = botMove;
-  Object.assign(dom.window,{premoveTargets,validPremove,normalizePremove,projectPremoves,createBoardAnnotations,createGameSound});
+  Object.assign(dom.window,{premoveTargets,validPremove,normalizePremove,projectPremoves,createBoardAnnotations,createGameSound,renderCaptures});
   dom.window.eval(source);
   const { document } = dom.window;
   const click = square => document.querySelector(`[data-square="${square}"]`).click();
@@ -269,4 +270,13 @@ test('guest premove anticipates a pawn capture and executes after the bot reply'
  assert.equal(app.game.get('d5').color,'w');assert.equal(app.game.get('d5').type,'p');
  assert.deepEqual(app.game.history().slice(0,3),['e4','d5','exd5']);
  app.window.close();
+});
+
+test('guest player strips show captures for the appropriate side', () => {
+  const { document, game, render, window } = setup();
+  for (const move of ['e4', 'd5', 'exd5', 'Qxd5']) game.move(move);
+  render();
+  assert.equal(document.querySelectorAll('#guest-player-captured img').length, 1);
+  assert.equal(document.querySelectorAll('#guest-bot-captured img').length, 1);
+  window.close();
 });

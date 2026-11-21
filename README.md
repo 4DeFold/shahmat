@@ -2,6 +2,12 @@
 
 ## The best chess arena. 
 
+## Browser compatibility checks
+
+Install Playwright's Chromium, Firefox and WebKit builds with `npx playwright install --with-deps chromium firefox webkit`. Start `npm run dev -- --port 4270`, then run `npm run test:cross-browser` in another terminal. Use `BROWSERS=firefox,webkit` to select engines; missing engines fail rather than being silently skipped. `BROWSER=webkit npm run test:particles-compat` exercises WebGL failure and context loss against the dev server. Supabase and the bot worker in the cross-browser smoke suite are mocked; `npm run test:bot` separately runs real Stockfish.
+
+Playwright WebKit is an approximation, not Apple Safari on macOS/iOS. Chrome, Edge, Opera and Yandex Browser share Chromium's engine, but product-specific behavior still requires testing the actual browsers and devices.
+
 ## Responsive browser checks
 
 ```sh

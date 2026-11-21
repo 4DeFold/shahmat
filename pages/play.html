@@ -7,7 +7,7 @@
   <title>Игра с ботом — shahmat.xyz</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/pages/play.css">
-  <script type="module" src="/pages/play.js"></script>
+  <link rel="stylesheet" href="/pages/board-layout.css"><script type="module" src="/pages/play.js"></script>
 </head>
 <body class="demo-page">
   <div class="game-shell">
@@ -18,9 +18,9 @@
     <main class="game-layout">
       <section class="board-section" aria-labelledby="game-title">
         <div class="game-heading"><h1 id="game-title">Игра с ботом<span>.</span></h1></div>
-        <div class="player-row"><span class="avatar bot-avatar"><img id="bot-avatar" src="/pieces/cburnett/bN.svg" alt=""></span><span><strong>Бот</strong><small id="bot-color">Чёрные</small></span></div>
+        <div class="player-row"><span class="avatar bot-avatar"><img id="bot-avatar" src="/pieces/cburnett/bN.svg" alt=""></span><span class="player-info"><span class="player-name-line"><strong>Бот</strong><small id="bot-color">Чёрные</small></span><span id="guest-bot-captured" class="captured-pieces" aria-label="Взятые фигуры"></span></span></div>
         <div class="board-frame"><div class="board" id="board" role="group" aria-label="Шахматная доска. Предварительный ход: выберите фигуру и клетку во время хода соперника. Правая кнопка мыши: отметить клетку или нарисовать стрелку." title="ПКМ: отметка или стрелка · Shift, Alt, Ctrl: цвет · ЛКМ: очистить"></div></div>
-        <div class="player-row"><span class="avatar"><img id="player-avatar" src="/pieces/cburnett/wN.svg" alt=""></span><span><strong>Вы</strong><small id="player-color">Белые</small></span></div>
+        <div class="player-row"><span class="avatar"><img id="player-avatar" src="/pieces/cburnett/wN.svg" alt=""></span><span class="player-info"><span class="player-name-line"><strong>Вы</strong><small id="player-color">Белые</small></span><span id="guest-player-captured" class="captured-pieces" aria-label="Взятые фигуры"></span></span></div>
       </section>
       <aside class="game-panel" aria-label="Информация о партии">
         <div class="status-card"><span class="status-dot"></span><div><p id="status" role="status" aria-live="polite">Ваш ход</p></div></div>

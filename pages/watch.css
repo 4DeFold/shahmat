@@ -24,3 +24,4 @@
 .watch-empty.fibers-fallback::before{content:"";position:absolute;inset:-30%;z-index:-1;background:repeating-radial-gradient(ellipse at 45% 50%,transparent 0 10px,#8b5cf629 11px 12px,transparent 14px 23px);transform:rotate(-18deg);animation:fibers-fallback 12s ease-in-out infinite alternate}@keyframes fibers-fallback{from{transform:rotate(-18deg) translateY(-8%)}to{transform:rotate(-8deg) translateY(8%)}}@media(prefers-reduced-motion:reduce){.watch-empty.fibers-fallback::before{animation:none}}
 
 .watch-empty p{position:absolute;top:75%;left:50%;transform:translate(-50%,-50%);white-space:nowrap;border-radius:0;margin:0}.watch-empty.fibers-fallback::before{background:repeating-radial-gradient(ellipse at 45% 50%,transparent 0 10px,color-mix(in srgb,var(--accent) 20%,transparent) 11px 12px,transparent 14px 23px)}
+.watch-mini { border:0; }

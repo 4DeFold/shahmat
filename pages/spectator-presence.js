@@ -1,3 +1,4 @@
+import {randomUUID} from './browser-compat.js';
 // Presence is ephemeral. Hashing the account ID groups multiple tabs without
 // broadcasting a profile identifier; disconnects remove stale viewers.
 export function startSpectatorPresence(client,gameId,{viewer=false,onCount=()=>{}}={}) {
@@ -5,7 +6,7 @@ export function startSpectatorPresence(client,gameId,{viewer=false,onCount=()=>{
  let channel,stopped=false;
  (async()=>{
   try {
-   let key=crypto.randomUUID();
+   let key=viewer ? null : randomUUID();
    if(viewer){const {data}=await client.auth.getUser();if(!data?.user?.id||stopped)return;const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(`shahmat-viewer:${gameId}:${data.user.id}`));key=Array.from(new Uint8Array(bytes),b=>b.toString(16).padStart(2,'0')).join('');}
    if(stopped)return;
    channel=client.channel(`spectators-v1:${gameId}`,{config:{presence:{key,enabled:true}}});

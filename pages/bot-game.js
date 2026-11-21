@@ -11,6 +11,7 @@ import { createStockfish, BOT_LEVELS } from './stockfish-engine.js';
 import { createBotStorage } from './bot-storage.js';
 import { BOT_DEMO_SCENARIOS as scenarios } from './bot-demo-scenarios.js';
 import { cachedUserId, startSessionMonitor } from './member-session.js';
+import {localStorageOrNull, randomUUID} from './browser-compat.js';
 import './game-theme.js';
 
 const $ = id => document.getElementById(id);
@@ -162,7 +163,7 @@ document.addEventListener('visibilitychange',()=>{ if(document.hidden) stopOrbit
 function showLevel() {
   const bot=BOT_LEVELS[level];
   $('bot-name').textContent=bot.name; $('bot-completed').hidden=!completedLevels.has(level+1);
-  $('game-bot-piece').src=piece('b',bot.piece); $('game-bot-name').textContent=bot.name;
+  $('game-bot-piece').src=piece('b',bot.piece); $('game-bot-name').textContent=`Бот ${bot.name}`;
   $('bot-prev').disabled=level===0; $('bot-next').disabled=level===BOT_LEVELS.length-1;
 }
 function switchLevel(next) {
@@ -187,6 +188,8 @@ function projected() { return premove.length ? projectPremoves(chess,premove,pla
 function shownChess() { if(historyIndex===null)return projected();const p=new Chess();chess.history().slice(0,historyIndex).forEach(m=>p.move(m));return p; }
 function draw(move=null,transitions=[]) {
   const shown=shownChess(), isLive=historyIndex===null;
+  const botPiece=piece(playerColor()==='w'?'b':'w',BOT_LEVELS[level].piece);
+  if($('game-bot-piece').getAttribute('src')!==botPiece)$('game-bot-piece').src=botPiece;
   const legal=selected&&isLive?(chess.turn()===playerColor()&&!premove.length?chess.moves({square:selected,verbose:true}):premoveTargets(shown,selected,playerColor())).map(m=>m.to):[];
   const displayedLast=isLive?last:shown.history({verbose:true}).at(-1);
   boardView.render({shown,selected,legal,last:displayedLast,premoves:isLive?premove:[],actual:isLive&&premove.length?chess:null,premoveMode:chess.turn()!==playerColor()||premove.length>0,animatedMove:isLive?move:null,transitions});
@@ -319,8 +322,9 @@ async function returnToSelection() {
 $('retry-bot').addEventListener('click',()=>{ reveal('retry-wrap',false); void botMove(); });
 async function launch() {
   if(phase!=='choose'||!userId||!store) return;
+  let id; try { id=randomUUID(); } catch { status('Не удалось начать партию: безопасный генератор случайных чисел недоступен.'); return; }
   sound.prime(); const current=++generation;
-  game={id:crypto.randomUUID(),player_color:Math.random()<.5?'w':'b',level:level+1,moves:[],status:'active',started_at:new Date().toISOString(),updated_at:new Date().toISOString()};
+  game={id,player_color:Math.random()<.5?'w':'b',level:level+1,moves:[],status:'active',started_at:new Date().toISOString(),updated_at:new Date().toISOString()};
   chess=new Chess(); selected=null; premove=[]; historyIndex=null; annotations.clear(); last=null; board.classList.toggle('black',playerColor()==='b'); draw(); history(); snapshot();
   fadeEntryIntoLaunch(); setPhase('launching'); status('Готовим доску…');
   if(!motion.matches) {
@@ -373,7 +377,7 @@ async function launch() {
 }
 $('bot-play').addEventListener('click',()=>void launch());
 async function restore(id) {
-  userId=id; store=createBotStorage({client:supabase,userId:id,storage:window.localStorage,onStatus:text=>{$('save-status').textContent=/^(Партия сохранена|Сохраняем партию)/.test(text)?'':text;}});
+  userId=id; store=createBotStorage({client:supabase,userId:id,storage:localStorageOrNull(window),onStatus:text=>{$('save-status').textContent=/^(Партия сохранена|Сохраняем партию)/.test(text)?'':text;}});
   const wins=await store.completed();if(destroyed||userId!==id)return;completedLevels=new Set(wins);if(phase==='choose'&&wins.length){level=Math.min(BOT_LEVELS.length-1,Math.max(...wins));carouselPosition=level;carouselVelocity=0;showLevel();positionOrbit();}
   const row=await store.restore(); if(destroyed || userId!==id || phase!=='choose' || !row) return;
   try {
@@ -385,7 +389,7 @@ async function restore(id) {
 }
 showLevel(); draw(); startOrbit(); if(pageVisible) animateEntry(); $('bot-play').disabled=true;
 function setPlayerAvatar(value) { const img=$('bot-player-avatar-image'), custom=typeof value==='string'&&/^data:image\/(?:png|jpeg);base64,/.test(value); img.src=custom?value:'/pieces/cburnett/wN.svg'; img.classList.toggle('custom-profile-avatar',custom); }
-startSessionMonitor({auth:supabase.auth,cachedId:cachedUserId(localStorage),open:async id=>{ void Promise.all([supabase.from('profile_media').select('avatar').eq('user_id',id).maybeSingle(),supabase.from('profile_rewards').select('avatar_unlocked').eq('user_id',id).maybeSingle()]).then(([media,reward])=>{if(!destroyed&&userId===id)setPlayerAvatar(!reward.error&&reward.data?.avatar_unlocked?media.data?.avatar:null);}).catch(()=>{}); await restore(id); if(!destroyed) $('bot-play').disabled=false; },logout:()=>{ destroyed=true; ++generation; stopOrbit(); engine?.destroy(); store?.destroy(); clearInterval(timer); sound.destroy(); if(window.parent===window) location.replace('/'); },accountChanged:()=>location.reload()});
+startSessionMonitor({auth:supabase.auth,cachedId:cachedUserId(localStorageOrNull(window)),open:async id=>{ void Promise.all([supabase.from('profile_media').select('avatar').eq('user_id',id).maybeSingle(),supabase.from('profile_rewards').select('avatar_unlocked').eq('user_id',id).maybeSingle()]).then(([media,reward])=>{if(!destroyed&&userId===id)setPlayerAvatar(!reward.error&&reward.data?.avatar_unlocked?media.data?.avatar:null);}).catch(()=>{}); await restore(id); if(!destroyed) $('bot-play').disabled=false; },logout:()=>{ destroyed=true; ++generation; stopOrbit(); engine?.destroy(); store?.destroy(); clearInterval(timer); sound.destroy(); if(window.parent===window) location.replace('/'); },accountChanged:()=>location.reload()});
 window.addEventListener('online',()=>store?.flush());
 // If Play is pressed during the entrance, continue from the current opacity
 // rather than letting a still-running entrance override the launch fade.

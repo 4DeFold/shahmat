@@ -3,6 +3,7 @@ const sound=createGameSound(window);
 import {pieceSrc as themedPieceSrc} from './piece-theme.js';
 import '../smooth-scroll.js';
 import { Chess } from 'chess.js';
+import {renderCaptures} from './board-insights.js';
 import { premoveTargets, validPremove, normalizePremove, projectPremoves } from './premove.js';
 import { createBoardAnnotations } from './board-annotations.js';
 import { chooseBotMove } from './bot.js';
@@ -157,6 +158,7 @@ function render(move = null) {
   document.getElementById('bot-avatar').src = pieceSrc(playerColor === 'w' ? 'b' : 'w', 'n');
   status.textContent = resultText();
   animateMove(move);
+  renderCaptures(game,playerColor,document.getElementById('guest-player-captured'),document.getElementById('guest-bot-captured'));
   renderHistory();
 }
 function playMove(move) {

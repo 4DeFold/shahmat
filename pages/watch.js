@@ -3,6 +3,7 @@ installLoadingIndicators(document, {embeddedFrame:true});
 import {createGameSound} from './game-sound.js';
 import {pieceSrc as themedPieceSrc} from './piece-theme.js';
 import {Chess} from 'chess.js';
+import {renderCaptures} from './board-insights.js';
 import {startFibers} from './watch-fibers.js';
 import {createClient} from '@supabase/supabase-js';
 import {createMemberBoard} from './member-board.js';
@@ -21,7 +22,7 @@ let stopFibers=null;
 const fibers={start(){if(stopFibers)return;try{stopFibers=startFibers($('watch-empty'),$('watch-fibers'),{lightMode:document.documentElement.dataset.theme!=='dark',glowColor:getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#777777',secondaryColor:getComputedStyle(document.documentElement).getPropertyValue('--board-dark').trim()||'#999999'});}catch{stopFibers=null;} $('watch-empty').classList.toggle('fibers-fallback',!stopFibers);if(!stopFibers)stopFibers=()=>{};},stop(){stopFibers?.();stopFibers=null;$('watch-empty').classList.remove('fibers-fallback');}};
 let selectedMode='all',modeCounts=[],visible=window.parent===window, selected=null, snapshot=null, chess=new Chess(), last=null, historyIndex=null, rows=[], pages=1, seq=0, timer=null, listTimer=0, destroyed=false, stopPresence=null;
 const history=createMoveHistory({document,list:$('move-list'),count:$('move-count'),onSelect:showHistory});
-function draw(move=null,transitions=[]) {const shown=historyIndex===null?chess:new Chess();if(historyIndex!==null)chess.history().slice(0,historyIndex).forEach(m=>shown.move(m));view.render({shown,last:historyIndex===null?last:shown.history({verbose:true}).at(-1),animatedMove:historyIndex===null?move:null,transitions});history(chess,historyIndex);const i=historyIndex??chess.history().length;$('history-first').disabled=$('history-prev').disabled=i===0;$('history-next').disabled=$('history-last').disabled=i===chess.history().length;}
+function draw(move=null,transitions=[]) {const shown=historyIndex===null?chess:new Chess();if(historyIndex!==null)chess.history().slice(0,historyIndex).forEach(m=>shown.move(m));view.render({shown,last:historyIndex===null?last:shown.history({verbose:true}).at(-1),animatedMove:historyIndex===null?move:null,transitions});renderCaptures(shown,'w',$('white-captured'),$('black-captured'));history(chess,historyIndex);const i=historyIndex??chess.history().length;$('history-first').disabled=$('history-prev').disabled=i===0;$('history-next').disabled=$('history-last').disabled=i===chess.history().length;}
 function showHistory(index){if(!snapshot)return;const length=chess.history().length,old=historyIndex??length;historyIndex=index>=length?null:Math.max(0,index);annotations.clear();draw(null,historyTransition(chess,old,historyIndex??length));const move=historySoundMove(chess,old,historyIndex??length);if(move)sound.play(move);}
 for(const [id,get] of [['history-first',()=>0],['history-prev',()=>(historyIndex??chess.history().length)-1],['history-next',()=>(historyIndex??chess.history().length)+1],['history-last',()=>chess.history().length]])$(id).addEventListener('click',()=>showHistory(get()));
 function key(k){if(!visible||!snapshot)return false;const d=k==='ArrowLeft'||k.toLowerCase()==='a'?-1:k==='ArrowRight'||k.toLowerCase()==='d'?1:0;if(d)showHistory((historyIndex??chess.history().length)+d);return !!d;}

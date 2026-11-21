@@ -12,7 +12,7 @@ try {for(const viewport of [{width:1440,height:900},{width:390,height:844}]){
  if(path==='/rest/v1/profiles')return route.fulfill({json:{username:'Alice',bio:'',palette:'monochrome'}});
  if(path.endsWith('/my_archive_all'))return route.fulfill({json:[{id:'a',mode:'blitz',my_color:'w',white_name:'Alice',black_name:'Bob',moves:['f3','e5','g4','Qh4#']}]});
  if(path.endsWith('/my_archive_games')){const mode=route.request().postDataJSON().p_mode;return route.fulfill({json:mode==='blitz'?[{id:'a',my_color:'w',white_name:'Alice',black_name:'Bob',moves:['f3','e5','g4','Qh4#']}]:mode==='rapid'?[{id:'c',my_color:'b',white_name:'Bob',black_name:'Alice',moves:['e4','e5']}]:[]});}
- if(path==='/rest/v1/bot_games'){const url=new URL(route.request().url());return route.fulfill({json:route.request().method()==='GET' && url.searchParams.has('status') && url.searchParams.get('status')!=='eq.active'?[{id:'b',level:2,moves:['e4','e5','Nf3'],status:'draw'}]:[]});}
+ if(path==='/rest/v1/bot_games'){const url=new URL(route.request().url());return route.fulfill({json:route.request().method()==='GET' && url.searchParams.has('status') && url.searchParams.get('status')!=='eq.active'?Array.from({length:12},(_,i)=>({id:`bot-${i}`,level:Math.floor(i/2)+1,player_color:i%2?'b':'w',moves:['e4','e5','Nf3'],status:'draw'})):[]});}
  if(path==='/rest/v1/profile_rewards')return route.fulfill({json:{avatar_unlocked:false}});
  if(path==='/functions/v1/matchplay')return route.fulfill({json:{game:null}});
  return route.fulfill({json:[]});});
@@ -22,7 +22,18 @@ try {for(const viewport of [{width:1440,height:900},{width:390,height:844}]){
  await page.waitForTimeout(600);const geometry=await f.locator('#archive-main').evaluate(el=>{const frame=el.getBoundingClientRect(),board=document.querySelector('#board').getBoundingClientRect();return {top:board.top-frame.top,bottom:frame.bottom-board.bottom,scroll:el.scrollHeight-el.clientHeight};});assert.ok(geometry.top>=-1&&geometry.bottom>=-1&&geometry.scroll<=1,JSON.stringify(geometry));const start=await f.locator('[data-square=e2]').boundingBox(),end=await f.locator('[data-square=e4]').boundingBox();await page.mouse.move(start.x+start.width/2,start.y+start.height/2);await page.mouse.down({button:'right'});await page.mouse.move(end.x+end.width/2,end.y+end.height/2,{steps:4});await page.mouse.up({button:'right'});assert.equal(await f.locator('.annotation-item').count(),1);
  await f.locator('#board').evaluate(el=>el.dispatchEvent(new KeyboardEvent('keydown',{key:'ф',code:'KeyA',bubbles:true})));assert.equal(await f.locator('[data-square=d8] .piece').count(),1);
  await f.locator('#board').evaluate(el=>el.dispatchEvent(new KeyboardEvent('keydown',{key:'в',code:'KeyD',bubbles:true})));assert.equal(await f.locator('[data-square=h4] .piece').count(),1);
- await page.locator('#nav-archive').focus();await page.evaluate(()=>document.activeElement.dispatchEvent(new KeyboardEvent('keydown',{key:'ф',code:'KeyA',bubbles:true})));await f.locator('[data-square=d8] .piece').waitFor();await f.locator('#archive-back').click();await f.locator('[data-mode=rapid]').click();await f.locator('.archive-card').waitFor();await f.locator('.archive-card').click();assert.equal(await f.locator('#white-name').textContent(),'Alice');assert.equal(await f.locator('#black-name').textContent(),'Bob');assert.equal(await f.locator('#board').evaluate(el=>el.classList.contains('black')),true);await f.locator('#archive-back').click();await f.locator('[data-mode=bot]').click();await f.locator('.archive-card strong').filter({hasText:'2 уровень'}).waitFor();
+ await page.locator('#nav-archive').focus();await page.evaluate(()=>document.activeElement.dispatchEvent(new KeyboardEvent('keydown',{key:'ф',code:'KeyA',bubbles:true})));await f.locator('[data-square=d8] .piece').waitFor();await f.locator('#archive-back').click();await f.locator('[data-mode=rapid]').click();await f.locator('.archive-card').waitFor();await f.locator('.archive-card').click();assert.equal(await f.locator('#white-name').textContent(),'Alice');assert.equal(await f.locator('#black-name').textContent(),'Bob');assert.equal(await f.locator('#board').evaluate(el=>el.classList.contains('black')),true);await f.locator('#archive-back').click();await f.locator('[data-mode=bot]').click();await f.locator('.archive-card strong').filter({hasText:'2 уровень'}).first().waitFor();
+ const pieces=['P','N','B','R','Q','K'];
+ for(let level=1;level<=6;level++)for(const flip of [false,true]){
+  const expected=level===6?'Бот Stockfish':`Бот ${level} уровень`;
+  const card=f.locator('.archive-card').nth((level-1)*2+Number(flip));
+  assert.equal(await card.locator('strong').textContent(),expected);await card.click();
+  assert.equal(await f.locator('#black-name').textContent(),expected);
+  assert.match(await f.locator('#archive-top-avatar').getAttribute('src'),new RegExp(`/${flip?'w':'b'}${pieces[level-1]}\\.svg$`));
+  assert.equal(await f.locator('#board').evaluate(el=>el.classList.contains('black')),flip);
+  await f.locator('#archive-back').click();
+ }
+
  await page.goto(`${base}/bot`);const b=page.frameLocator('#bot-game-frame');await b.locator('#bot-play:not([disabled])').waitFor({timeout:10000});assert.match(await b.locator('#hero-piece').getAttribute('src'),/wP.svg/);
  await b.locator('#bot-app').evaluate(el=>el.dispatchEvent(new KeyboardEvent('keydown',{key:'в',code:'KeyD',bubbles:true})));assert.equal(await b.locator('#bot-name').textContent(),'2 уровень');
  await b.locator('#bot-app').evaluate(el=>el.dispatchEvent(new KeyboardEvent('keydown',{key:'ф',code:'KeyA',bubbles:true})));assert.equal(await b.locator('#bot-name').textContent(),'1 уровень');

@@ -119,3 +119,21 @@ body.demo-page .status-card::before { content: ''; position: absolute; inset: 0;
 .square.possible.premove-dest::after { background:rgba(20,30,85,.5); }
 .square.possible.premove-dest:has(.piece)::after { background:transparent; border-color:rgba(20,30,85,.3); }
 .demo-page .piece.premove-ghost { opacity:.52;  }
+
+/* Player strips meet the board edge. The outline is inset and follows the palette. */
+.board-frame { padding:0; border-radius:0; background:transparent; }
+.board-section .player-row { padding:0; }
+.player-row { gap:6px; }
+.player-row .avatar { flex:none; border:0; border-radius:0; position:relative; }
+.player-row .avatar::after { content:''; position:absolute; inset:0; box-shadow:inset 0 0 0 1px var(--accent, var(--ink)); pointer-events:none; }
+.player-info { display:grid; grid-template-rows:1fr 1fr; align-self:stretch; min-width:0; }
+.player-info > :first-child { align-self:center; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.player-info .player-name-line { display:flex; align-items:baseline; gap:5px; min-width:0; }
+.player-info .player-name-line strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.player-info small { display:inline; margin:0; white-space:nowrap; }
+.captured-pieces { display:flex; align-items:center; min-width:0; height:100%; overflow:hidden; font:600 12px system-ui,sans-serif; opacity:.8; }
+.captured-pieces img { width:18px; height:18px; object-fit:contain; margin-right:-6px; flex:none; }
+.captured-pieces span { margin-left:8px; }
+.player-info { height:40px; align-self:center; grid-template-rows:minmax(0,1fr) minmax(0,1fr); }
+.player-info > :first-child { line-height:1; }
+.player-info .player-name-line { height:100%; align-items:center; overflow:hidden; }
