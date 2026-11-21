@@ -1,0 +1,33 @@
+name: Cross-browser checks
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps ${{ matrix.browser }}
+      - run: npm run build
+      - name: Run browser and graphics compatibility checks
+        env:
+          BROWSERS: ${{ matrix.browser }}
+          BROWSER: ${{ matrix.browser }}
+          RESPONSIVE_BASE_URL: http://127.0.0.1:4270
+        run: |
+          npm run dev -- --port 4270 > /tmp/vite.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS "$RESPONSIVE_BASE_URL" >/dev/null && break; sleep 1; done
+          npm run test:cross-browser
+          npm run test:particles-compat

@@ -30,3 +30,8 @@ test('finishing preserves completed bot games and pending offline snapshots',asy
  const store=createBotStorage({client,userId:'alice',storage});store.put(row('game',['f3','e5','g4','Qh4#'],'black_win'));await tick();store.finish('game');
  assert.equal(await store.restore(),null);const saved=JSON.parse(storage.getItem('shahmat.bot-games.v1.alice'));assert.equal(saved.current,null);assert.equal(saved.pending[0].status,'black_win');assert.equal(saved.pending.some(x=>x._op==='delete'),false);store.destroy();
 });
+
+test('blocked storage still syncs to server and warns when offline',async()=>{
+ const messages=[]; const store=createBotStorage({client:clientWith(async()=>({error:'offline'})),userId:'alice',storage:null,onStatus:message=>messages.push(message)});
+ store.put(row('game'));await tick();assert.ok(messages.some(message=>message.includes('Не удалось сохранить партию')));store.destroy();
+});

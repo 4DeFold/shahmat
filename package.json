@@ -8,6 +8,8 @@
     "preview": "vite preview --host 0.0.0.0",
     "test": "node --test",
     "test:responsive": "node scripts/responsive-check.mjs",
+    "test:cross-browser": "node scripts/cross-browser-check.mjs",
+    "test:particles-compat": "node scripts/particles-compat-check.mjs",
     "test:sync": "node scripts/appearance-sync-check.mjs",
     "test:routes": "node scripts/routes-check.mjs",
     "test:profile": "node scripts/profile-check.mjs",
