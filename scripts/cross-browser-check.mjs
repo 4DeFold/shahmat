@@ -35,7 +35,7 @@ for(const name of requested){
     assert.equal(border,'0px',`${name} ${label} border`);assert.equal(padding,'0px',`${name} ${label} frame padding`);
     assert.equal(avatars.length,2,`${name} ${label} avatars`);
     assert.ok(radius.every(r=>r==='0px')&&avatarBorders.every(x=>x==='0px')&&outlines.every(x=>x==='none'),`${name} ${label} avatar corners and border`);
-    avatars.forEach(avatar=>assert.ok(Math.abs(avatar.width-frame.width/12)<1&&Math.abs(avatar.height-frame.width/12)<1,`${name} ${label} avatar 1/12 of board ${JSON.stringify(geometry)}`));
+    avatars.forEach(avatar=>assert.ok(Math.abs(avatar.width-frame.width/13)<1&&Math.abs(avatar.height-frame.width/13)<1,`${name} ${label} avatar 1/13 of board ${JSON.stringify(geometry)}`));
     info.forEach((part,i)=>{const middle=(avatars[i].top+avatars[i].bottom)/2;assert.ok(part.name.bottom<=middle+1&&part.captures.top>=middle-1,`${name} ${label} two-line layout ${JSON.stringify(geometry)}`);});
     assert.ok(Math.abs(frame.width-board.width)<1,`${name} ${label} board fills frame`);
     assert.ok(Math.abs(avatars[0].left-frame.left)<1&&Math.abs(avatars[1].left-frame.left)<1,`${name} ${label} aligned edges ${JSON.stringify(geometry)}`);
@@ -80,9 +80,9 @@ for(const name of requested){
     if(route==='profile'){await page.locator('#profile-display-name').getByText('Alice').waitFor();await page.waitForLoadState('networkidle');}
    }
    await page.goto(`${base}/game`);let f=page.frameLocator('#member-game-frame');await f.locator('#board .square').first().waitFor();assert.equal(await f.locator('#board .square').count(),64);await checkBoardLayout(f,'online');
-   await page.goto(`${base}/archive`);f=page.frameLocator('#archive-frame');await f.locator('.archive-card').first().click();await f.locator('#archive-detail').waitFor({state:'visible'});assert.equal(await f.locator('#board .square').count(),64);await checkBoardLayout(f,'archive');
+   await page.goto(`${base}/archive`);f=page.frameLocator('#archive-frame');await f.locator('.archive-card').first().click();await f.locator('#archive-detail').waitFor({state:'visible'});assert.equal(await f.locator('#board .square').count(),64);await checkBoardLayout(f,'archive');assert.equal(await f.locator('#black-name').textContent(),'Бот 1 уровень');assert.match(await f.locator('#archive-top-avatar').getAttribute('src'),/bP\.svg$/);
    await page.goto(`${base}/watch`);f=page.frameLocator('#watch-frame');await f.locator('[data-game-id=fixture]').click();await f.locator('#white-name').getByText('Alice').waitFor();await checkBoardLayout(f,'watch');assert.equal(await f.locator('#white-captured img').count(),1);assert.equal(await f.locator('#black-captured img').count(),1);await f.locator('#history-prev').click();assert.equal(await f.locator('[data-square=g1] .piece').count(),1);
-   await page.goto(`${base}/bot`);f=page.frameLocator('#bot-game-frame');await press(f.locator('#bot-play:not([disabled])'));await f.locator('#bot-app[data-phase=playing]').waitFor();await checkBoardLayout(f,'bot');await press(f.locator('[data-square=e2]'));await press(f.locator('[data-square=e4]'));await f.locator('[data-square=e5] .piece').waitFor();
+   await page.goto(`${base}/bot`);f=page.frameLocator('#bot-game-frame');await press(f.locator('#bot-play:not([disabled])'));await f.locator('#bot-app[data-phase=playing]').waitFor();await checkBoardLayout(f,'bot');assert.equal(await f.locator('#game-bot-name').textContent(),'Бот 1 уровень');assert.match(await f.locator('#game-bot-piece').getAttribute('src'),/bP\.svg$/);await press(f.locator('[data-square=e2]'));await press(f.locator('[data-square=e4]'));await f.locator('[data-square=e5] .piece').waitFor();
    await page.goto(`${base}/play`);await page.locator('#board .piece').first().waitFor();await checkBoardLayout(page,'guest');await press(page.locator('[data-square=e2]'));await press(page.locator('[data-square=e4]'));await page.locator('[data-square=e4] .piece').waitFor();
    if(errors.length) console.error('BROWSER_ERRORS_JSON',JSON.stringify(errors));
    assert.deepEqual(errors,[],`${name} ${viewport.width} browser errors`);

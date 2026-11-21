@@ -171,7 +171,7 @@ try {
   await p.goto(`${base}/bot`); const f=p.frameLocator('#bot-game-frame'); await f.locator('#bot-play:not([disabled])').waitFor();
   await f.locator('#bot-next').evaluate(button=>{button.click(); document.querySelector('#bot-play').click();});
   await f.locator('.fly-board').waitFor({timeout:10000}); await f.locator('#bot-app[data-phase=playing]').waitFor({timeout:12000});
-  assert.equal(await f.locator('#game-bot-name').textContent(),'2 уровень'); await p.close();
+  assert.equal(await f.locator('#game-bot-name').textContent(),'Бот 2 уровень'); await p.close();
  }
  // Restore a game older than a minute to check resignation and persistence.
  const page=await browser.newPage({viewport:{width:1440,height:900},reducedMotion:'reduce'});

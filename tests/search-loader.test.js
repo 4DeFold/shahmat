@@ -8,6 +8,7 @@ test('matchmaking loader reproduces a closed 64-square knight tour without a gri
  const loader=doc.querySelector('#search-loader');assert.ok(loader.hidden);assert.ok(loader.querySelector('canvas'));assert.equal(loader.querySelector('svg'),null);
  assert.equal(knightTour.length,65);assert.equal(knightTour[0],knightTour.at(-1));assert.equal(new Set(knightTour.slice(0,-1)).size,64);
  for(let i=1;i<knightTour.length;i++){const a=knightTour[i-1],b=knightTour[i];assert.deepEqual([Math.abs(a%8-b%8),Math.abs(Math.floor(a/8)-Math.floor(b/8))].sort(),[1,2]);}
+ const path=knightTour.slice(0,-1).map((_,i)=>tourPoint(i));assert.equal(Math.min(...path.map(p=>p.x)),.5);assert.equal(Math.max(...path.map(p=>p.x)),7.5);assert.equal(Math.min(...path.map(p=>p.y)),.5);assert.equal(Math.max(...path.map(p=>p.y)),7.5);
  assert.deepEqual(tourPoint(0),{x:.5,y:.5});assert.deepEqual(tourPoint(64),tourPoint(0));assert.deepEqual(tourPoint(-1),tourPoint(63));
 });
 

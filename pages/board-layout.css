@@ -1,19 +1,19 @@
 /* A player strip is measured from the actual board, not the viewport. */
 .board-wrap, .board-section { container-type:inline-size; }
 .board-wrap, .board-section {
-  --avatar-size:8.333333cqw;
-  --player-font:clamp(6px, 2.35cqw, 18px);
-  --capture-size:3.333333cqw;
+  --avatar-size:7.692308cqw;
+  --player-font:clamp(6px, 3cqw, 24px);
+  --capture-size:3.7cqw;
 }
 /* Desktop online/spectator wraps also contain a 124px clock and a 12px gap. */
 @media (min-width:701px) {
   #member-game .board-wrap, #watch-app .board-wrap {
-    --avatar-size:calc(8.333333cqw - 11.333333px);
-    --player-font:clamp(6px, calc(2.35cqw - 3.196px), 18px);
-    --capture-size:calc(3.333333cqw - 4.533333px);
-    width:min(100%, 816px, calc(85.714286dvh + 115.43px));
+    --avatar-size:calc(7.692308cqw - 10.461538px);
+    --player-font:clamp(6px, calc(3cqw - 4.08px), 24px);
+    --capture-size:calc(3.7cqw - 5.032px);
+    width:min(100%, 816px, calc(86.666667dvh + 115.2px));
   }
-  #bot-app .bot-board-wrap { width:min(100%, 680px, calc(85.714286dvh - 20.57px)); }
+  #bot-app .bot-board-wrap { width:min(100%, 680px, calc(86.666667dvh - 20.8px)); }
 }
 .board-section .player-row .avatar,
 .board-wrap .player-row .avatar,
@@ -35,25 +35,30 @@
   width:var(--capture-size); height:var(--capture-size); margin-right:calc(var(--capture-size) * -.3);
 }
 .board-section .captured-pieces span, .board-wrap .captured-pieces span { margin-left:calc(var(--capture-size) * .45); }
-/* Fit the square board and the two 1/12-high strips within the available height. */
-.archive-detail { width:min(100%, 680px, 85.714286cqh); }
+/* Fit the square board and the two 1/13-high strips within the available height. */
+.archive-detail { width:min(100%, 680px, 86.666667cqh); }
 @media (max-width:700px) {
   .board-wrap, #member-game .board-wrap, #bot-app .bot-board-wrap {
-    width:min(100%, 500px, 85.714286cqh);
+    width:min(100%, 500px, 86.666667cqh);
   }
   #member-game .board-wrap, #watch-app .board-wrap {
-    width:min(100%, 500px, 85.714286cqh, max(90px, calc(100cqh - 100px)));
+    width:min(100%, 500px, 86.666667cqh, max(90px, calc(100cqh - 100px)));
   }
-  .archive-detail { width:min(100%, 500px, 85.714286cqh); }
+  .archive-detail { width:min(100%, 500px, 86.666667cqh); }
 }
 /* The knight's path and its dot share a canvas covering the whole board. */
-.search-loader { padding:0; }
-.search-loader canvas { width:100%; }
+#member-game .search-loader { padding:0; }
+#member-game .search-loader canvas { width:100%; }
 
 /* Compact landscape embeds leave enough room for names beside the clocks. */
 @media (max-width:700px) and (max-height:500px) {
   #member-game .board-wrap, #watch-app .board-wrap {
-    width:min(100%, 500px, 85.714286cqh, max(90px, calc(100cqh - 68px)));
+    width:min(100%, 500px, 86.666667cqh, max(90px, calc(100cqh - 68px)));
   }
   #member-game .clock, #watch-app .clock { width:60px; }
 }
+
+/* Keep both rows close to the middle of the avatar instead of leaving a gap. */
+.board-section .player-info > :first-child, .board-wrap .player-info > :first-child { align-self:end; }
+.board-section .player-info .player-name-line, .board-wrap .player-info .player-name-line { align-items:end; }
+.board-section .captured-pieces, .board-wrap .captured-pieces { align-items:start; }

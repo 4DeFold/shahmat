@@ -163,7 +163,7 @@ document.addEventListener('visibilitychange',()=>{ if(document.hidden) stopOrbit
 function showLevel() {
   const bot=BOT_LEVELS[level];
   $('bot-name').textContent=bot.name; $('bot-completed').hidden=!completedLevels.has(level+1);
-  $('game-bot-piece').src=piece('b',bot.piece); $('game-bot-name').textContent=bot.name;
+  $('game-bot-piece').src=piece('b',bot.piece); $('game-bot-name').textContent=`Бот ${bot.name}`;
   $('bot-prev').disabled=level===0; $('bot-next').disabled=level===BOT_LEVELS.length-1;
 }
 function switchLevel(next) {
@@ -188,6 +188,8 @@ function projected() { return premove.length ? projectPremoves(chess,premove,pla
 function shownChess() { if(historyIndex===null)return projected();const p=new Chess();chess.history().slice(0,historyIndex).forEach(m=>p.move(m));return p; }
 function draw(move=null,transitions=[]) {
   const shown=shownChess(), isLive=historyIndex===null;
+  const botPiece=piece(playerColor()==='w'?'b':'w',BOT_LEVELS[level].piece);
+  if($('game-bot-piece').getAttribute('src')!==botPiece)$('game-bot-piece').src=botPiece;
   const legal=selected&&isLive?(chess.turn()===playerColor()&&!premove.length?chess.moves({square:selected,verbose:true}):premoveTargets(shown,selected,playerColor())).map(m=>m.to):[];
   const displayedLast=isLive?last:shown.history({verbose:true}).at(-1);
   boardView.render({shown,selected,legal,last:displayedLast,premoves:isLive?premove:[],actual:isLive&&premove.length?chess:null,premoveMode:chess.turn()!==playerColor()||premove.length>0,animatedMove:isLive?move:null,transitions});

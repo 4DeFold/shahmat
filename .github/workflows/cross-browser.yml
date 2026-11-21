@@ -28,9 +28,10 @@ jobs:
           RESPONSIVE_BASE_URL: http://127.0.0.1:4270
         run: |
           npm run dev -- --port 4270 > /tmp/vite.log 2>&1 &
-          for i in $(seq 1 30); do curl -fsS "$RESPONSIVE_BASE_URL" >/dev/null && break; sleep 1; done
+          npm run preview -- --port 4271 > /tmp/preview.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS "$RESPONSIVE_BASE_URL" >/dev/null && curl -fsS http://127.0.0.1:4271 >/dev/null && break; sleep 1; done
           set +e
-          npm run test:cross-browser > /tmp/browser-test.log 2>&1
+          RESPONSIVE_BASE_URL=http://127.0.0.1:4271 npm run test:cross-browser > /tmp/browser-test.log 2>&1
           result=$?
           cat /tmp/browser-test.log
           if [ "$result" -eq 0 ]; then
@@ -40,7 +41,7 @@ jobs:
             cp /tmp/particles-test.log /tmp/browser-test.log
           fi
           if [ "$result" -eq 0 ]; then
-            node scripts/search-loader-check.mjs > /tmp/loader-test.log 2>&1
+            RESPONSIVE_BASE_URL=http://127.0.0.1:4271 node scripts/search-loader-check.mjs > /tmp/loader-test.log 2>&1
             result=$?
             cat /tmp/loader-test.log
             cp /tmp/loader-test.log /tmp/browser-test.log
