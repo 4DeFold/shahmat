@@ -11,12 +11,16 @@ try {
  await page.goto(process.env.RESPONSIVE_BASE_URL||'http://127.0.0.1:4270');
  const result=await page.evaluate(async()=>{
   const {createHomeParticles}=await import('/pages/home-particles.js');
-  const host=document.createElement('div');Object.assign(host.style,{width:'500px',height:'300px',position:'relative'});host.style.setProperty('--foreground','#111');host.style.setProperty('--accent','#f00');host.style.setProperty('--board-dark','#777');document.body.append(host);
+  const host=document.createElement('div');Object.assign(host.style,{width:'500px',height:'300px',position:'fixed',top:'0',left:'0',zIndex:'9999'});host.style.setProperty('--foreground','#111');host.style.setProperty('--accent','#f00');host.style.setProperty('--board-dark','#777');document.body.append(host);
   const original=HTMLCanvasElement.prototype.getContext;
   HTMLCanvasElement.prototype.getContext=function(type,...args){if(type==='webgl'||type==='webgl2')return null;return original.call(this,type,...args);};
-  const fallback=createHomeParticles(host); await new Promise(r=>setTimeout(r,100));
+  const fallback=createHomeParticles(host);
   const canvas=host.querySelector('canvas'), ctx=canvas?.getContext('2d');
-  const alpha=ctx&&[...ctx.getImageData(0,0,canvas.width,canvas.height).data].some((value,index)=>index%4===3&&value>0);
+  let alpha=false;
+  for(let attempt=0;attempt<40&&!alpha;attempt++){
+   await new Promise(r=>setTimeout(r,100));
+   alpha=!!ctx&&[...ctx.getImageData(0,0,canvas.width,canvas.height).data].some((value,index)=>index%4===3&&value>0);
+  }
   const dimensions=[canvas?.width,canvas?.height];fallback.destroy();const removed=!host.querySelector('canvas');
   HTMLCanvasElement.prototype.getContext=original;
   const normal=createHomeParticles(host), old=host.querySelector('canvas');let contextLoss=null;
