@@ -627,3 +627,15 @@ test('own rating follows selected mode and ignores stale responses', async () =>
     assert.match(app.$('player-rating').textContent,/988/);
   } finally {app.close();}
 });
+
+test('configured friendly variation searches the correct separate pool and initial clock',async()=>{
+ const calls=[],app=setup(async body=>{calls.push(body);return body.action==='search'?{state:'searching'}:{game:null};});
+ try {
+  await app.ui.open(A);
+  assert.equal(app.ui.configureMatch({mode:'blitz',kind:'friendly',timeControl:'5+3'}),true);
+  assert.equal(app.$('player-clock').getAttribute('aria-label'),'05:00');
+  assert.match(app.$('mode-summary').textContent,/Товарищеская.*5\+3/);
+  app.$('start-search').click();await flush();
+  assert.deepEqual(calls.at(-1),{action:'search',mode:'blitz',gameKind:'friendly',timeControl:'5+3'});
+ } finally{app.close();}
+});
