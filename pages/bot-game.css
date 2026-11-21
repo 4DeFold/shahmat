@@ -90,3 +90,10 @@
   #bot-app .history-content { grid-template-rows:1fr!important; }
   #bot-app .history-controls { margin:0; }
 }
+.orbit-board { padding:0; border-radius:0; background:transparent; }
+@media(max-width:700px) {
+ #bot-app .bot-board-wrap { width:min(100%, max(90px,calc(100cqh - 76px))); }
+ #bot-app .bot-board-wrap .board-frame { width:100%; }
+ #bot-app .bot-board-wrap > .player-row { padding:0; }
+ #bot-app .bot-board-wrap .avatar { width:36px; height:36px; }
+}

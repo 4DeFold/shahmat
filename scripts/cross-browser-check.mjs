@@ -12,7 +12,7 @@ const id='12345678-1234-1234-1234-123456789012';
 const user={id,aud:'authenticated',role:'authenticated',user_metadata:{palette:'forest'}};
 const token=['e30',Buffer.from(JSON.stringify({sub:id,exp:Math.floor(Date.now()/1000)+3600,role:'authenticated'})).toString('base64url'),'x'].join('.');
 const session={access_token:token,token_type:'bearer',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,refresh_token:'mock',user};
-const game={id:'fixture',white_name:'Alice',black_name:'Bob',mode:'blitz',moves:['e4','e5','Nf3'],turn:'b',version:3,status:'active',white_ms:150000,black_ms:155000,white_yar:1100,black_yar:1200};
+const game={id:'fixture',white_name:'Alice',black_name:'Bob',mode:'blitz',moves:['e4','d5','exd5','Qxd5','Nf3'],turn:'b',version:5,status:'active',white_ms:150000,black_ms:155000,white_yar:1100,black_yar:1200};
 const board=new Chess();for(const move of game.moves)board.move(move);
 for(const name of requested){
  assert.ok(engines[name],`Unknown browser: ${name}`);
@@ -24,6 +24,22 @@ for(const name of requested){
    const touch=viewport.width<=700 && name!=='firefox';
    const context=await browser.newContext({viewport,hasTouch:touch,reducedMotion:'reduce'}),page=await context.newPage(),errors=[];
    const press=locator=>touch?locator.tap():locator.click();
+   async function checkBoardLayout(root,label){
+    const geometry=await root.locator('#board').evaluate(board=>{
+     const frame=board.closest('.board-frame'),wrap=frame.closest('.board-wrap, .board-section');
+     const rect=el=>{const r=el.getBoundingClientRect();return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height}};
+     const avatars=[...wrap.querySelectorAll('.player-row .avatar')];
+     const rows=[...wrap.querySelectorAll('.player-row')];return {board:rect(board),frame:rect(frame),avatars:avatars.map(rect),info:rows.map(row=>({name:rect(row.querySelector('.player-info > :first-child')), captures:rect(row.querySelector('.captured-pieces'))})),border:getComputedStyle(board).borderTopWidth,padding:getComputedStyle(frame).paddingTop,radius:avatars.map(a=>getComputedStyle(a).borderRadius)};
+    });
+    const {board,frame,avatars,info,border,padding,radius}=geometry;
+    assert.equal(border,'0px',`${name} ${label} border`);assert.equal(padding,'0px',`${name} ${label} frame padding`);
+    assert.equal(avatars.length,2,`${name} ${label} avatars`);
+    assert.ok(radius.every(r=>r==='0px'),`${name} ${label} avatar corners`);
+    info.forEach((part,i)=>{const middle=(avatars[i].top+avatars[i].bottom)/2;assert.ok(part.name.bottom<=middle+1&&part.captures.top>=middle-1,`${name} ${label} two-line layout ${JSON.stringify(geometry)}`);});
+    assert.ok(Math.abs(frame.width-board.width)<1,`${name} ${label} board fills frame`);
+    assert.ok(Math.abs(avatars[0].left-frame.left)<1&&Math.abs(avatars[1].left-frame.left)<1,`${name} ${label} aligned edges ${JSON.stringify(geometry)}`);
+    assert.ok(Math.abs(avatars[0].bottom-frame.top)<1&&Math.abs(avatars[1].top-frame.bottom)<1,`${name} ${label} flush avatars ${JSON.stringify(geometry)}`);
+   }
    page.on('pageerror',error=>errors.push({route:new URL(page.url()).pathname,message:error.message,stack:error.stack}));
    await page.addInitScript(session=>{
     localStorage.setItem('sb-eswyxbyddkajysogtglp-auth-token',JSON.stringify(session));
@@ -43,7 +59,7 @@ for(const name of requested){
     if(p.endsWith('/profile_piece_sets'))return route.fulfill({json:[{username:'Bob',piece_set:'chessnut'}]});
     if(p.endsWith('/my_archive_all'))return route.fulfill({json:[{id:'a',mode:'bot',level:1,my_color:'w',moves:['e4','e5'],result:'draw'}]});
     if(p.endsWith('/spectator_modes'))return route.fulfill({json:[{mode:'blitz',game_count:1}]});
-    if(p.endsWith('/spectator_games_sorted'))return route.fulfill({json:[{...game,fen:board.fen(),move_count:3}]});
+    if(p.endsWith('/spectator_games_sorted'))return route.fulfill({json:[{...game,fen:board.fen(),move_count:5}]});
     if(p.endsWith('/spectator_game'))return route.fulfill({json:game});
     if(p==='/rest/v1/profile_media'||p==='/rest/v1/profile_rewards')return route.fulfill({json:null});
     if(p==='/functions/v1/matchplay')return route.fulfill({json:{game:null}});
@@ -60,11 +76,11 @@ for(const name of requested){
     }
     if(route==='profile')await page.locator('#profile-display-name').getByText('Alice').waitFor();
    }
-   await page.goto(`${base}/game`);let f=page.frameLocator('#member-game-frame');await f.locator('#board .square').first().waitFor();assert.equal(await f.locator('#board .square').count(),64);
-   await page.goto(`${base}/archive`);f=page.frameLocator('#archive-frame');await f.locator('.archive-card').first().click();await f.locator('#archive-detail').waitFor({state:'visible'});assert.equal(await f.locator('#board .square').count(),64);
-   await page.goto(`${base}/watch`);f=page.frameLocator('#watch-frame');await f.locator('[data-game-id=fixture]').click();await f.locator('#white-name').getByText('Alice').waitFor();await f.locator('#history-prev').click();assert.equal(await f.locator('[data-square=g1] .piece').count(),1);
-   await page.goto(`${base}/bot`);f=page.frameLocator('#bot-game-frame');await press(f.locator('#bot-play:not([disabled])'));await f.locator('#bot-app[data-phase=playing]').waitFor();await press(f.locator('[data-square=e2]'));await press(f.locator('[data-square=e4]'));await f.locator('[data-square=e5] .piece').waitFor();
-   await page.goto(`${base}/play`);await page.locator('#board .piece').first().waitFor();await press(page.locator('[data-square=e2]'));await press(page.locator('[data-square=e4]'));await page.locator('[data-square=e4] .piece').waitFor();
+   await page.goto(`${base}/game`);let f=page.frameLocator('#member-game-frame');await f.locator('#board .square').first().waitFor();assert.equal(await f.locator('#board .square').count(),64);await checkBoardLayout(f,'online');
+   await page.goto(`${base}/archive`);f=page.frameLocator('#archive-frame');await f.locator('.archive-card').first().click();await f.locator('#archive-detail').waitFor({state:'visible'});assert.equal(await f.locator('#board .square').count(),64);await checkBoardLayout(f,'archive');
+   await page.goto(`${base}/watch`);f=page.frameLocator('#watch-frame');await f.locator('[data-game-id=fixture]').click();await f.locator('#white-name').getByText('Alice').waitFor();await checkBoardLayout(f,'watch');assert.equal(await f.locator('#white-captured img').count(),1);assert.equal(await f.locator('#black-captured img').count(),1);await f.locator('#history-prev').click();assert.equal(await f.locator('[data-square=g1] .piece').count(),1);
+   await page.goto(`${base}/bot`);f=page.frameLocator('#bot-game-frame');await press(f.locator('#bot-play:not([disabled])'));await f.locator('#bot-app[data-phase=playing]').waitFor();await checkBoardLayout(f,'bot');await press(f.locator('[data-square=e2]'));await press(f.locator('[data-square=e4]'));await f.locator('[data-square=e5] .piece').waitFor();
+   await page.goto(`${base}/play`);await page.locator('#board .piece').first().waitFor();await checkBoardLayout(page,'guest');await press(page.locator('[data-square=e2]'));await press(page.locator('[data-square=e4]'));await page.locator('[data-square=e4] .piece').waitFor();
    if(errors.length) console.error('BROWSER_ERRORS_JSON',JSON.stringify(errors));
    assert.deepEqual(errors,[],`${name} ${viewport.width} browser errors`);
    await context.close();
