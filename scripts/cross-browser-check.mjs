@@ -24,7 +24,7 @@ for(const name of requested){
    const touch=viewport.width<=700 && name!=='firefox';
    const context=await browser.newContext({viewport,hasTouch:touch,reducedMotion:'reduce'}),page=await context.newPage(),errors=[];
    const press=locator=>touch?locator.tap():locator.click();
-   page.on('pageerror',error=>errors.push(error.message));
+   page.on('pageerror',error=>errors.push({route:new URL(page.url()).pathname,message:error.message,stack:error.stack}));
    await page.addInitScript(session=>{
     localStorage.setItem('sb-eswyxbyddkajysogtglp-auth-token',JSON.stringify(session));
     Math.random=()=>.1;
