@@ -40,9 +40,7 @@ jobs:
             cp /tmp/particles-test.log /tmp/browser-test.log
           fi
           if [ "$result" -ne 0 ]; then
-            while IFS= read -r line; do
-              line=${line//'%'/'%25'}; line=${line//$'\r'/'%0D'}
-              echo "::error::$line"
-            done < <(tail -35 /tmp/browser-test.log)
+            details=$(tail -50 /tmp/browser-test.log | sed ':a;N;$!ba;s/%/%25/g;s/\r/%0D/g;s/\n/%0A/g')
+            echo "::error::$details"
           fi
           exit "$result"

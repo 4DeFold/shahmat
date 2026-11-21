@@ -65,6 +65,7 @@ for(const name of requested){
    await page.goto(`${base}/watch`);f=page.frameLocator('#watch-frame');await f.locator('[data-game-id=fixture]').click();await f.locator('#white-name').getByText('Alice').waitFor();await f.locator('#history-prev').click();assert.equal(await f.locator('[data-square=g1] .piece').count(),1);
    await page.goto(`${base}/bot`);f=page.frameLocator('#bot-game-frame');await press(f.locator('#bot-play:not([disabled])'));await f.locator('#bot-app[data-phase=playing]').waitFor();await press(f.locator('[data-square=e2]'));await press(f.locator('[data-square=e4]'));await f.locator('[data-square=e5] .piece').waitFor();
    await page.goto(`${base}/play`);await page.locator('#board .piece').first().waitFor();await press(page.locator('[data-square=e2]'));await press(page.locator('[data-square=e4]'));await page.locator('[data-square=e4] .piece').waitFor();
+   if(errors.length) console.error('BROWSER_ERRORS_JSON',JSON.stringify(errors));
    assert.deepEqual(errors,[],`${name} ${viewport.width} browser errors`);
    await context.close();
    console.log(`✓ ${name} ${viewport.width}×${viewport.height}: home, rating, profile, settings, help, online, archive, watch, bot and guest`);
