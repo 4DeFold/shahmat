@@ -8,9 +8,9 @@ import { createMemberGame, formatClock } from '../pages/member-game.js';
 const html = await readFile('pages/game.html', 'utf8');
 const A = 'a', B = 'b';
 const flush = () => new Promise(resolve => setTimeout(resolve, 10));
-function setup(api, now = () => 0) {
+function setup(api, now = () => 0, options = {}) {
   const dom = new JSDOM(html, { url: 'https://example.com/pages/game.html' });
-  const ui = createMemberGame({ document: dom.window.document, api, now });
+  const ui = createMemberGame({ document: dom.window.document, api, now, ...options });
   return { dom, ui, $: id => dom.window.document.getElementById(id), close() { ui.destroy(); dom.window.close(); } };
 }
 function game({ moves = [], turn = 'w', version = moves.length, status = 'active', result = null, reason = null } = {}) {
@@ -35,11 +35,13 @@ test('board opens at starting position, modes are explicit and a real request st
   assert.equal(app.$('player-clock').getAttribute('aria-label'), '00:00');
   assert.equal(app.$('opponent-clock').getAttribute('aria-label'), '00:00');
   assert.equal(app.$('board').querySelector('[data-square=e2] img').getAttribute('src'), '/pieces/cburnett/wP.svg');
-  assert.deepEqual([...app.$('mode-list').querySelectorAll('input')].map(input => input.value), ['blitz','rapid','classical']);
+  assert.deepEqual([...app.$('mode-list').querySelectorAll('input')].map(input => input.value), ['bullet','blitz','rapid','classical']);
   assert.equal(app.$('start-search').disabled, true); assert.equal(app.$('start-search').hidden, true);
   assert.equal(app.$('search-loader').hidden, true);
   await app.ui.open(A);
   assert.equal(app.$('player-color'), null);
+  const bullet = app.$('mode-list').querySelector('[value=bullet]'); bullet.checked = true; bullet.dispatchEvent(new app.dom.window.Event('change', { bubbles:true }));
+  assert.equal(app.$('player-clock').getAttribute('aria-label'), '01:00');
   const rapid = app.$('mode-list').querySelector('[value=rapid]'); rapid.checked = true; rapid.dispatchEvent(new app.dom.window.Event('change', { bubbles:true }));
   assert.equal(app.$('player-clock').getAttribute('aria-label'), '10:00'); assert.equal(app.$('start-search').disabled, false); assert.equal(app.$('start-search').hidden, false);
   app.$('start-search').click(); await flush();
@@ -604,4 +606,36 @@ test('newly matched and restored games start silently',async t=>{
  await app.ui.open(A);const blitz=app.$('mode-list').querySelector('[value=blitz]');blitz.checked=true;blitz.dispatchEvent(new app.dom.window.Event('change',{bubbles:true}));app.$('start-search').click();await flush();
  assert.equal(plays.length,0,'matching is silent');
  const restored=setup(async()=>({game:game()}));t.after(()=>restored.close());restored.dom.window.Audio=app.dom.window.Audio;await restored.ui.open(A);await flush();assert.equal(plays.length,0,'restoring a game is silent');
+});
+
+
+test('own rating follows selected mode and ignores stale responses', async () => {
+  let resolveBlitz;
+  const app=setup(async () => ({game:null}), () => 0, {ownRatingForMode: mode => {
+    if(mode==='blitz') return new Promise(resolve=>{resolveBlitz=resolve;});
+    return Promise.resolve({yar:mode==='rapid'?988:972,elo:1000});
+  }});
+  try {
+    await app.ui.open(A); await flush();
+    assert.match(app.$('player-rating').textContent,/972/);
+    for(const mode of ['blitz','rapid']) {
+      const input=app.$('mode-list').querySelector(`[value=${mode}]`); input.checked=true;
+      input.dispatchEvent(new app.dom.window.Event('change',{bubbles:true}));
+    }
+    await flush(); assert.match(app.$('player-rating').textContent,/988/);
+    resolveBlitz({yar:1200,elo:1000}); await flush();
+    assert.match(app.$('player-rating').textContent,/988/);
+  } finally {app.close();}
+});
+
+test('configured friendly variation searches the correct separate pool and initial clock',async()=>{
+ const calls=[],app=setup(async body=>{calls.push(body);return body.action==='search'?{state:'searching'}:{game:null};});
+ try {
+  await app.ui.open(A);
+  assert.equal(app.ui.configureMatch({mode:'blitz',kind:'friendly',timeControl:'5+3'}),true);
+  assert.equal(app.$('player-clock').getAttribute('aria-label'),'05:00');
+  assert.match(app.$('mode-summary').textContent,/Товарищеская.*5\+3/);
+  app.$('start-search').click();await flush();
+  assert.deepEqual(calls.at(-1),{action:'search',mode:'blitz',gameKind:'friendly',timeControl:'5+3'});
+ } finally{app.close();}
 });

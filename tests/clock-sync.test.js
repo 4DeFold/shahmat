@@ -14,3 +14,10 @@ test('network jitter slews a running clock without reversals or double-speed tic
   assert.equal(clock.value('w',3000),177000);
   assert.equal(clock.value('b',4000),179000);
 });
+test('Fischer increment is visible after a move but not on a finished game',()=>{
+ const clock=createClockSync();clock.update({...game,time_control:'3+2'},0);
+ clock.update({...game,version:1,turn:'b',time_control:'3+2',white_ms:181000},1000);
+ assert.equal(clock.value('w',1000),181000);
+ clock.update({...game,version:2,turn:'b',status:'finished',time_control:'3+2',black_ms:180000},2000);
+ assert.equal(clock.value('b',2000),179000);
+});

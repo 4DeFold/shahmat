@@ -1,0 +1,41 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {readFile,readdir} from 'node:fs/promises';
+import {PGlite} from '@electric-sql/pglite';
+const A='00000000-0000-4000-8000-000000000001',B='00000000-0000-4000-8000-000000000002',C='00000000-0000-4000-8000-000000000003';
+test('four categories, weighted calibration, control isolation, increment and bullet rating',async()=>{
+ const db=await PGlite.create(); try {
+ await db.exec("create role anon;create role authenticated;create role service_role;create schema auth;create table auth.users(id uuid primary key,raw_user_meta_data jsonb default '{}');create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;");
+ for(const f of (await readdir('supabase/migrations')).filter(f=>f.endsWith('.sql')).sort()) await db.exec(await readFile('supabase/migrations/'+f,'utf8'));
+ await db.query('insert into auth.users(id) values($1),($2),($3)',[A,B,C]);
+ await db.query("insert into profiles(id,username) values($1,'Alice'),($2,'Bobby'),($3,'Carol')",[A,B,C]);
+ const controls={bullet:['1','1+1','2','2+1'],blitz:['3','3+2','5','5+3'],rapid:['10','10+5','15','15+10'],classical:['30','30+20','60','60+40']};
+ for(const [mode,variants] of Object.entries(controls)) for(const control of variants) assert.ok(Number((await db.query('select online_control_ms($1,$2) n',[mode,control])).rows[0].n)>0);
+ assert.equal((await db.query("select online_control_ms('rapid','1') n")).rows[0].n,null);
+ assert.equal((await db.query('select rating_overall($1,false) n',[A])).rows[0].n,null);
+ await db.query("insert into yar_mode_ratings(user_id,mode,yar,games) values($1,'bullet',3000,20),($1,'blitz',1000,9)",[A]);
+ assert.equal(Number((await db.query('select rating_overall($1,false) n',[A])).rows[0].n),3000);
+ await db.query("update yar_mode_ratings set games=10 where user_id=$1 and mode='blitz'",[A]);
+ assert.equal(Number((await db.query('select rating_overall($1,false) n',[A])).rows[0].n),2273);
+ await db.query("update yar_mode_ratings set games=20 where user_id=$1 and mode='blitz'",[A]);
+ assert.equal(Number((await db.query('select rating_overall($1,false) n',[A])).rows[0].n),1933);
+ assert.equal((await db.query("select online_find($1,'bullet','1+1') r",[A])).rows[0].r.state,'searching');
+ assert.equal((await db.query("select online_find($1,'bullet') r",[B])).rows[0].r.state,'searching');
+ const found=(await db.query("select online_find($1,'bullet','1+1') r",[C])).rows[0].r;assert.equal(found.state,'matched');
+ const g=(await db.query('select * from online_games where id=$1',[found.game_id])).rows[0];assert.equal(g.time_control,'1+1');assert.equal(Number(g.white_ms),60000);
+ await db.query('select online_commit($1,$2,0,$3,$4,$5,null,null)',[A,g.id,'e4','rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1','b']);
+ const clock=(await db.query('select white_ms from online_games where id=$1',[g.id])).rows[0]; assert.ok(Number(clock.white_ms)>60000&&Number(clock.white_ms)<=61000);
+ await db.exec(`select set_config('request.jwt.claim.sub','${A}',false);set role authenticated`);
+ const players=(await db.query('select * from rank_game_players($1)',[g.id])).rows;
+ assert.equal(Number(players.find(x=>x.player==='self').yar),3000);assert.equal(players.find(x=>x.player==='opponent').yar,null);
+ assert.equal(Number((await db.query("select * from rank_my_position('overall')")).rows[0].yar),1933);
+ assert.equal((await db.query("select profile_public('Alice') p")).rows[0].p.ratings.overall,1933);
+ await db.exec('reset role');
+ await db.query("update online_games set status='finished',result='white_win',finished_at=clock_timestamp() where id=$1",[g.id]);
+ assert.equal((await db.query("select count(*)::int n from yar_history where game_id=$1 and mode='bullet'",[g.id])).rows[0].n,2);
+ await db.exec('set role authenticated');
+ assert.equal((await db.query('select my_archive_stats() s')).rows[0].s.bullet,1);
+ const archive=(await db.query('select * from my_archive_ratings($1::uuid[])',[[g.id]])).rows[0]; assert.equal(Number(archive.white_yar),3000); assert.equal(Number(archive.black_yar),1000);
+ await db.exec('reset role');
+ } finally {await db.close()}
+});

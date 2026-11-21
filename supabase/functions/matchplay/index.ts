@@ -7,7 +7,7 @@ const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers
 const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 const idPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const squarePattern = /^[a-h][1-8]$/;
-const modes = new Set(['blitz', 'rapid', 'classical']);
+const modes = new Set(['bullet', 'blitz', 'rapid', 'classical']);
 
 Deno.serve(async request => {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
@@ -39,7 +39,12 @@ Deno.serve(async request => {
     }
     if (body.action === 'search') {
       if (!modes.has(body.mode)) return reply({ error: 'Выберите режим.' }, 400);
-      const result = await rpc('online_find', { p_user: user, p_mode: body.mode });
+      if (body.timeControl != null && (typeof body.timeControl !== 'string' || !/^(1|2|3|5|10|15|30|60)(\+(0|1|2|3|5|10|20|40))?$/.test(body.timeControl))) return reply({ error: 'Неверный контроль времени.' }, 400);
+      if (body.gameKind != null && !['rated','friendly'].includes(body.gameKind)) return reply({ error: 'Неверный тип партии.' }, 400);
+      const defaults: Record<string,string> = {bullet:'1',blitz:'3',rapid:'10',classical:'60'};
+      const result = body.gameKind != null
+        ? await rpc('online_find_kind', {p_user:user,p_mode:body.mode,p_control:body.timeControl ?? defaults[body.mode],p_kind:body.gameKind})
+        : await rpc('online_find', { p_user: user, p_mode: body.mode, ...(body.timeControl != null ? { p_control: body.timeControl } : {}) });
       return reply(result.state === 'matched' ? { state: 'matched', game: await rpc('online_match_snapshot', { p_user: user, p_game: result.game_id }) } : { state: 'searching' });
     }
     if (!idPattern.test(body.gameId || '')) return reply({ error: 'Неверная партия.' }, 400);

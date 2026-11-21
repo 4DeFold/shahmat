@@ -46,6 +46,12 @@ jobs:
             cat /tmp/loader-test.log
             cp /tmp/loader-test.log /tmp/browser-test.log
           fi
+          if [ "$result" -eq 0 ]; then
+            RESPONSIVE_BASE_URL=http://127.0.0.1:4271 node scripts/play-lobby-motion-check.mjs > /tmp/lobby-motion.log 2>&1
+            result=$?
+            cat /tmp/lobby-motion.log
+            cp /tmp/lobby-motion.log /tmp/browser-test.log
+          fi
           if [ "$result" -ne 0 ]; then
             details=$(tail -50 /tmp/browser-test.log | sed ':a;N;$!ba;s/%/%25/g;s/\r/%0D/g;s/\n/%0A/g')
             echo "::error::$details"

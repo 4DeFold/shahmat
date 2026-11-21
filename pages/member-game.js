@@ -11,9 +11,10 @@ import { createSearchLoader } from './search-loader.js';
 import { createRollingClock } from './rolling-clock.js';
 import { retryMessage } from './match-api.js';
 import { createClockSync } from './clock-sync.js';
+import { createRatingCount } from './rating-count.js';
 
-const times = { blitz: 180000, rapid: 600000, classical: 3600000 };
-const modeLabels = { blitz:'Блиц · 3 мин', rapid:'Рапид · 10 мин', classical:'Классика · 1 час' };
+const times = { bullet: 60000, blitz: 180000, rapid: 600000, classical: 3600000 };
+const modeLabels = { bullet:'Пуля · 1 мин', blitz:'Блиц · 3 мин', rapid:'Рапид · 10 мин', classical:'Классика · 1 час' };
 const names = { k:'король', q:'ферзь', r:'ладья', b:'слон', n:'конь', p:'пешка' };
 const files = 'abcdefgh';
 const pieceSrc = (color, type) => themedPieceSrc(color,type);
@@ -24,21 +25,31 @@ export function formatClock(ms) {
   return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-export function createMemberGame({ document, api, opponentName = async () => null, playerRatings = async () => null, onGameChanged = () => {}, now = () => performance.now() }) {
+export function createMemberGame({ document, api, opponentName = async () => null, playerRatings = async () => null, ownRatingForMode = async () => null, onGameChanged = () => {}, onGameSnapshot = () => {}, onGameReset = () => {}, now = () => performance.now() }) {
   const $ = id => document.getElementById(id), win = document.defaultView;
   const board = $('board'), start = $('start-search'), cancel = $('cancel-search'), reset = $('new-game');
   const promotion = $('promotion'), options = $('promotion-options');
-  let userId = null, ready = false, chess = new Chess(), latestMove = null, mode = null, phase = 'idle', selected = null, pending = null;
+  let userId = null, ready = false, chess = new Chess(), latestMove = null, mode = null, selection = null, phase = 'idle', selected = null, pending = null;
   let snapshot = null, receivedAt = 0, polling = null, generation = 0, moving = false, pendingSearch = null, viewVisible = true, browserVisible = true, pollFailures = 0;
   let currentRequest = null, destroyed = false, reconciling = false, cancelPending = false;
   let threatKeys = new Set();
   let premove = [], historyIndex = null, nameForGame = null, nameTimer = null, drag = null, suppressClick = false, actionPending = false;
   let rankUnit = 'yar', ownScore = null, scores = null, ratingsKey = null, ratingsRequest = 0, ratingsRetryAt = 0;
-  const format = value => value == null || !Number.isFinite(Number(value)) ? '' : `(${new Intl.NumberFormat('ru-RU', { maximumFractionDigits:0 }).format(Number(value))} ${rankUnit === 'elo' ? 'Эло' : 'ЯР'})`;
+  let ownRatingRequest = 0;
+  const ratingCounts = Object.fromEntries(['player','opponent'].map(who => [who, createRatingCount($(who+'-rating'), win)]));
+  async function refreshOwnRating() {
+    if (!userId) return;
+    const request = ++ownRatingRequest, requestedMode = mode, id = userId;
+    try {
+      const value = await ownRatingForMode(requestedMode);
+      if (destroyed || request !== ownRatingRequest || userId !== id || mode !== requestedMode || snapshot) return;
+      if (value) { ownScore = value; renderRatings(); }
+    } catch { /* Keep the last known value on a temporary failure. */ }
+  }
   function setAvatar(who, value, set) { const img = $(`${who}-avatar-image`); if(!img)return; const custom=typeof value==='string' && /^data:image\/(?:png|jpeg);base64,/.test(value); if(who==='opponent')setPublicPiece(img,set,'b');else {delete img.dataset.pieceFixed;img.src=themedPieceSrc('w','n');}if(custom)img.src=value; img.classList.toggle('custom-profile-avatar',custom); }
   function renderRatings() {
     for (const who of ['player','opponent']) {
-      const data=who === 'player' ? (scores?.self || ownScore) : scores?.opponent; const rating = $(who + '-rating'); if (rating) rating.textContent = format(data?.[rankUnit]); const badge=$(who+'-top-status'); if(badge){const place=Number(data?.topPlace);badge.hidden=!(place>=1&&place<=5);badge.textContent=badge.hidden?'':`Топ ${place}`;} const img=$(who+'-avatar-image');if(img)img.parentElement.style.backgroundColor=profileAvatarColor(data?.palette);
+      const data=who === 'player' ? (scores?.self || ownScore) : scores?.opponent; ratingCounts[who].set(data?.[rankUnit], rankUnit, !!data); const badge=$(who+'-top-status'); if(badge){const place=Number(data?.topPlace);badge.hidden=!(place>=1&&place<=5);badge.textContent=badge.hidden?'':`Топ ${place}`;} const img=$(who+'-avatar-image');if(img)img.parentElement.style.backgroundColor=profileAvatarColor(data?.palette);
     }
   }
   function loadRatings(game) {
@@ -74,8 +85,9 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     const picker = $('mode-picker');
     picker.classList.toggle('is-collapsed', locked);
     picker.inert = locked; picker.setAttribute('aria-hidden', String(locked));
-    $('mode-summary').hidden = !locked || !mode;
-    $('mode-summary').textContent = modeLabels[mode] || '';
+    $('mode-summary').hidden = !mode || (!locked && !selection);
+    $('mode-summary').textContent = selection ? `${selection.kind === 'friendly' ? 'Товарищеская' : 'Ранговая'} · ${modeLabels[mode]?.split(' · ')[0] || ''} · ${selection.timeControl}` : (modeLabels[mode] || '');
+    if ($('change-selection')) $('change-selection').hidden = locked || !selection;
     $('resign-control').hidden = !canResign();
     $('offline-choice').hidden = phase !== 'active' || snapshot?.opponent_offline !== true;
     for (const id of ['resign-button','resign-confirm','offline-win','offline-draw']) $(id).disabled = actionPending || moving;
@@ -88,7 +100,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   function currentColor() { return snapshot?.black_id === userId ? 'b' : 'w'; }
   function drawClocks() {
     const own = currentColor();
-    const time = color => snapshot ? clockSync.value(color, now()) : mode ? times[mode] : null;
+    const time = color => snapshot ? clockSync.value(color, now()) : selection ? Number(selection.timeControl.split('+')[0])*60000 : mode ? times[mode] : null;
     const other = own === 'w' ? 'b' : 'w';
     for (const [id, color] of [['player', own], ['opponent', other]]) {
       const card = $(`${id}-clock-card`), remaining = time(color);
@@ -193,7 +205,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     if (!game || !Array.isArray(game.moves) || (snapshot && snapshot.id === game.id && game.version < snapshot.version)) return;
     onGameChanged(game.status==='active'&&isVisible()?game.id:null);
     if (snapshot && snapshot.id === game.id && game.version === snapshot.version && game.status === snapshot.status && !moving) {
-      snapshot = game; receivedAt = now(); clockSync.update(game, receivedAt); loadRatings(game); modeControls(); drawClocks(); playQueuedPremove(); return;
+      snapshot = game; receivedAt = now(); clockSync.update(game, receivedAt); onGameSnapshot(game); loadRatings(game); modeControls(); drawClocks(); playQueuedPremove(); return;
     }
     const previous = snapshot, localMoves = chess.history(), selectedPiece = selected ? chess.get(selected) : null;
     const sameGame = previous?.id === game.id;
@@ -217,6 +229,8 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     if (historyIndex !== null && historyIndex >= game.moves.length) historyIndex = game.moves.length ? null : 0;
     if (!alreadyDisplayed) { cancelDrag(); const piece = selected && next.get(selected); if (!sameGame || !selectedPiece || !piece || piece.color !== currentColor() || piece.type !== selectedPiece.type || piece.color !== selectedPiece.color) selected = null; pending = null; promotion.hidden = true; }
     phase = game.status === 'active' ? 'active' : 'finished'; mode = game.mode;
+    if(game.time_control) selection = {kind:game.game_kind || 'rated',timeControl:game.time_control.includes('+') ? game.time_control : game.time_control+'+0'};
+    onGameSnapshot(game);
     const clearedPremove = phase === 'finished' && premove.length > 0;
     if (phase === 'finished') premove = [];
     const input = $('mode-list').querySelector(`input[value="${mode}"]`); if (input) input.checked = true;
@@ -232,7 +246,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     if (expected !== generation || !userId || !isVisible() || !['searching','active'].includes(phase)) return;
     try {
       const searching = phase === 'searching';
-      const request = api(searching ? { action:'search', mode } : { action:'snapshot', gameId:snapshot.id });
+      const request = api(searching ? { action:'search', mode, ...(selection ? {timeControl:selection.timeControl,gameKind:selection.kind} : {}) } : { action:'snapshot', gameId:snapshot.id });
       if (searching) pendingSearch = request;
       let response;
       try { response = await request; } finally { if (pendingSearch === request) pendingSearch = null; }
@@ -458,9 +472,9 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   $('resign-confirm').addEventListener('click', () => void finishAction('resign'));
   $('offline-win').addEventListener('click', () => void finishAction('offline_win'));
   $('offline-draw').addEventListener('click', () => void finishAction('offline_draw'));
-  $('mode-list').addEventListener('change', event => { if (phase === 'idle' && times[event.target.value]) { mode = event.target.value; modeControls(); drawClocks(); if (ready) setStatus('Всё готово к поиску.'); } });
+  $('mode-list').addEventListener('change', event => { if (phase === 'idle' && times[event.target.value]) { mode = event.target.value; void refreshOwnRating(); modeControls(); drawClocks(); if (ready) setStatus('Всё готово к поиску.'); } });
   start.addEventListener('click', () => void search()); cancel.addEventListener('click', () => void cancelSearch());
-  reset.addEventListener('click', () => { annotations.clear(); onGameChanged(null); cancelTimer(); generation++; snapshot = null; scores = null; ratingsKey = null; ratingsRetryAt = 0; ratingsRequest++; renderRatings(); clockSync.clear(); chess = new Chess(); latestMove = null; phase = 'idle'; mode = null; $('mode-list').querySelectorAll('input').forEach(input => { input.checked = false; }); premove = []; historyIndex = null; nameForGame = null; profileTrigger.disabled = true; profilePinned = false; showProfile(false); clearInterval(nameTimer); $('opponent-name').textContent = 'Соперник'; setAvatar('opponent',null); modeControls(); renderBoard(); renderHistory(); drawClocks(); setStatus(''); });
+  reset.addEventListener('click', () => { annotations.clear(); onGameChanged(null); cancelTimer(); generation++; snapshot = null; scores = null; ratingsKey = null; ratingsRetryAt = 0; ratingsRequest++; renderRatings(); clockSync.clear(); chess = new Chess(); latestMove = null; phase = 'idle'; mode = null; selection = null; onGameReset(); void refreshOwnRating(); $('mode-list').querySelectorAll('input').forEach(input => { input.checked = false; }); premove = []; historyIndex = null; nameForGame = null; profileTrigger.disabled = true; profilePinned = false; showProfile(false); clearInterval(nameTimer); $('opponent-name').textContent = 'Соперник'; setAvatar('opponent',null); modeControls(); renderBoard(); renderHistory(); drawClocks(); setStatus(''); });
   function pause() { cancelDrag(); if (moving) reconciling = true; if (phase === 'searching') void cancelSearch(); else if (phase !== 'cancelling') { generation++; cancelTimer(); } }
   function resume() {
     if (!userId || destroyed) return;
@@ -505,6 +519,12 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   if (win.parent === win) revealPieces();
   return {
     navigateHistory, setThreat, clearThreats,
+    configureMatch(value) {
+      if (phase !== 'idle' || !times[value?.mode] || !['rated','friendly'].includes(value.kind) || !/^\d+\+\d+$/.test(value.timeControl)) return false;
+      mode = value.mode; selection = {kind:value.kind,timeControl:value.timeControl};
+      const input = $('mode-list').querySelector(`input[value="${mode}"]`); if(input) input.checked=true;
+      void refreshOwnRating(); modeControls(); drawClocks(); if(ready) setStatus('Всё готово к поиску.'); return true;
+    },
     setOwnRating(value) { ownScore = value; renderRatings(); },
     setRatingUnit(value) { rankUnit = value === 'elo' ? 'elo' : 'yar'; renderRatings(); },
     setPlayerAvatar(value) { setAvatar('player',value); },
@@ -512,12 +532,13 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     async open(id) {
       if (userId === id || destroyed) return;
       userId = id; modeControls();
+      void refreshOwnRating();
       await checkCurrent();
     },
     online() { if (isVisible()) resume(); },
     hide() { clearThreats(); onGameChanged(null); const wasVisible = isVisible(); viewVisible = false; if (wasVisible) pause(); },
     show() { if(snapshot?.status==='active'&&browserVisible)onGameChanged(snapshot.id); const wasVisible = isVisible(); const wasShown = viewVisible; viewVisible = true; if (!wasShown) revealPieces(); if (!wasVisible && isVisible()) resume(); },
     browserVisibility(value) { if(!value)onGameChanged(null);else if(viewVisible&&snapshot?.status==='active')onGameChanged(snapshot.id); const wasVisible = isVisible(); browserVisible = value; if (wasVisible && !isVisible()) pause(); else if (!wasVisible && isVisible()) resume(); },
-    destroy() { destroyed = true; onGameChanged(null); document.removeEventListener('keydown',onThreatDown); document.removeEventListener('keyup',onThreatUp); win.removeEventListener('blur',clearThreats); document.removeEventListener('keydown', onPremoveKey); document.removeEventListener('keydown', onHistoryKey); annotations.destroy(); generation++; cancelDrag(); cancelTimer(); clearInterval(clockInterval); clearInterval(nameTimer); revealAnimations.forEach(animation => animation.cancel()); Object.values(clocks).forEach(clock => clock.destroy()); searchLoader.destroy(); profileLoader.destroy(); sound.destroy(); },
+    destroy() { destroyed = true; ownRatingRequest++; Object.values(ratingCounts).forEach(count => count.destroy()); onGameChanged(null); document.removeEventListener('keydown',onThreatDown); document.removeEventListener('keyup',onThreatUp); win.removeEventListener('blur',clearThreats); document.removeEventListener('keydown', onPremoveKey); document.removeEventListener('keydown', onHistoryKey); annotations.destroy(); generation++; cancelDrag(); cancelTimer(); clearInterval(clockInterval); clearInterval(nameTimer); revealAnimations.forEach(animation => animation.cancel()); Object.values(clocks).forEach(clock => clock.destroy()); searchLoader.destroy(); profileLoader.destroy(); sound.destroy(); },
   };
 }

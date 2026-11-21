@@ -8,10 +8,17 @@
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/pages/play.css">
   <link rel="stylesheet" href="/pages/game.css">
-  <link rel="stylesheet" href="/pages/board-layout.css"><script type="module" src="/pages/game.js"></script>
+  <link rel="stylesheet" href="/pages/board-layout.css"><link rel="stylesheet" href="/pages/play-lobby.css"><script type="module" src="/pages/game.js"></script>
 </head>
 <body>
-  <main class="member-shell" id="member-game">
+  <main class="member-shell lobby-open" id="member-game">
+    <section class="play-lobby" id="play-lobby" aria-label="Выбор партии">
+      <div class="lobby-content">
+        <div class="lobby-stage" id="lobby-stage"></div>
+        <button class="lobby-back" id="lobby-back" type="button" hidden>← Назад</button>
+      </div>
+
+    </section>
     <section class="board-area" aria-label="Шахматная доска">
       <div class="board-wrap">
         <div class="player-row opponent-row"><button type="button" class="opponent-trigger" id="opponent-profile-trigger" aria-expanded="false" aria-controls="opponent-profile-card" disabled><span class="avatar bot-avatar"><img id="opponent-avatar-image" src="/pieces/cburnett/bN.svg" alt=""></span><span class="player-info"><span class="player-name-line"><strong id="opponent-name">Соперник</strong><span class="player-rating" id="opponent-rating"></span><span id="opponent-top-status" class="player-top-status" hidden></span></span><span id="opponent-captured" class="captured-pieces" aria-label="Взятые фигуры"></span></span></button><div class="opponent-profile-card" id="opponent-profile-card" hidden><div class="opponent-card-banner"><img id="opponent-profile-banner" alt="" hidden></div><img id="opponent-profile-avatar" class="opponent-card-avatar" src="/pieces/cburnett/bN.svg" alt=""><strong id="opponent-profile-name">Соперник</strong><span class="bio-label" id="opponent-profile-bio-label" hidden>Био</span><p id="opponent-profile-bio" hidden></p><div id="opponent-profile-loading" class="opponent-profile-loading" role="status" aria-label="Загрузка" hidden><span class="particle-loading" hidden aria-hidden="true"><canvas></canvas></span></div></div></div>
@@ -28,11 +35,12 @@
       <div class="rail-content">
         <div class="mode-picker" id="mode-picker"><div class="mode-picker-inner"><p class="rail-label" id="mode-label" hidden></p>
         <fieldset class="mode-list" id="mode-list"><legend class="visually-hidden">Режим партии</legend>
+          <label class="mode-option"><input type="radio" name="mode" value="bullet"><span><strong>Пуля</strong><small>1 минута</small></span></label>
           <label class="mode-option"><input type="radio" name="mode" value="blitz"><span><strong>Блиц</strong><small>3 минуты</small></span></label>
           <label class="mode-option"><input type="radio" name="mode" value="rapid"><span><strong>Рапид</strong><small>10 минут</small></span></label>
           <label class="mode-option"><input type="radio" name="mode" value="classical"><span><strong>Классика</strong><small>1 час</small></span></label>
         </fieldset></div></div>
-        <div class="mode-summary" id="mode-summary" hidden></div>
+        <div class="mode-summary" id="mode-summary" hidden></div><button class="lobby-change" id="change-selection" type="button" hidden>← Изменить выбор</button>
         <button class="new-game" id="start-search" type="button" hidden disabled>Начать <span>↗</span></button>
         <button class="cancel-search" id="cancel-search" type="button" hidden>Отменить поиск</button>
         <button class="cancel-search" id="new-game" type="button" hidden>Новая партия</button>

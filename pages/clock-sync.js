@@ -20,9 +20,11 @@ export function createClockSync() {
         values[game.turn] = previous[game.turn];
         drift = Math.max(-10000, Math.min(10000, (game.turn === 'w' ? w : b) - values[game.turn]));
       } else if (same && state.status === 'active') {
-        // No time control here has increment: latency cannot add time to the
-        // side that was running just before the turn or result changed.
-        values[state.turn] = Math.min(values[state.turn], previous[state.turn]);
+        // A completed move may add its Fischer increment, but latency must not
+        // create more time than the control allows. A finish adds nothing.
+        const increment = game.status === 'active' && game.turn !== state.turn
+          ? Math.max(0, Number(String(game.time_control || '').split('+')[1]) || 0) * 1000 : 0;
+        values[state.turn] = Math.min(values[state.turn], previous[state.turn] + increment);
       }
       state = {id:game.id, version:game.version, status:game.status, turn:game.turn, at, ...values, drift};
     },
