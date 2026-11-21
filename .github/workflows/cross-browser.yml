@@ -29,5 +29,20 @@ jobs:
         run: |
           npm run dev -- --port 4270 > /tmp/vite.log 2>&1 &
           for i in $(seq 1 30); do curl -fsS "$RESPONSIVE_BASE_URL" >/dev/null && break; sleep 1; done
-          npm run test:cross-browser
-          npm run test:particles-compat
+          set +e
+          npm run test:cross-browser > /tmp/browser-test.log 2>&1
+          result=$?
+          cat /tmp/browser-test.log
+          if [ "$result" -eq 0 ]; then
+            npm run test:particles-compat > /tmp/particles-test.log 2>&1
+            result=$?
+            cat /tmp/particles-test.log
+            cp /tmp/particles-test.log /tmp/browser-test.log
+          fi
+          if [ "$result" -ne 0 ]; then
+            while IFS= read -r line; do
+              line=${line//'%'/'%25'}; line=${line//$'\r'/'%0D'}
+              echo "::error::$line"
+            done < <(tail -35 /tmp/browser-test.log)
+          fi
+          exit "$result"
