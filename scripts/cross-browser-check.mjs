@@ -51,20 +51,22 @@ for(const name of requested){
    },session);
    await page.route('https://eswyxbyddkajysogtglp.supabase.co/**',route=>{
     const p=new URL(route.request().url()).pathname, method=route.request().method();
-    if(p==='/auth/v1/user')return route.fulfill({json:user});
-    if(p==='/rest/v1/profiles')return route.fulfill({json:{username:'Alice',bio:'Hello',palette:'forest'}});
-    if(p.endsWith('/profile_public'))return route.fulfill({json:{username:route.request().postDataJSON().p_name,bio:'Hello',palette:'forest',theme:'light',ratings:{overall:1100},games:{bot:1}}});
-    if(p.endsWith('/rank_leaderboard'))return route.fulfill({json:[{username:'Alice',yar:1100,elo:1000},{username:'Bob',yar:1000,elo:1000}]});
-    if(p.endsWith('/rank_my_position'))return route.fulfill({json:[{username:'Alice',yar:1100,elo:1000,place:1}]});
-    if(p.endsWith('/profile_piece_sets'))return route.fulfill({json:[{username:'Bob',piece_set:'chessnut'}]});
-    if(p.endsWith('/my_archive_all'))return route.fulfill({json:[{id:'a',mode:'bot',level:1,my_color:'w',moves:['e4','e5'],result:'draw'}]});
-    if(p.endsWith('/spectator_modes'))return route.fulfill({json:[{mode:'blitz',game_count:1}]});
-    if(p.endsWith('/spectator_games_sorted'))return route.fulfill({json:[{...game,fen:board.fen(),move_count:5}]});
-    if(p.endsWith('/spectator_game'))return route.fulfill({json:game});
-    if(p==='/rest/v1/profile_media'||p==='/rest/v1/profile_rewards')return route.fulfill({json:null});
-    if(p==='/functions/v1/matchplay')return route.fulfill({json:{game:null}});
-    if(method!=='GET' && p==='/rest/v1/bot_games')return route.fulfill({status:201,json:null});
-    return route.fulfill({json:[]});
+    const fulfill=options=>route.fulfill({...options,headers:{'access-control-allow-origin':'*','access-control-allow-headers':'*','access-control-allow-methods':'GET,POST,PATCH,DELETE,OPTIONS',...options.headers}});
+    if(method==='OPTIONS')return fulfill({status:204,body:''});
+    if(p==='/auth/v1/user')return fulfill({json:user});
+    if(p==='/rest/v1/profiles')return fulfill({json:{username:'Alice',bio:'Hello',palette:'forest'}});
+    if(p.endsWith('/profile_public'))return fulfill({json:{username:route.request().postDataJSON().p_name,bio:'Hello',palette:'forest',theme:'light',ratings:{overall:1100},games:{bot:1}}});
+    if(p.endsWith('/rank_leaderboard'))return fulfill({json:[{username:'Alice',yar:1100,elo:1000},{username:'Bob',yar:1000,elo:1000}]});
+    if(p.endsWith('/rank_my_position'))return fulfill({json:[{username:'Alice',yar:1100,elo:1000,place:1}]});
+    if(p.endsWith('/profile_piece_sets'))return fulfill({json:[{username:'Bob',piece_set:'chessnut'}]});
+    if(p.endsWith('/my_archive_all'))return fulfill({json:[{id:'a',mode:'bot',level:1,my_color:'w',moves:['e4','e5'],result:'draw'}]});
+    if(p.endsWith('/spectator_modes'))return fulfill({json:[{mode:'blitz',game_count:1}]});
+    if(p.endsWith('/spectator_games_sorted'))return fulfill({json:[{...game,fen:board.fen(),move_count:5}]});
+    if(p.endsWith('/spectator_game'))return fulfill({json:game});
+    if(p==='/rest/v1/profile_media'||p==='/rest/v1/profile_rewards')return fulfill({json:null});
+    if(p==='/functions/v1/matchplay')return fulfill({json:{game:null}});
+    if(method!=='GET' && p==='/rest/v1/bot_games')return fulfill({status:201,json:null});
+    return fulfill({json:[]});
    });
    await page.goto(`${base}/home`);await page.locator('#dashboard-home').waitFor({state:'visible'});
    for(const route of ['rating','profile','settings','help']){
