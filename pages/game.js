@@ -9,13 +9,16 @@ import { startOnlinePresence, createOnlineCounter } from './online-presence.js';
 import { startMatchHeartbeat } from './match-heartbeat.js';
 import { startSpectatorPresence } from './spectator-presence.js';
 import { createMatchApi } from './match-api.js';
+import { createMatchSignal } from './match-signal.js';
 import { ownModeRating } from './own-mode-rating.js';
 import {createPlayLobby} from './play-lobby.js';
 
 const supabase = createClient('https://eswyxbyddkajysogtglp.supabase.co', 'sb_publishable_w9pinHWr8XK5F9CflsSJmQ_4KFMKzHS');
 let watchingGame=null,stopSpectators=null,lobby=null;
 function updateSpectators(id){if(id===watchingGame)return;stopSpectators?.();stopSpectators=null;watchingGame=id;if(!id)return;stopSpectators=startSpectatorPresence(supabase,id,{onCount:count=>{const el=document.getElementById('spectator-count');const show=Number.isInteger(count)&&count>0;el.classList.toggle('is-visible',show);el.setAttribute('aria-hidden',String(!show));if(show){document.getElementById('spectator-value').textContent=String(count);el.setAttribute('aria-label',`Зрителей: ${count}`);}}});}
-const ui = createMemberGame({ document, onGameChanged:updateSpectators, onGameSnapshot:()=>lobby?.openBoard(), onGameReset:()=>lobby?.show('kinds'), ownRatingForMode: mode => ownModeRating(supabase, mode), opponentName: async gameId => {
+const signal = createMatchSignal(supabase, (id,version)=>ui.notifyUpdate(id,version));
+const changeGame = id => { updateSpectators(id); signal.setGame(id); };
+const ui = createMemberGame({ document, onGameChanged:changeGame, onMoveCommitted:(id,version)=>signal.publish(id,version), onGameSnapshot:()=>lobby?.openBoard(), onGameReset:selection=>selection?lobby?.showControls(selection):lobby?.show('kinds'), ownRatingForMode: mode => ownModeRating(supabase, mode), opponentName: async gameId => {
   const { data, error } = await supabase.functions.invoke('matchplay', { body: { action:'opponent', gameId }, timeout: 8000 });
   if(error||!data?.username) return error ? null : data;
   try { const {data: profile, error: profileError}=await supabase.rpc('profile_public',{p_name:data.username}); return !profileError && profile && typeof profile.username === 'string' && profile.username ? profile : data; } catch { return data; }
@@ -24,9 +27,9 @@ const ui = createMemberGame({ document, onGameChanged:updateSpectators, onGameSn
   if(error||!Array.isArray(data)) return null;
   try { const names=data.map(row=>row.username).filter(Boolean); const [images,themes,ranking,sets]=await Promise.all([supabase.rpc('profile_avatars',{p_names:names}),supabase.rpc('profile_avatar_themes',{p_names:names}),supabase.rpc('rank_leaderboard',{p_mode:'overall'}),supabase.rpc('profile_piece_sets',{p_names:names})]); const byName=new Map((Array.isArray(images.data)?images.data:[]).map(row=>[row.username,row.avatar]));const palettes=new Map((Array.isArray(themes.data)?themes.data:[]).map(row=>[row.username,row.palette]));const pieceSets=new Map((Array.isArray(sets.data)?sets.data:[]).map(row=>[row.username,row.piece_set]));const places=new Map((Array.isArray(ranking.data)?ranking.data:[]).slice(0,5).map((row,i)=>[row.username,i+1])); return data.map(row=>({...row,avatar:byName.get(row.username)||null,piece_set:pieceSets.get(row.username),palette:palettes.get(row.username),topPlace:places.get(row.username)})); }
   catch { return data; }
-}, api: createMatchApi(supabase) });
+}, gameRatingChanges: async gameId => { const {data,error}=await supabase.rpc('rank_game_result',{p_game:gameId}); if(error)throw error; return data; }, api: createMatchApi(supabase) });
 lobby=createPlayLobby({document,client:supabase,onChoose:value=>ui.configureMatch(value)});
-document.getElementById('change-selection').addEventListener('click',()=>lobby.show('controls'));
+document.getElementById('change-selection').addEventListener('click',()=>lobby.show('controls',{fromBoard:true}));
 const ownProfileCard=createProfileCard(document.getElementById('member-game'),supabase,name=>{if(window.parent!==window)window.parent.postMessage({type:'shahmat-open-profile',username:name},window.location.origin);else location.href=`/profile?player=${encodeURIComponent(name)}`;});
 const updateOnline = createOnlineCounter(document);
 let stopOnline = null, stopHeartbeat = null;

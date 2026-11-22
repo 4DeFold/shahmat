@@ -27,14 +27,13 @@ The landing page is `/`, with PLAY opening the standalone guest demo at `/play`
 and «Войти» opening `/login`. The dashboard «Играть» link opens a separate
 `/game` page inside the persistent dashboard, with the existing sidebar and
 profile controls. The board appears immediately; Supabase Auth is checked in the
-background. The member screen offers match search for blitz (3 minutes), rapid
-(10 minutes) and classical (1 hour), per player, without an
-increment. Search pairs distinct authenticated users with the same control.
-The Supabase `matchplay` Edge Function validates legal moves with chess.js;
-transactional SQL serializes matching and updates clocks using server time.
-An active match resumes on return. Online games are rated, and the
-previously requested automatic bot fallback is not implemented: search waits for
-another player. The guest demo remains an independent local bot game; its move
+background. The member screen offers rated and friendly matchmaking for bullet,
+blitz, rapid and classical, with four time controls per category. Search pairs
+distinct authenticated users in the same kind/category/control. The Supabase
+`matchplay` Edge Function validates legal moves with chess.js; transactional SQL
+serializes matching and updates clocks using server time. Friendly games do not
+affect ratings. An active match resumes on return; there is no automatic bot
+fallback. The guest demo remains an independent local bot game; its move
 history is saved in browser localStorage and clearing browser data removes it.
 In the guest demo, “Новая партия” opens registration. If the game has ended,
 the first click also starts a one-hour countdown; the completed game is preserved
@@ -58,6 +57,34 @@ To test production routing and lazy loading using mock Supabase responses:
 terminal `npm run test:routes` (set `RESPONSIVE_BASE_URL` if needed).
 `npm run test:game` and `npm run test:game-appearance` check guest play, themes,
 piece images, movement animations and reduced-motion behavior in the browser.
+
+## Online move delivery and clocks
+
+A player's own move is drawn optimistically. The arbiter still verifies legality,
+turn, game version and time and performs the sole atomic database commit. After
+confirmation, the client sends a best-effort Supabase Realtime broadcast with
+only the game version. It is an **untrusted wake-up hint**, not peer-to-peer
+proof of a move: the receiving player immediately fetches an authenticated
+server snapshot, rate-limited and coalesced. No position, clock, result or player
+identity is accepted from the hint. Ordinary polling remains a fallback for lost
+messages, reconnects, older clients and disabled WebSockets. Duplicate submits
+are protected by the server's game version/transaction; the opponent does not
+write the move a second time.
+
+Displayed clocks advance using a monotonic client clock. A pending local move
+switches the displayed turn immediately, then reconciles to the server. The
+client estimates response transit time at half RTT (capped at two seconds),
+smooths same-turn jitter, and resynchronizes after a hidden tab or connection
+failure. This is only a display estimate; server time decides flags, increments
+and results. Network delay, server processing and asymmetric routes still matter;
+this is not a measured tournament-grade latency compensation system.
+
+The Vercel branch preview currently shares the production Supabase database,
+matchmaking and ratings. Use **friendly** games and two test accounts when
+trying it; a rated preview game can pair with a production player and affect
+production ratings. Realtime is an optimization, not a security boundary. The
+existing project and Edge Function are unchanged by this client-only rollout.
+Automated two-client tests use mocked services, not a real live game.
 
 ## Database foundations
 
@@ -84,8 +111,11 @@ key to browser code. No game data is populated by this migration.
 The game migration is tracked locally with the same version as the applied
 Supabase migration. The older `create_profiles` migration predates this workflow:
 its local filename is `20261113140000`, while the existing remote migration
-history records it as `20261113151708`. Reconcile that historical mismatch before
-using a CLI command that automatically applies migrations to an existing project.
+history records it as `20261113151708`. Several later migrations also have
+different remote timestamps; notably `game_rating_result` is recorded remotely as
+`20261122043747`, while its local timestamp keeps it after the lobby schema.
+Reconcile migration histories before using a CLI command that automatically
+applies migrations to an existing project.
 
 ## Email verification and password recovery
 

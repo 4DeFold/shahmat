@@ -276,8 +276,9 @@ test('finished games retain the mode and offer a new game without resignation', 
   assert.equal(app.$('mode-summary').textContent, 'Блиц · 3 мин');
   assert.equal(app.$('resign-control').hidden, true);
   assert.equal(app.$('new-game').hidden, false);
-  app.$('new-game').click();
-  assert.equal(app.$('mode-picker').classList.contains('is-collapsed'), false); assert.equal(app.$('mode-summary').hidden, true);
+  assert.equal(app.$('other-mode').hidden, false);
+  app.$('other-mode').click();
+  assert.equal(app.$('mode-picker').classList.contains('is-collapsed'), false); assert.equal(app.$('mode-summary').hidden, false);
 });
 
 
@@ -638,4 +639,91 @@ test('configured friendly variation searches the correct separate pool and initi
   app.$('start-search').click();await flush();
   assert.deepEqual(calls.at(-1),{action:'search',mode:'blitz',gameKind:'friendly',timeControl:'5+3'});
  } finally{app.close();}
+});
+
+test('clock switches immediately on an optimistic move and reconciles to the server',async t=>{
+ let now=0,resolveMove;
+ const initial={...game(),time_control:'3+2'},app=setup(async body=>{
+  if(body.action==='move')return new Promise(resolve=>{resolveMove=resolve});
+  return {game:initial};
+ },()=>now);t.after(()=>app.close());await app.ui.open(A);await flush();
+ now=1000;const click=s=>app.$('board').querySelector(`[data-square="${s}"]`).click();click('e2');click('e4');
+ assert.equal(app.$('opponent-clock-card').classList.contains('running'),true);
+ assert.equal(app.$('player-clock').getAttribute('aria-label'),'03:01');
+ now=3000;resolveMove({game:{...game({moves:['e4'],turn:'b'}),time_control:'3+2',white_ms:180700,black_ms:178000}});await flush();
+ assert.equal(app.$('player-clock').getAttribute('aria-label'),'03:01');
+ assert.equal(app.$('opponent-clock').getAttribute('aria-label'),'02:58');
+});
+
+test('untrusted realtime hints only trigger throttled authoritative snapshots',async t=>{
+ let now=1000, current=game(), snapshots=0,hold=null;
+ const app=setup(async body=>{if(body.action==='snapshot'){snapshots++;if(hold)return hold;return {game:current}}return {game:current}},()=>now);t.after(()=>app.close());
+ await app.ui.open(B);await flush();const before=snapshots;
+ current=game({moves:['e4'],turn:'b'});app.ui.notifyUpdate('other',1);app.ui.notifyUpdate('game','1');app.ui.notifyUpdate('game',0);
+ assert.equal(snapshots,before);
+ app.ui.notifyUpdate('game',1);await flush();assert.ok(app.$('board').querySelector('[data-square=e4] img'));assert.equal(snapshots,before+1);
+ // A forged hint is just a read: it cannot install a fake position or result.
+ app.ui.notifyUpdate('game',9);await flush();assert.equal(snapshots,before+1);
+ now+=501;let release;hold=new Promise(r=>{release=r});app.ui.notifyUpdate('game',9);app.ui.notifyUpdate('game',10);assert.equal(snapshots,before+2);
+ release({game:current});await flush();assert.ok(app.$('board').querySelector('[data-square=e4] img'));assert.match(app.$('status').textContent,/Ваш ход/);
+});
+
+test('two clients exchange a confirmed wake-up and fetch the authoritative move without waiting for polling',async t=>{
+ const {createMatchSignal}=await import('../pages/match-signal.js');
+ const channels=[];
+ const client={channel(topic){const c={topic,on(_type,_filter,fn){this.receive=fn;return this},subscribe(fn){fn('SUBSCRIBED');return this},send(message){for(const other of channels)if(other!==this&&other.topic===topic)other.receive({payload:message.payload});return Promise.resolve('ok')}};channels.push(c);return c},removeChannel(c){const i=channels.indexOf(c);if(i>=0)channels.splice(i,1)}};
+ let server=game(),blackReads=0;
+ const api=side=>async body=>{
+  if(body.action==='move'){server=game({moves:['e4'],turn:'b'});return {game:server};}
+  if(body.action==='snapshot'&&side===B)blackReads++;
+  return {game:server};
+ };
+ let white,black;
+ const whiteSignal=createMatchSignal(client,(id,version)=>white.ui.notifyUpdate(id,version));
+ const blackSignal=createMatchSignal(client,(id,version)=>black.ui.notifyUpdate(id,version));
+ white=setup(api(A),()=>performance.now(),{onGameChanged:id=>whiteSignal.setGame(id),onMoveCommitted:(id,v)=>whiteSignal.publish(id,v)});
+ black=setup(api(B),()=>performance.now(),{onGameChanged:id=>blackSignal.setGame(id),onMoveCommitted:(id,v)=>blackSignal.publish(id,v)});
+ t.after(()=>{white.close();black.close();whiteSignal.destroy();blackSignal.destroy()});
+ await white.ui.open(A);await black.ui.open(B);await flush();const before=blackReads;
+ const click=s=>white.$('board').querySelector(`[data-square="${s}"]`).click();click('e2');click('e4');await flush();
+ assert.equal(blackReads,before+1);assert.ok(black.$('board').querySelector('[data-square=e4] img'));
+ assert.match(black.$('status').textContent,/Ваш ход/);
+});
+
+test('lost move reply reconciles and emits a hint only after a confirmed commit',async t=>{
+ let committed=game(),published=[];
+ const app=setup(async body=>{
+  if(body.action==='move'){committed=game({moves:['e4'],turn:'b'});throw Error('lost reply')}
+  return {game:committed};
+ },()=>performance.now(),{onMoveCommitted:(id,version)=>published.push([id,version])});t.after(()=>app.close());
+ await app.ui.open(A);await flush();const click=s=>app.$('board').querySelector(`[data-square="${s}"]`).click();click('e2');click('e4');await flush();
+ assert.deepEqual(published,[['game',1]]);assert.ok(app.$('board').querySelector('[data-square=e4] img'));
+});
+
+test('finished rated game shows recorded signed ЯР changes for both players',async t=>{
+ const finished={...game({moves:['e4','e5'],turn:'w',status:'finished',result:'white_win'}),game_kind:'rated',time_control:'3+2'};
+ const app=setup(async()=>({game:finished}),()=>0,{playerRatings:async()=>[{player:'self',yar:900},{player:'opponent',yar:1200}],gameRatingChanges:async()=>[
+  {player:'self',before_yar:1000,after_yar:1020,before_elo:1400,after_elo:1410},
+  {player:'opponent',before_yar:1100,after_yar:1080,before_elo:1450,after_elo:1440}
+ ]});t.after(()=>app.close());await app.ui.open(A);await flush();
+ assert.equal(app.$('player-rating-delta').textContent,'+20 ЯР');assert.equal(app.$('opponent-rating-delta').textContent,'−20 ЯР');
+ assert.ok(app.$('player-rating-delta').classList.contains('positive'));assert.ok(app.$('opponent-rating-delta').classList.contains('negative'));
+ assert.match(app.$('player-rating').textContent,/1\s*020 ЯР/);assert.match(app.$('opponent-rating').textContent,/1\s*080 ЯР/);
+ app.ui.setRatingUnit('elo');assert.match(app.$('player-rating').textContent,/1\s*410 Эло/);
+});
+
+test('friendly games and unrecorded rated results never invent a rating change',async t=>{
+ let calls=0;const friendly={...game({status:'finished',result:'draw'}),game_kind:'friendly'};
+ const app=setup(async()=>({game:friendly}),()=>0,{gameRatingChanges:async()=>{calls++;return []}});t.after(()=>app.close());await app.ui.open(A);await flush();
+ assert.equal(calls,0);assert.equal(app.$('player-rating-delta').hidden,true);assert.equal(app.$('opponent-rating-delta').hidden,true);
+});
+
+test('new game searches immediately in the same pool and other mode returns the selection',async t=>{
+ const finished={...game({status:'finished',result:'draw'}),game_kind:'friendly',time_control:'10+5',mode:'rapid'};
+ const calls=[],app=setup(async body=>{calls.push(body);return body.action==='search'?{state:'searching'}:{game:finished}},()=>0);t.after(()=>app.close());
+ await app.ui.open(A);await flush();assert.equal(app.$('new-game').hidden,false);assert.equal(app.$('other-mode').hidden,false);
+ app.$('new-game').click();await flush();assert.deepEqual(calls.find(c=>c.action==='search'),{action:'search',mode:'rapid',timeControl:'10+5',gameKind:'friendly'});
+ assert.equal(app.$('new-game').hidden,true);assert.equal(app.$('other-mode').hidden,true);
+ let chosen=null;const other=setup(async()=>({game:finished}),()=>0,{onGameReset:value=>{chosen=value}});t.after(()=>other.close());
+ await other.ui.open(A);await flush();other.$('other-mode').click();assert.deepEqual(chosen,{mode:'rapid',kind:'friendly',timeControl:'10+5'});
 });

@@ -14,3 +14,9 @@ test('match requests preserve HTTP status and do not expose server details', asy
   assert.match(retryMessage({status:503}, 'network'), /сервис/);
   assert.equal(retryMessage({}, 'network'), 'network');
 });
+
+test('snapshot clock gets a bounded estimate of request transit time',async()=>{
+ let time=100;
+ const api=createMatchApi({functions:{invoke:async()=>{time=500;return {data:{game:{white_ms:60000}},error:null}}}},()=>time);
+ assert.equal((await api({action:'snapshot'})).game._clock_age_ms,200);
+});
