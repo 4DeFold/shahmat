@@ -1,6 +1,7 @@
 // Keep HTTP failures distinct from transport failures without exposing server details.
-export function createMatchApi(client) {
+export function createMatchApi(client, now = () => performance.now()) {
   return async body => {
+    const started = now();
     const { data, error } = await client.functions.invoke('matchplay', { body, timeout:12000 });
     if (error || data?.error) {
       const failure = new Error('Matchplay request failed');
@@ -8,6 +9,7 @@ export function createMatchApi(client) {
       if (Number.isInteger(status)) failure.status = status;
       throw failure;
     }
+    if (data?.game) data.game = {...data.game, _clock_age_ms:Math.max(0, (now() - started) / 2)};
     return data;
   };
 }

@@ -639,3 +639,62 @@ test('configured friendly variation searches the correct separate pool and initi
   assert.deepEqual(calls.at(-1),{action:'search',mode:'blitz',gameKind:'friendly',timeControl:'5+3'});
  } finally{app.close();}
 });
+
+test('clock switches immediately on an optimistic move and reconciles to the server',async t=>{
+ let now=0,resolveMove;
+ const initial={...game(),time_control:'3+2'},app=setup(async body=>{
+  if(body.action==='move')return new Promise(resolve=>{resolveMove=resolve});
+  return {game:initial};
+ },()=>now);t.after(()=>app.close());await app.ui.open(A);await flush();
+ now=1000;const click=s=>app.$('board').querySelector(`[data-square="${s}"]`).click();click('e2');click('e4');
+ assert.equal(app.$('opponent-clock-card').classList.contains('running'),true);
+ assert.equal(app.$('player-clock').getAttribute('aria-label'),'03:01');
+ now=3000;resolveMove({game:{...game({moves:['e4'],turn:'b'}),time_control:'3+2',white_ms:180700,black_ms:178000}});await flush();
+ assert.equal(app.$('player-clock').getAttribute('aria-label'),'03:01');
+ assert.equal(app.$('opponent-clock').getAttribute('aria-label'),'02:58');
+});
+
+test('untrusted realtime hints only trigger throttled authoritative snapshots',async t=>{
+ let now=1000, current=game(), snapshots=0,hold=null;
+ const app=setup(async body=>{if(body.action==='snapshot'){snapshots++;if(hold)return hold;return {game:current}}return {game:current}},()=>now);t.after(()=>app.close());
+ await app.ui.open(B);await flush();const before=snapshots;
+ current=game({moves:['e4'],turn:'b'});app.ui.notifyUpdate('other',1);app.ui.notifyUpdate('game','1');app.ui.notifyUpdate('game',0);
+ assert.equal(snapshots,before);
+ app.ui.notifyUpdate('game',1);await flush();assert.ok(app.$('board').querySelector('[data-square=e4] img'));assert.equal(snapshots,before+1);
+ // A forged hint is just a read: it cannot install a fake position or result.
+ app.ui.notifyUpdate('game',9);await flush();assert.equal(snapshots,before+1);
+ now+=501;let release;hold=new Promise(r=>{release=r});app.ui.notifyUpdate('game',9);app.ui.notifyUpdate('game',10);assert.equal(snapshots,before+2);
+ release({game:current});await flush();assert.ok(app.$('board').querySelector('[data-square=e4] img'));assert.match(app.$('status').textContent,/Ваш ход/);
+});
+
+test('two clients exchange a confirmed wake-up and fetch the authoritative move without waiting for polling',async t=>{
+ const {createMatchSignal}=await import('../pages/match-signal.js');
+ const channels=[];
+ const client={channel(topic){const c={topic,on(_type,_filter,fn){this.receive=fn;return this},subscribe(fn){fn('SUBSCRIBED');return this},send(message){for(const other of channels)if(other!==this&&other.topic===topic)other.receive({payload:message.payload});return Promise.resolve('ok')}};channels.push(c);return c},removeChannel(c){const i=channels.indexOf(c);if(i>=0)channels.splice(i,1)}};
+ let server=game(),blackReads=0;
+ const api=side=>async body=>{
+  if(body.action==='move'){server=game({moves:['e4'],turn:'b'});return {game:server};}
+  if(body.action==='snapshot'&&side===B)blackReads++;
+  return {game:server};
+ };
+ let white,black;
+ const whiteSignal=createMatchSignal(client,(id,version)=>white.ui.notifyUpdate(id,version));
+ const blackSignal=createMatchSignal(client,(id,version)=>black.ui.notifyUpdate(id,version));
+ white=setup(api(A),()=>performance.now(),{onGameChanged:id=>whiteSignal.setGame(id),onMoveCommitted:(id,v)=>whiteSignal.publish(id,v)});
+ black=setup(api(B),()=>performance.now(),{onGameChanged:id=>blackSignal.setGame(id),onMoveCommitted:(id,v)=>blackSignal.publish(id,v)});
+ t.after(()=>{white.close();black.close();whiteSignal.destroy();blackSignal.destroy()});
+ await white.ui.open(A);await black.ui.open(B);await flush();const before=blackReads;
+ const click=s=>white.$('board').querySelector(`[data-square="${s}"]`).click();click('e2');click('e4');await flush();
+ assert.equal(blackReads,before+1);assert.ok(black.$('board').querySelector('[data-square=e4] img'));
+ assert.match(black.$('status').textContent,/Ваш ход/);
+});
+
+test('lost move reply reconciles and emits a hint only after a confirmed commit',async t=>{
+ let committed=game(),published=[];
+ const app=setup(async body=>{
+  if(body.action==='move'){committed=game({moves:['e4'],turn:'b'});throw Error('lost reply')}
+  return {game:committed};
+ },()=>performance.now(),{onMoveCommitted:(id,version)=>published.push([id,version])});t.after(()=>app.close());
+ await app.ui.open(A);await flush();const click=s=>app.$('board').querySelector(`[data-square="${s}"]`).click();click('e2');click('e4');await flush();
+ assert.deepEqual(published,[['game',1]]);assert.ok(app.$('board').querySelector('[data-square=e4] img'));
+});

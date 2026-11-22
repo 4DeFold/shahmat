@@ -25,13 +25,13 @@ export function formatClock(ms) {
   return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-export function createMemberGame({ document, api, opponentName = async () => null, playerRatings = async () => null, ownRatingForMode = async () => null, onGameChanged = () => {}, onGameSnapshot = () => {}, onGameReset = () => {}, now = () => performance.now() }) {
+export function createMemberGame({ document, api, opponentName = async () => null, playerRatings = async () => null, ownRatingForMode = async () => null, onGameChanged = () => {}, onMoveCommitted = () => {}, onGameSnapshot = () => {}, onGameReset = () => {}, now = () => performance.now() }) {
   const $ = id => document.getElementById(id), win = document.defaultView;
   const board = $('board'), start = $('start-search'), cancel = $('cancel-search'), reset = $('new-game');
   const promotion = $('promotion'), options = $('promotion-options');
   let userId = null, ready = false, chess = new Chess(), latestMove = null, mode = null, selection = null, phase = 'idle', selected = null, pending = null;
   let snapshot = null, receivedAt = 0, polling = null, generation = 0, moving = false, pendingSearch = null, viewVisible = true, browserVisible = true, pollFailures = 0;
-  let currentRequest = null, destroyed = false, reconciling = false, cancelPending = false;
+  let currentRequest = null, destroyed = false, reconciling = false, cancelPending = false, hintInFlight = false, lastHintAt = -Infinity;
   let threatKeys = new Set();
   let premove = [], historyIndex = null, nameForGame = null, nameTimer = null, drag = null, suppressClick = false, actionPending = false;
   let rankUnit = 'yar', ownScore = null, scores = null, ratingsKey = null, ratingsRequest = 0, ratingsRetryAt = 0;
@@ -106,8 +106,8 @@ export function createMemberGame({ document, api, opponentName = async () => nul
       const card = $(`${id}-clock-card`), remaining = time(color);
       const background = snapshot ? color : 'neutral';
       if (card.dataset.color !== background) card.dataset.color = background;
-      card.classList.toggle('running', snapshot?.status === 'active' && snapshot.turn === color);
-      card.classList.toggle('low', remaining != null && remaining <= 30000 && snapshot?.status === 'active' && snapshot.turn === color);
+      card.classList.toggle('running', snapshot?.status === 'active' && clockSync.turn() === color);
+      card.classList.toggle('low', remaining != null && remaining <= 30000 && snapshot?.status === 'active' && clockSync.turn() === color);
       clocks[id].update(formatClock(remaining));
     }
     for (const [id, text] of [['player', `Вы · ${own === 'w' ? 'Белые' : 'Чёрные'}`], ['opponent', `Соперник · ${other === 'w' ? 'Белые' : 'Чёрные'}`]]) {
@@ -209,7 +209,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     }
     const previous = snapshot, localMoves = chess.history(), selectedPiece = selected ? chess.get(selected) : null;
     const sameGame = previous?.id === game.id;
-    if (!sameGame) { historyIndex = null; premove = []; annotations.clear(); setAvatar('opponent',null); ratingsKey = null; ratingsRetryAt = 0; ratingsRequest++; scores = null; renderRatings(); }
+    if (!sameGame) { lastHintAt = -Infinity; historyIndex = null; premove = []; annotations.clear(); setAvatar('opponent',null); ratingsKey = null; ratingsRetryAt = 0; ratingsRequest++; scores = null; renderRatings(); }
     const alreadyDisplayed = sameGame && localMoves.length === game.moves.length && localMoves.every((move, i) => move === game.moves[i]);
     let next = chess, nextLast = latestMove;
     if (!alreadyDisplayed) {
@@ -252,10 +252,11 @@ export function createMemberGame({ document, api, opponentName = async () => nul
       try { response = await request; } finally { if (pendingSearch === request) pendingSearch = null; }
       if (expected !== generation) return;
       if (searching ? !response?.game && response?.state !== 'searching' : !response?.game) throw Error('missing game state');
-      if (response.game && (!Array.isArray(response.game.moves) || (!searching && (response.game.id !== snapshot.id || response.game.version < snapshot.version)))) throw Error('invalid game state');
+      if (response.game && (!Array.isArray(response.game.moves) || (!searching && response.game.id !== snapshot.id))) throw Error('invalid game state');
       const recovering = pollFailures > 0 || reconciling;
       pollFailures = 0;
       if (response.game && !moving) {
+        if (recovering) clockSync.resync();
         reconciling = false; applyGame(response.game);
         if (recovering && historyIndex === null && !premove.length && !moving) statusGame();
       }
@@ -303,11 +304,14 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     // Invalidate any old snapshot request before it can overwrite the optimistic move.
     cancelTimer(); const moveGeneration = ++generation;
     moving = true; modeControls(); selected = null; pending = null; promotion.hidden = true; latestMove = move;
+    const increment = Math.max(0, Number(String(saved.time_control || '').split('+')[1]) || 0) * 1000;
+    clockSync.beginMove(now(), increment); drawClocks();
     renderBoard(animate ? move : null); renderHistory(); playSound(move); setStatus('Отправляем ход…');
     try {
       const result = await api({ action:'move', gameId:saved.id, version:saved.version, from, to, ...(piece ? { promotion:piece } : {}) });
       if (!result.game) throw Error('missing snapshot');
       if (moveGeneration !== generation) return;
+      if (result.game.moves?.[priorMoves.length] === move.san && result.game.version > saved.version) onMoveCommitted(saved.id, result.game.version);
       applyGame(result.game);
       if (result.game.moves?.[priorMoves.length] !== move.san) { premove=[]; renderBoard(); setStatus('Ход не принят сервером. Позиция обновлена.', true); }
     } catch {
@@ -318,10 +322,11 @@ export function createMemberGame({ document, api, opponentName = async () => nul
         const result = await api({ action:'snapshot', gameId:saved.id });
         if (moveGeneration !== generation) return;
         if (!result.game) throw Error('missing snapshot');
+        if (result.game.moves?.[priorMoves.length] === move.san && result.game.version > saved.version) onMoveCommitted(saved.id, result.game.version);
         applyGame(result.game);
       } catch {
         if (moveGeneration !== generation) return;
-        reconciling = true; chess = new Chess(); priorMoves.forEach(m => chess.move(m)); latestMove = savedLast;
+        clockSync.cancelMove(); drawClocks(); reconciling = true; chess = new Chess(); priorMoves.forEach(m => chess.move(m)); latestMove = savedLast;
         premove = []; selected = null; renderBoard(); renderHistory();
         setStatus('Позиция не подтверждена. Проверяем игровой сервис…', true);
       }
@@ -460,6 +465,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
       const response = await api({ action, gameId });
       if (!response.game) throw new Error('missing snapshot');
       if (snapshot?.id !== gameId) return;
+      if (response.game.version > (snapshot?.version ?? -1)) onMoveCommitted(gameId, response.game.version);
       applyGame(response.game);
       if (response.game.status === 'active') setStatus(action === 'resign' ? 'Не удалось подтвердить сдачу.' : 'Соперник вернулся или отключение ещё не подтверждено.', true);
     } catch {
@@ -475,7 +481,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   $('mode-list').addEventListener('change', event => { if (phase === 'idle' && times[event.target.value]) { mode = event.target.value; void refreshOwnRating(); modeControls(); drawClocks(); if (ready) setStatus('Всё готово к поиску.'); } });
   start.addEventListener('click', () => void search()); cancel.addEventListener('click', () => void cancelSearch());
   reset.addEventListener('click', () => { annotations.clear(); onGameChanged(null); cancelTimer(); generation++; snapshot = null; scores = null; ratingsKey = null; ratingsRetryAt = 0; ratingsRequest++; renderRatings(); clockSync.clear(); chess = new Chess(); latestMove = null; phase = 'idle'; mode = null; selection = null; onGameReset(); void refreshOwnRating(); $('mode-list').querySelectorAll('input').forEach(input => { input.checked = false; }); premove = []; historyIndex = null; nameForGame = null; profileTrigger.disabled = true; profilePinned = false; showProfile(false); clearInterval(nameTimer); $('opponent-name').textContent = 'Соперник'; setAvatar('opponent',null); modeControls(); renderBoard(); renderHistory(); drawClocks(); setStatus(''); });
-  function pause() { cancelDrag(); if (moving) reconciling = true; if (phase === 'searching') void cancelSearch(); else if (phase !== 'cancelling') { generation++; cancelTimer(); } }
+  function pause() { clockSync.resync(); cancelDrag(); if (moving) reconciling = true; if (phase === 'searching') void cancelSearch(); else if (phase !== 'cancelling') { generation++; cancelTimer(); } }
   function resume() {
     if (!userId || destroyed) return;
     if (!ready) { cancelTimer(); void checkCurrent(); return; }
@@ -534,6 +540,16 @@ export function createMemberGame({ document, api, opponentName = async () => nul
       userId = id; modeControls();
       void refreshOwnRating();
       await checkCurrent();
+    },
+    // Realtime hints contain no trusted game state: use a bounded, authenticated
+    // snapshot request and keep regular polling as the loss/reconnect fallback.
+    notifyUpdate(gameId, version) {
+      if (destroyed || !isVisible() || phase !== 'active' || moving || actionPending || hintInFlight || snapshot?.id !== gameId || !Number.isSafeInteger(version) || version <= snapshot.version || now()-lastHintAt < 500) return;
+      lastHintAt = now(); hintInFlight = true;
+      void (async()=>{try {
+        const response = await api({action:'snapshot',gameId});
+        if (!destroyed && isVisible() && !moving && !actionPending && snapshot?.id === gameId && response?.game?.id === gameId && response.game.version >= snapshot.version) applyGame(response.game);
+      } catch { /* Polling will retry. */ } finally { hintInFlight = false; }})();
     },
     online() { if (isVisible()) resume(); },
     hide() { clearThreats(); onGameChanged(null); const wasVisible = isVisible(); viewVisible = false; if (wasVisible) pause(); },

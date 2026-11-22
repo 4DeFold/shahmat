@@ -9,13 +9,16 @@ import { startOnlinePresence, createOnlineCounter } from './online-presence.js';
 import { startMatchHeartbeat } from './match-heartbeat.js';
 import { startSpectatorPresence } from './spectator-presence.js';
 import { createMatchApi } from './match-api.js';
+import { createMatchSignal } from './match-signal.js';
 import { ownModeRating } from './own-mode-rating.js';
 import {createPlayLobby} from './play-lobby.js';
 
 const supabase = createClient('https://eswyxbyddkajysogtglp.supabase.co', 'sb_publishable_w9pinHWr8XK5F9CflsSJmQ_4KFMKzHS');
 let watchingGame=null,stopSpectators=null,lobby=null;
 function updateSpectators(id){if(id===watchingGame)return;stopSpectators?.();stopSpectators=null;watchingGame=id;if(!id)return;stopSpectators=startSpectatorPresence(supabase,id,{onCount:count=>{const el=document.getElementById('spectator-count');const show=Number.isInteger(count)&&count>0;el.classList.toggle('is-visible',show);el.setAttribute('aria-hidden',String(!show));if(show){document.getElementById('spectator-value').textContent=String(count);el.setAttribute('aria-label',`Зрителей: ${count}`);}}});}
-const ui = createMemberGame({ document, onGameChanged:updateSpectators, onGameSnapshot:()=>lobby?.openBoard(), onGameReset:()=>lobby?.show('kinds'), ownRatingForMode: mode => ownModeRating(supabase, mode), opponentName: async gameId => {
+const signal = createMatchSignal(supabase, (id,version)=>ui.notifyUpdate(id,version));
+const changeGame = id => { updateSpectators(id); signal.setGame(id); };
+const ui = createMemberGame({ document, onGameChanged:changeGame, onMoveCommitted:(id,version)=>signal.publish(id,version), onGameSnapshot:()=>lobby?.openBoard(), onGameReset:()=>lobby?.show('kinds'), ownRatingForMode: mode => ownModeRating(supabase, mode), opponentName: async gameId => {
   const { data, error } = await supabase.functions.invoke('matchplay', { body: { action:'opponent', gameId }, timeout: 8000 });
   if(error||!data?.username) return error ? null : data;
   try { const {data: profile, error: profileError}=await supabase.rpc('profile_public',{p_name:data.username}); return !profileError && profile && typeof profile.username === 'string' && profile.username ? profile : data; } catch { return data; }
