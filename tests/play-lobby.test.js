@@ -115,3 +115,20 @@ test('specular edge and 3D tilt follow the pointer on every lobby stage',()=>{
   }
  }finally{lobby.destroy();w.close()}
 });
+
+test('board opens from the selected time card and returns into that same card',()=>{
+ const dom=new JSDOM(html,{url:'https://example.com',pretendToBeVisual:true}),w=dom.window,d=w.document,records=[];
+ w.matchMedia=()=>({matches:false});w.HTMLElement.prototype.animate=function(frames,options){const a={cancel(){},onfinish:null};records.push({el:this,frames,options});return a};
+ w.HTMLElement.prototype.getBoundingClientRect=function(){let index=this.parentElement?[...this.parentElement.children].indexOf(this):0;let left=this.classList.contains('board-area')?20:100+index*120,top=100,width=this.classList.contains('board-area')?700:100,height=this.classList.contains('board-area')?600:180;return {left,top,width,height,right:left+width,bottom:top+height}};
+ const lobby=createPlayLobby({document:d,client:{rpc:async()=>({data:[]})},onChoose:()=>true});
+ try{
+  d.querySelector('[data-kind=rated]').click();d.querySelector('[data-mode=blitz]').click();d.querySelector('[data-control="3+2"]').click();
+  assert.equal(d.getElementById('play-lobby').hidden,true);
+  const forward=records.find(r=>r.el.classList.contains('board-area'));assert.match(forward.frames[0].transform,/translate/);
+  assert.ok(d.querySelector('.lobby-ghost [data-control="3+2"]'));
+  lobby.showControls({mode:'blitz',kind:'rated',timeControl:'3+2'});
+  assert.equal(d.getElementById('play-lobby').hidden,false);const reverse=records.find(r=>r.el.classList.contains('lobby-board-ghost'));
+  assert.match(reverse.frames.at(-1).transform,/translate/);assert.equal(reverse.el.getAttribute('aria-hidden'),'true');
+  const selected=d.querySelector('#lobby-stage [data-control="3+2"]');assert.ok(records.some(r=>r.el===selected&&r.frames.length===3));
+ }finally{lobby.destroy();w.close()}
+});

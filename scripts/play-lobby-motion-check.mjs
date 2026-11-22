@@ -65,6 +65,22 @@ try {
   if(motion==='no-preference')assert.equal(await page.locator('.lobby-back[aria-hidden=true]').count(),1);
   await checkCardEffect(page.locator('#lobby-stage .kind-card').first());
   assert.equal(await page.locator('#lobby-nav, .lobby-pixels, .lobby-ripple').count(),0);
+  await page.locator('#lobby-stage [data-kind=rated]').click();
+  await page.locator('#lobby-stage [data-mode=blitz]').click();
+  await page.locator('#lobby-stage [data-control="3+2"]').click();
+  await page.locator('#board').waitFor({state:'visible'});
+  if(motion==='no-preference'){
+   const forward=await page.evaluate(()=>{const el=document.querySelector('#member-game > .board-area');return {ghost:!!document.querySelector('.lobby-ghost [data-control="3+2"]'),frames:el.getAnimations().flatMap(a=>a.effect.getKeyframes())};});
+   assert.ok(forward.ghost,JSON.stringify(forward));assert.ok(forward.frames.some(f=>f.transform?.includes('translate')),JSON.stringify(forward));
+  }else assert.equal(await page.locator('.lobby-ghost').count(),0);
+  await page.locator('#change-selection').click();
+  await page.locator('#lobby-stage [data-control="3+2"]').waitFor();
+  if(motion==='no-preference'){
+   const backToCard=await page.evaluate(()=>{const ghost=document.querySelector('.lobby-board-ghost'),target=document.querySelector('#lobby-stage [data-control="3+2"]');return {ghost:!!ghost,frames:ghost?.getAnimations()[0]?.effect.getKeyframes(),target:target.getAnimations()[0]?.effect.getKeyframes(),aria:ghost?.getAttribute('aria-hidden')};});
+   assert.ok(backToCard.ghost&&backToCard.aria==='true');assert.match(backToCard.frames.at(-1).transform,/translate/);assert.ok(backToCard.target.length>=3);
+  }else assert.equal(await page.locator('.lobby-board-ghost').count(),0);
+  await page.setViewportSize({width:390,height:844});
+  const backSize=await page.locator('#lobby-back').boundingBox();assert.ok(backSize.height>=44,JSON.stringify(backSize));
   await page.close();
  }
  console.log(`✓ ${name}: spotlight, shared-element transitions, back button and reduced motion`);

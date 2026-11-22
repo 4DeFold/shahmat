@@ -2,7 +2,7 @@
 // First render is immediate; later transitions start at the last visible value.
 export function createRatingCount(element, win) {
   const number = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 });
-  let frame = null, current = null, targetKey = null;
+  let frame = null, current = null, targetKey = null, lastUnit = null;
   const cancel = () => { if (frame !== null) win.cancelAnimationFrame(frame); frame = null; };
   function set(value, unit, calibration = false) {
     const valid = value != null && Number.isFinite(Number(value));
@@ -10,6 +10,8 @@ export function createRatingCount(element, win) {
     const key = `${target}:${unit}:${calibration}`;
     if (targetKey === key) return;
     targetKey = key; cancel();
+    if (lastUnit !== null && lastUnit !== unit) current = null;
+    lastUnit = unit;
     const format = n => `(${number.format(n)} ${unit === 'elo' ? 'Эло' : 'ЯР'})`;
     if (target === null) { current = null; element.textContent = calibration ? '(калибровка)' : ''; element.removeAttribute('aria-label'); return; }
     element.setAttribute('aria-label',format(target));
@@ -28,5 +30,5 @@ export function createRatingCount(element, win) {
     };
     frame = win.requestAnimationFrame(tick);
   }
-  return { set, destroy:cancel };
+  return { set, reset(value, unit, calibration = false) { cancel(); current = null; targetKey = null; set(value,unit,calibration); }, destroy:cancel };
 }

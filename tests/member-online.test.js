@@ -276,8 +276,9 @@ test('finished games retain the mode and offer a new game without resignation', 
   assert.equal(app.$('mode-summary').textContent, 'Блиц · 3 мин');
   assert.equal(app.$('resign-control').hidden, true);
   assert.equal(app.$('new-game').hidden, false);
-  app.$('new-game').click();
-  assert.equal(app.$('mode-picker').classList.contains('is-collapsed'), false); assert.equal(app.$('mode-summary').hidden, true);
+  assert.equal(app.$('other-mode').hidden, false);
+  app.$('other-mode').click();
+  assert.equal(app.$('mode-picker').classList.contains('is-collapsed'), false); assert.equal(app.$('mode-summary').hidden, false);
 });
 
 
@@ -697,4 +698,32 @@ test('lost move reply reconciles and emits a hint only after a confirmed commit'
  },()=>performance.now(),{onMoveCommitted:(id,version)=>published.push([id,version])});t.after(()=>app.close());
  await app.ui.open(A);await flush();const click=s=>app.$('board').querySelector(`[data-square="${s}"]`).click();click('e2');click('e4');await flush();
  assert.deepEqual(published,[['game',1]]);assert.ok(app.$('board').querySelector('[data-square=e4] img'));
+});
+
+test('finished rated game shows recorded signed ЯР changes for both players',async t=>{
+ const finished={...game({moves:['e4','e5'],turn:'w',status:'finished',result:'white_win'}),game_kind:'rated',time_control:'3+2'};
+ const app=setup(async()=>({game:finished}),()=>0,{playerRatings:async()=>[{player:'self',yar:900},{player:'opponent',yar:1200}],gameRatingChanges:async()=>[
+  {player:'self',before_yar:1000,after_yar:1020,before_elo:1400,after_elo:1410},
+  {player:'opponent',before_yar:1100,after_yar:1080,before_elo:1450,after_elo:1440}
+ ]});t.after(()=>app.close());await app.ui.open(A);await flush();
+ assert.equal(app.$('player-rating-delta').textContent,'+20 ЯР');assert.equal(app.$('opponent-rating-delta').textContent,'−20 ЯР');
+ assert.ok(app.$('player-rating-delta').classList.contains('positive'));assert.ok(app.$('opponent-rating-delta').classList.contains('negative'));
+ assert.match(app.$('player-rating').textContent,/1\s*020 ЯР/);assert.match(app.$('opponent-rating').textContent,/1\s*080 ЯР/);
+ app.ui.setRatingUnit('elo');assert.match(app.$('player-rating').textContent,/1\s*410 Эло/);
+});
+
+test('friendly games and unrecorded rated results never invent a rating change',async t=>{
+ let calls=0;const friendly={...game({status:'finished',result:'draw'}),game_kind:'friendly'};
+ const app=setup(async()=>({game:friendly}),()=>0,{gameRatingChanges:async()=>{calls++;return []}});t.after(()=>app.close());await app.ui.open(A);await flush();
+ assert.equal(calls,0);assert.equal(app.$('player-rating-delta').hidden,true);assert.equal(app.$('opponent-rating-delta').hidden,true);
+});
+
+test('new game searches immediately in the same pool and other mode returns the selection',async t=>{
+ const finished={...game({status:'finished',result:'draw'}),game_kind:'friendly',time_control:'10+5',mode:'rapid'};
+ const calls=[],app=setup(async body=>{calls.push(body);return body.action==='search'?{state:'searching'}:{game:finished}},()=>0);t.after(()=>app.close());
+ await app.ui.open(A);await flush();assert.equal(app.$('new-game').hidden,false);assert.equal(app.$('other-mode').hidden,false);
+ app.$('new-game').click();await flush();assert.deepEqual(calls.find(c=>c.action==='search'),{action:'search',mode:'rapid',timeControl:'10+5',gameKind:'friendly'});
+ assert.equal(app.$('new-game').hidden,true);assert.equal(app.$('other-mode').hidden,true);
+ let chosen=null;const other=setup(async()=>({game:finished}),()=>0,{onGameReset:value=>{chosen=value}});t.after(()=>other.close());
+ await other.ui.open(A);await flush();other.$('other-mode').click();assert.deepEqual(chosen,{mode:'rapid',kind:'friendly',timeControl:'10+5'});
 });

@@ -25,7 +25,7 @@ export function formatClock(ms) {
   return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-export function createMemberGame({ document, api, opponentName = async () => null, playerRatings = async () => null, ownRatingForMode = async () => null, onGameChanged = () => {}, onMoveCommitted = () => {}, onGameSnapshot = () => {}, onGameReset = () => {}, now = () => performance.now() }) {
+export function createMemberGame({ document, api, opponentName = async () => null, playerRatings = async () => null, gameRatingChanges = async () => [], ownRatingForMode = async () => null, onGameChanged = () => {}, onMoveCommitted = () => {}, onGameSnapshot = () => {}, onGameReset = () => {}, now = () => performance.now() }) {
   const $ = id => document.getElementById(id), win = document.defaultView;
   const board = $('board'), start = $('start-search'), cancel = $('cancel-search'), reset = $('new-game');
   const promotion = $('promotion'), options = $('promotion-options');
@@ -35,7 +35,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   let threatKeys = new Set();
   let premove = [], historyIndex = null, nameForGame = null, nameTimer = null, drag = null, suppressClick = false, actionPending = false;
   let rankUnit = 'yar', ownScore = null, scores = null, ratingsKey = null, ratingsRequest = 0, ratingsRetryAt = 0;
-  let ownRatingRequest = 0;
+  let ownRatingRequest = 0, ratingResult = null, resultRequest = 0, resultKey = null, resultTimer = null;
   const ratingCounts = Object.fromEntries(['player','opponent'].map(who => [who, createRatingCount($(who+'-rating'), win)]));
   async function refreshOwnRating() {
     if (!userId) return;
@@ -49,7 +49,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   function setAvatar(who, value, set) { const img = $(`${who}-avatar-image`); if(!img)return; const custom=typeof value==='string' && /^data:image\/(?:png|jpeg);base64,/.test(value); if(who==='opponent')setPublicPiece(img,set,'b');else {delete img.dataset.pieceFixed;img.src=themedPieceSrc('w','n');}if(custom)img.src=value; img.classList.toggle('custom-profile-avatar',custom); }
   function renderRatings() {
     for (const who of ['player','opponent']) {
-      const data=who === 'player' ? (scores?.self || ownScore) : scores?.opponent; ratingCounts[who].set(data?.[rankUnit], rankUnit, !!data); const badge=$(who+'-top-status'); if(badge){const place=Number(data?.topPlace);badge.hidden=!(place>=1&&place<=5);badge.textContent=badge.hidden?'':`Топ ${place}`;} const img=$(who+'-avatar-image');if(img)img.parentElement.style.backgroundColor=profileAvatarColor(data?.palette);
+      const base=who === 'player' ? (scores?.self || ownScore) : scores?.opponent; const record=ratingResult?.[who]; const data=record ? {...base, yar:record.after_yar, elo:record.after_elo ?? base?.elo} : base; ratingCounts[who].set(data?.[rankUnit], rankUnit, !!data); const badge=$(who+'-top-status'); if(badge){const place=Number(data?.topPlace);badge.hidden=!(place>=1&&place<=5);badge.textContent=badge.hidden?'':`Топ ${place}`;} const img=$(who+'-avatar-image');if(img)img.parentElement.style.backgroundColor=profileAvatarColor(data?.palette);
     }
   }
   function loadRatings(game) {
@@ -65,6 +65,40 @@ export function createMemberGame({ document, api, opponentName = async () => nul
       setAvatar('player',scores.self?.avatar); setAvatar('opponent',scores.opponent?.avatar,scores.opponent?.piece_set);
       renderRatings();
     }).catch(() => { if (request === ratingsRequest) { ratingsKey = null; ratingsRetryAt = now() + 8000; } });
+  }
+  function clearRatingResult() {
+    resultRequest++; resultKey = null; ratingResult = null;
+    if (resultTimer !== null) win.clearTimeout(resultTimer); resultTimer = null;
+    for (const who of ['player','opponent']) { const el=$(who+'-rating-delta'); el.hidden=true; el.textContent=''; el.classList.remove('positive','negative','neutral'); }
+  }
+  function loadRatingResult(game) {
+    if (game.status !== 'finished' || (game.game_kind || 'rated') !== 'rated' || resultKey === game.id) return;
+    resultKey=game.id; const request=++resultRequest;
+    Promise.resolve().then(()=>gameRatingChanges(game.id)).then(rows=>{
+      if (destroyed || request!==resultRequest || snapshot?.id!==game.id || snapshot.status!=='finished') return;
+      if (!Array.isArray(rows)) throw Error('missing rating result');
+      const records={};
+      for (const row of rows) {
+        const who=row.player==='self'?'player':row.player==='opponent'?'opponent':null;
+        const number=value=>value == null || !Number.isFinite(Number(value)) ? null : Number(value);
+        const before=number(row.before_yar),after=number(row.after_yar);
+        if (!who || before===null || after===null) continue;
+        records[who]={before_yar:before,after_yar:after,before_elo:number(row.before_elo),after_elo:number(row.after_elo)};
+      }
+      ratingResult=records;
+      for (const [who,record] of Object.entries(records)) {
+        const el=$(who+'-rating-delta'), delta=record.after_yar-record.before_yar;
+        const formatted=new Intl.NumberFormat('ru-RU',{maximumFractionDigits:1}).format(Math.abs(delta));
+        el.textContent=`${delta>0?'+':delta<0?'−':''}${formatted} ЯР`;
+        el.className=`rating-delta ${delta>0?'positive':delta<0?'negative':'neutral'}`; el.hidden=false;
+        const start=record[`before_${rankUnit}`];
+        if (start!==null) ratingCounts[who].reset(start,rankUnit,true);
+      }
+      renderRatings();
+    }).catch(()=>{
+      if (request!==resultRequest || destroyed || snapshot?.id!==game.id) return;
+      resultKey=null; resultTimer=win.setTimeout(()=>{resultTimer=null;if(snapshot?.id===game.id)loadRatingResult(snapshot);},4000);
+    });
   }
   const sound = createGameSound(win);
   const searchLoader = createSearchLoader($('search-loader'), win);
@@ -94,7 +128,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     if (phase !== 'active') closeResign();
     start.hidden = phase !== 'idle' || !mode; start.disabled = !userId || !ready || !mode;
     searchLoader.setVisible(phase === 'searching');
-    cancel.hidden = phase !== 'searching' && phase !== 'cancelling'; cancel.disabled = phase === 'cancelling'; reset.hidden = phase !== 'finished';
+    cancel.hidden = phase !== 'searching' && phase !== 'cancelling'; cancel.disabled = phase === 'cancelling'; reset.hidden = phase !== 'finished'; $('other-mode').hidden = phase !== 'finished';
     $('moves').hidden = phase !== 'active' && phase !== 'finished';
   }
   function currentColor() { return snapshot?.black_id === userId ? 'b' : 'w'; }
@@ -209,7 +243,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     }
     const previous = snapshot, localMoves = chess.history(), selectedPiece = selected ? chess.get(selected) : null;
     const sameGame = previous?.id === game.id;
-    if (!sameGame) { lastHintAt = -Infinity; historyIndex = null; premove = []; annotations.clear(); setAvatar('opponent',null); ratingsKey = null; ratingsRetryAt = 0; ratingsRequest++; scores = null; renderRatings(); }
+    if (!sameGame) { clearRatingResult(); lastHintAt = -Infinity; historyIndex = null; premove = []; annotations.clear(); setAvatar('opponent',null); ratingsKey = null; ratingsRetryAt = 0; ratingsRequest++; scores = null; renderRatings(); }
     const alreadyDisplayed = sameGame && localMoves.length === game.moves.length && localMoves.every((move, i) => move === game.moves[i]);
     let next = chess, nextLast = latestMove;
     if (!alreadyDisplayed) {
@@ -234,7 +268,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     const clearedPremove = phase === 'finished' && premove.length > 0;
     if (phase === 'finished') premove = [];
     const input = $('mode-list').querySelector(`input[value="${mode}"]`); if (input) input.checked = true;
-    loadName(game); loadRatings(game); modeControls();
+    loadName(game); loadRatings(game); loadRatingResult(game); modeControls();
     // Confirming our optimistic move must not restart its animation or replace pieces.
     if (!alreadyDisplayed || clearedPremove) renderBoard(newMove);
     renderHistory(); drawClocks();
@@ -480,7 +514,24 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   $('offline-draw').addEventListener('click', () => void finishAction('offline_draw'));
   $('mode-list').addEventListener('change', event => { if (phase === 'idle' && times[event.target.value]) { mode = event.target.value; void refreshOwnRating(); modeControls(); drawClocks(); if (ready) setStatus('Всё готово к поиску.'); } });
   start.addEventListener('click', () => void search()); cancel.addEventListener('click', () => void cancelSearch());
-  reset.addEventListener('click', () => { annotations.clear(); onGameChanged(null); cancelTimer(); generation++; snapshot = null; scores = null; ratingsKey = null; ratingsRetryAt = 0; ratingsRequest++; renderRatings(); clockSync.clear(); chess = new Chess(); latestMove = null; phase = 'idle'; mode = null; selection = null; onGameReset(); void refreshOwnRating(); $('mode-list').querySelectorAll('input').forEach(input => { input.checked = false; }); premove = []; historyIndex = null; nameForGame = null; profileTrigger.disabled = true; profilePinned = false; showProfile(false); clearInterval(nameTimer); $('opponent-name').textContent = 'Соперник'; setAvatar('opponent',null); modeControls(); renderBoard(); renderHistory(); drawClocks(); setStatus(''); });
+  function resetFinished(replay) {
+    if (phase !== 'finished') return;
+    const chosen = selection || (mode ? {kind:'rated',timeControl:`${times[mode]/60000}+0`} : null);
+    const chosenMode = mode;
+    annotations.clear(); onGameChanged(null); cancelTimer(); generation++; snapshot = null;
+    clearRatingResult(); scores = null; ratingsKey = null; ratingsRetryAt = 0; ratingsRequest++; renderRatings();
+    clockSync.clear(); chess = new Chess(); latestMove = null; phase = 'idle';
+    mode = chosenMode; selection = chosen; void refreshOwnRating();
+    $('mode-list').querySelectorAll('input').forEach(input => { input.checked = input.value === mode; });
+    premove = []; historyIndex = null; nameForGame = null; profileTrigger.disabled = true; profilePinned = false; showProfile(false);
+    clearInterval(nameTimer); $('opponent-name').textContent = 'Соперник'; setAvatar('opponent',null);
+    modeControls();
+    if (!replay || !chosen || !mode) onGameReset(chosen ? {...chosen,mode} : null);
+    renderBoard(); renderHistory(); drawClocks(); setStatus('');
+    if (replay && chosen && mode) void search();
+  }
+  reset.addEventListener('click',()=>resetFinished(true));
+  $('other-mode').addEventListener('click',()=>resetFinished(false));
   function pause() { clockSync.resync(); cancelDrag(); if (moving) reconciling = true; if (phase === 'searching') void cancelSearch(); else if (phase !== 'cancelling') { generation++; cancelTimer(); } }
   function resume() {
     if (!userId || destroyed) return;
@@ -555,6 +606,6 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     hide() { clearThreats(); onGameChanged(null); const wasVisible = isVisible(); viewVisible = false; if (wasVisible) pause(); },
     show() { if(snapshot?.status==='active'&&browserVisible)onGameChanged(snapshot.id); const wasVisible = isVisible(); const wasShown = viewVisible; viewVisible = true; if (!wasShown) revealPieces(); if (!wasVisible && isVisible()) resume(); },
     browserVisibility(value) { if(!value)onGameChanged(null);else if(viewVisible&&snapshot?.status==='active')onGameChanged(snapshot.id); const wasVisible = isVisible(); browserVisible = value; if (wasVisible && !isVisible()) pause(); else if (!wasVisible && isVisible()) resume(); },
-    destroy() { destroyed = true; ownRatingRequest++; Object.values(ratingCounts).forEach(count => count.destroy()); onGameChanged(null); document.removeEventListener('keydown',onThreatDown); document.removeEventListener('keyup',onThreatUp); win.removeEventListener('blur',clearThreats); document.removeEventListener('keydown', onPremoveKey); document.removeEventListener('keydown', onHistoryKey); annotations.destroy(); generation++; cancelDrag(); cancelTimer(); clearInterval(clockInterval); clearInterval(nameTimer); revealAnimations.forEach(animation => animation.cancel()); Object.values(clocks).forEach(clock => clock.destroy()); searchLoader.destroy(); profileLoader.destroy(); sound.destroy(); },
+    destroy() { destroyed = true; clearRatingResult(); ownRatingRequest++; Object.values(ratingCounts).forEach(count => count.destroy()); onGameChanged(null); document.removeEventListener('keydown',onThreatDown); document.removeEventListener('keyup',onThreatUp); win.removeEventListener('blur',clearThreats); document.removeEventListener('keydown', onPremoveKey); document.removeEventListener('keydown', onHistoryKey); annotations.destroy(); generation++; cancelDrag(); cancelTimer(); clearInterval(clockInterval); clearInterval(nameTimer); revealAnimations.forEach(animation => animation.cancel()); Object.values(clocks).forEach(clock => clock.destroy()); searchLoader.destroy(); profileLoader.destroy(); sound.destroy(); },
   };
 }

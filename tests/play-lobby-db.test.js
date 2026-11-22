@@ -15,14 +15,23 @@ test('friendly and rated queues and controls are isolated; friendly finishes nev
   const match=await find(ids[3],'friendly');assert.equal(match.state,'matched');
   let g=(await db.query('select * from online_games where id=$1',[match.game_id])).rows[0];assert.equal(g.game_kind,'friendly');assert.equal(g.white_id,ids[0]);assert.equal(g.black_id,ids[3]);
   await db.query("update online_games set status='finished',result='white_win',finished_at=clock_timestamp() where id=$1",[g.id]);
+  await db.exec(`set request.jwt.claim.sub='${ids[0]}'`);
+  assert.deepEqual((await db.query('select * from rank_game_result($1)',[g.id])).rows,[]);
   assert.equal((await db.query('select count(*)::int n from yar_history where game_id=$1',[g.id])).rows[0].n,0);
   assert.equal((await db.query('select count(*)::int n from yar_mode_ratings')).rows[0].n,0);
   const rated=(await db.query("select online_find($1,'blitz') r",[ids[0]])).rows[0].r;assert.equal(rated.state,'matched');
   g=(await db.query('select * from online_games where id=$1',[rated.game_id])).rows[0];assert.equal(g.game_kind,'rated');assert.equal(g.white_id,ids[1]);
   await db.query("update online_games set status='finished',result='white_win',finished_at=clock_timestamp() where id=$1",[g.id]);
   assert.equal((await db.query('select count(*)::int n from yar_history where game_id=$1 and before_elo is not null',[g.id])).rows[0].n,2);
+  const changes=(await db.query('select * from rank_game_result($1) order by player',[g.id])).rows;assert.equal(changes.length,2);
+  assert.ok(Number(changes.find(r=>r.player==='self').after_yar)<Number(changes.find(r=>r.player==='self').before_yar));
+  assert.ok(Number(changes.find(r=>r.player==='opponent').after_yar)>Number(changes.find(r=>r.player==='opponent').before_yar));
+  await db.exec(`set request.jwt.claim.sub='${ids[2]}'`);await assert.rejects(db.query('select * from rank_game_result($1)',[g.id]),/game not found/);
+  assert.equal((await db.query("select has_function_privilege('anon','public.rank_game_result(uuid)','execute') allowed")).rows[0].allowed,false);
   await assert.rejects(db.query("select online_find_kind($1,'bullet','3','friendly')",[ids[0]]),/invalid request/);
+  await db.exec("set request.jwt.claim.sub=''");
   await assert.rejects(db.query('select * from play_demo_games()'),/unauthorized/);
+  await assert.rejects(db.query('select * from rank_game_result($1)',[g.id]),/unauthorized/);
  } finally{await db.close()}
 });
 

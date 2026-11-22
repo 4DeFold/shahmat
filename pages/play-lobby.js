@@ -44,7 +44,7 @@ export function createOnlineCount(element, win) {
 export function createPlayLobby({document,client,onChoose,onOpenBoard}) {
  const win=document.defaultView, root=document.getElementById('play-lobby'), shell=document.getElementById('member-game');
  const stage=document.getElementById('lobby-stage'), back=document.getElementById('lobby-back');
- let screen='kinds',kind='rated',mode=null, timers=[], demoGames=[], fetching=null, visible=true, disposed=false, active=false;
+ let screen='kinds',kind='rated',mode=null, selectedTime=null, timers=[], demoGames=[], fetching=null, visible=true, disposed=false, active=false;
  let counts=null, counters=[], pollTimer=null, pollInFlight=false, pollGeneration=0;
  const reduced=()=>win.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
  const clear=()=>{timers.forEach(id=>win.clearTimeout(id));timers=[];};
@@ -118,16 +118,17 @@ export function createPlayLobby({document,client,onChoose,onOpenBoard}) {
  // Shared-element transitions: the old stage stays beneath the real controls.
  // Geometry is measured before/after the render, so both desktop and stacked
  // mobile cards animate from/to the selected card without blocking input.
- let ghost=null,ghostTimer=null,backGhost=null,backGhostTimer=null,animations=[];
+ let ghost=null,ghostTimer=null,boardGhost=null,boardGhostTimer=null,backGhost=null,backGhostTimer=null,animations=[];
  function clearTransitions(){
   for(const animation of animations)animation.cancel();animations=[];
   if(ghostTimer!==null)win.clearTimeout(ghostTimer);ghostTimer=null;ghost?.remove();ghost=null;
+  if(boardGhostTimer!==null)win.clearTimeout(boardGhostTimer);boardGhostTimer=null;boardGhost?.remove();boardGhost=null;
   if(backGhostTimer!==null)win.clearTimeout(backGhostTimer);backGhostTimer=null;backGhost?.remove();backGhost=null;
  }
  function animate(element,frames,options){
   if(!element?.animate)return;
   const animation=element.animate(frames,{fill:'both',...options});animations.push(animation);
-  animation.onfinish=()=>{animations=animations.filter(item=>item!==animation);if(!element.closest('.lobby-ghost')&&element!==backGhost)animation.cancel();};
+  animation.onfinish=()=>{animations=animations.filter(item=>item!==animation);if(!element.closest('.lobby-ghost')&&element!==backGhost&&element!==boardGhost)animation.cancel();};
  }
  function snapshotStage(source){
   if(reduced()||root.hidden||!stage.children.length||!stage.animate)return null;
@@ -174,6 +175,35 @@ export function createPlayLobby({document,client,onChoose,onOpenBoard}) {
    });
   }
  }
+ function snapshotBoard(){
+  const board=shell.querySelector(':scope > .board-area');
+  if(reduced()||!root.hidden||!board?.animate)return null;
+  const rect=board.getBoundingClientRect(),outer=shell.getBoundingClientRect();
+  boardGhost=board.cloneNode(true);boardGhost.classList.remove('board-area');boardGhost.classList.add('lobby-board-ghost');
+  boardGhost.removeAttribute('id');boardGhost.querySelectorAll('[id]').forEach(el=>el.removeAttribute('id'));
+  boardGhost.setAttribute('aria-hidden','true');boardGhost.inert=true;
+  const padding=win.getComputedStyle(board).padding;
+  Object.assign(boardGhost.style,{left:`${rect.left-outer.left}px`,top:`${rect.top-outer.top}px`,width:`${rect.width}px`,height:`${rect.height}px`,padding});
+  shell.append(boardGhost);boardGhostTimer=win.setTimeout(()=>{boardGhost?.remove();boardGhost=null;boardGhostTimer=null;},900);
+  return {element:boardGhost,rect};
+ }
+ function animateBoardBack(snapshot){
+  if(!snapshot)return;
+  const cards=[...stage.children],target=cards.find(card=>card.dataset.control===selectedTime) || cards[0];if(!target)return;
+  const ease='cubic-bezier(.22,1,.36,1)';
+  animate(snapshot.element,[{transform:'none',opacity:1,filter:'blur(0px)'},{transform:rectTransform(snapshot.rect,target.getBoundingClientRect()),opacity:0,filter:'blur(10px)'}],{duration:560,easing:ease});
+  cards.forEach(card=>animate(card,card===target?[
+   {opacity:0,transform:'scale(.9)',filter:'blur(10px)',offset:0},{opacity:0,transform:'scale(.94)',filter:'blur(8px)',offset:.38},{opacity:1,transform:'none',filter:'blur(0px)',offset:1}
+  ]:[{opacity:0,transform:'scale(.97)',filter:'blur(8px)'},{opacity:1,transform:'none',filter:'blur(0px)'}],{duration:card===target?650:400,delay:card===target?0:260,easing:ease}));
+ }
+ function animateBoardForward(snapshot){
+  if(!snapshot || snapshot.index<0)return;
+  const ease='cubic-bezier(.22,1,.36,1)',origin=snapshot.rects[snapshot.index];
+  snapshot.cards.forEach((card,i)=>animate(card,i===snapshot.index?[{opacity:1,transform:'none',filter:'blur(0px)'},{opacity:0,transform:'scale(1.13)',filter:'blur(12px)'}]:[{opacity:1,transform:'none',filter:'blur(0px)'},{opacity:0,transform:'scale(.96)',filter:'blur(9px)'}],{duration:i===snapshot.index?390:300,easing:ease}));
+  const board=shell.querySelector(':scope > .board-area'),rail=shell.querySelector(':scope > .game-rail');
+  if(board){const end=board.getBoundingClientRect();animate(board,[{transform:rectTransform(end,origin),opacity:0,filter:'blur(12px)'},{transform:'none',opacity:1,filter:'blur(0px)'}],{duration:620,delay:75,easing:ease});}
+  if(rail)animate(rail,[{opacity:0,transform:'translateX(12px)',filter:'blur(6px)'},{opacity:1,transform:'none',filter:'blur(0px)'}],{duration:480,delay:180,easing:ease});
+ }
  function animateBack(previousHidden,nextHidden){
   if(reduced()||!back.animate||previousHidden===nextHidden)return;
   const ease='cubic-bezier(.22,1,.36,1)';
@@ -210,12 +240,13 @@ export function createPlayLobby({document,client,onChoose,onOpenBoard}) {
  const resetSpecular=()=>{for(const card of stage.children)card.style.removeProperty('--shine-opacity');};
  root.addEventListener('pointermove',specular);root.addEventListener('pointerleave',resetSpecular);
  stage.addEventListener('pointermove',spotlight);back.addEventListener('pointermove',spotlight);
- function show(next, {backwards=false, source=null} = {}) {
+ function show(next, {backwards=false, source=null, fromBoard=false} = {}) {
   clearTransitions();const wasHidden=back.hidden, showBack=next!=='kinds';
-  const snapshot=snapshotStage(source);if(!showBack&&snapshot)animateBack(wasHidden,true);
+  const previousBoard=fromBoard?snapshotBoard():null;
+  const snapshot=previousBoard?null:snapshotStage(source);if(!showBack&&snapshot)animateBack(wasHidden,true);
   clear();counters.forEach(x=>x.counter.destroy());counters=[];screen=next;shell.classList.add('lobby-open');root.hidden=false;back.hidden=!showBack;
   const first=!stage.children.length;stage.className=`lobby-stage stage-${screen}${first?' stage-initial':''}`;stage.replaceChildren();
-  if(showBack)animateBack(wasHidden,false);
+  if(showBack)animateBack(previousBoard?true:wasHidden,false);
   if(screen==='kinds'){
    for(const [key,label] of [['friendly','Товарищеские'],['rated','Ранговые']]){
     const button=document.createElement('button');button.type='button';button.className='kind-card lobby-card';button.dataset.kind=key;
@@ -231,16 +262,17 @@ export function createPlayLobby({document,client,onChoose,onOpenBoard}) {
    const custom=document.createElement('button');custom.type='button';custom.disabled=true;custom.className='choice-card lobby-card';custom.innerHTML=`<span class="choice-icon">${icon('<path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4"/>')}</span><strong>Кастом</strong>`;countFor(custom,()=>false);stage.append(custom);
   } else {
    for(const control of controls[mode]){
-    const button=document.createElement('button');button.type='button';button.className='choice-card time-card lobby-card';button.innerHTML=`<strong>${control}</strong>`;
+    const button=document.createElement('button');button.type='button';button.className='choice-card time-card lobby-card';button.dataset.control=control;button.innerHTML=`<strong>${control}</strong>`;
     countFor(button,row=>row.kind===kind&&row.mode===mode&&row.control===control.replace(/\+0$/,''));
-    button.addEventListener('click',()=>{if(onChoose({mode,kind,timeControl:control}))openBoard();});stage.append(button);
+    button.addEventListener('click',()=>{if(onChoose({mode,kind,timeControl:control})){selectedTime=control;openBoard(button);}});stage.append(button);
    }
   }
-  updateCounts();startPolling();animateStage(snapshot,backwards,next);
+  updateCounts();startPolling();if(previousBoard)animateBoardBack(previousBoard);else animateStage(snapshot,backwards,next);
  }
- function openBoard(){clearTransitions();clear();stopPolling();root.hidden=true;shell.classList.remove('lobby-open');onOpenBoard?.();}
+ function openBoard(source=null){if(root.hidden)return;clearTransitions();const snapshot=source?snapshotStage(source):null;clear();stopPolling();root.hidden=true;shell.classList.remove('lobby-open');animateBoardForward(snapshot);onOpenBoard?.();}
+ function showControls(selection){if(selection && controls[selection.mode] && ['friendly','rated'].includes(selection.kind)){kind=selection.kind;mode=selection.mode;selectedTime=selection.timeControl;}if(mode)show('controls',{fromBoard:true});else show('kinds',{fromBoard:true});}
  back.addEventListener('click',()=>show(screen==='controls'?'modes':'kinds',{backwards:true}));
  const onResize=()=>clearTransitions();win.addEventListener('resize',onResize);
  show('kinds');
- return {activate(){active=true;startPolling();return load();},show,openBoard,setVisible(value){visible=value;if(visible&&!root.hidden){if(screen==='kinds'){void load();startDemos();}startPolling();}else{clearTransitions();clear();stopPolling();}},destroy(){disposed=true;root.removeEventListener('pointermove',specular);root.removeEventListener('pointerleave',resetSpecular);win.removeEventListener('resize',onResize);clear();clearTransitions();stopPolling();counters.forEach(x=>x.counter.destroy());}};
+ return {activate(){active=true;startPolling();return load();},show,showControls,openBoard,setVisible(value){visible=value;if(visible&&!root.hidden){if(screen==='kinds'){void load();startDemos();}startPolling();}else{clearTransitions();clear();stopPolling();}},destroy(){disposed=true;root.removeEventListener('pointermove',specular);root.removeEventListener('pointerleave',resetSpecular);win.removeEventListener('resize',onResize);clear();clearTransitions();stopPolling();counters.forEach(x=>x.counter.destroy());}};
 }

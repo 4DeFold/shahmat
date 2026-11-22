@@ -111,8 +111,11 @@ key to browser code. No game data is populated by this migration.
 The game migration is tracked locally with the same version as the applied
 Supabase migration. The older `create_profiles` migration predates this workflow:
 its local filename is `20261113140000`, while the existing remote migration
-history records it as `20261113151708`. Reconcile that historical mismatch before
-using a CLI command that automatically applies migrations to an existing project.
+history records it as `20261113151708`. Several later migrations also have
+different remote timestamps; notably `game_rating_result` is recorded remotely as
+`20261122043747`, while its local timestamp keeps it after the lobby schema.
+Reconcile migration histories before using a CLI command that automatically
+applies migrations to an existing project.
 
 ## Email verification and password recovery
 

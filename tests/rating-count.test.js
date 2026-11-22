@@ -16,3 +16,10 @@ test('count animates from the current visible number and can be interrupted',()=
  count.set(null,'yar',true);assert.equal(el.textContent,'(калибровка)');
  count.destroy();
 });
+
+test('result can reset to the recorded starting rating and animate down',()=>{
+ let next=0,pending=new Map();const win={requestAnimationFrame(fn){pending.set(++next,fn);return next},cancelAnimationFrame(id){pending.delete(id)},matchMedia(){return {matches:false}}};
+ const el={textContent:'',setAttribute(){},removeAttribute(){}};const tick=t=>{const [id,fn]=pending.entries().next().value;pending.delete(id);fn(t)};
+ const count=createRatingCount(el,win);count.set(900,'yar');count.reset(1100,'yar');count.set(1080,'yar');tick(0);assert.match(el.textContent,/1\s*100/);tick(900);assert.match(el.textContent,/1\s*080/);
+ count.set(1400,'elo');assert.match(el.textContent,/1\s*400 Эло/);assert.equal(pending.size,0);count.destroy();
+});
