@@ -2,10 +2,11 @@
 // https://lichess.org/page/accuracy (not a calibrated personal win probability).
 export const winExpectation = cp => 100 / (1 + Math.exp(-0.00368208 * Math.max(-4000,Math.min(4000,cp))));
 export const moveAccuracy = loss => Math.max(0,Math.min(100,103.1668 * Math.exp(-0.04354 * Math.max(0,loss)) - 3.1669));
-// Only flag meaningful losses; ordinary moves still contribute to accuracy.
+// Approximate categories from the bounded local search, not Chess.com classifications.
 export function classifyMove(before,after,move) {
  const delta=move.color==='w' ? before.win-after.win : after.win-before.win;
- if(delta<5)return null;
+ if(delta<2 && before.best===move.from+move.to+(move.promotion||''))return 'best';
+ if(delta<2)return 'excellent'; if(delta<5)return 'good';
  if(delta<10)return 'inaccuracy'; if(delta<20)return 'mistake'; return 'blunder';
 }
 export function summarizeReview(moves,positions) {

@@ -66,8 +66,17 @@ try {
    } else assert.equal(await boardMark.count(),0);
   }
   await frame.locator('#history-first').click();assert.equal(await frame.locator('.review-board-mark').count(),0);
+  const motionResult=await frame.locator('#board').evaluate((board,reduced)=>{
+   const queen=board.querySelector('[data-square=d8] .piece');queen.getAnimations().forEach(a=>a.finish());
+   document.querySelector('#history-last').click();const moved=board.querySelector('[data-square=d5] .piece');
+   return {same:queen===moved,animation:moved.getAnimations().some(a=>a.effect?.getKeyframes().some(k=>k.translate&&k.translate!=='0px 0px')),reduced};
+  },motion==='reduce');
+  assert.equal(motionResult.same,true,'jump preserves moving piece');assert.equal(motionResult.animation,!motionResult.reduced,'jump animates unless motion is reduced');
   const graph=frame.locator('.review-graph-area');await graph.waitFor();
-  await graph.focus();await page.keyboard.press('ArrowRight');assert.equal(await graph.getAttribute('aria-valuenow'),'1');
+  await graph.focus();await page.keyboard.press('ArrowUp');assert.equal(await graph.getAttribute('aria-valuenow'),'0');
+  await page.keyboard.press('ArrowDown');assert.equal(await graph.getAttribute('aria-valuenow'),'4');
+  await page.keyboard.press('ArrowUp');assert.equal(await graph.getAttribute('aria-valuenow'),'0');
+  await page.keyboard.press('ArrowRight');assert.equal(await graph.getAttribute('aria-valuenow'),'1');
   assert.equal(await graph.evaluate(el=>el===document.activeElement),true,'graph keeps focus during navigation');
   await graph.click({position:{x:2,y:30}});assert.equal(await graph.getAttribute('aria-valuenow'),'0');
   await frame.getByRole('button',{name:'Оценка',exact:true}).click();assert.match(await graph.getAttribute('aria-valuetext'),/оценка белых/);

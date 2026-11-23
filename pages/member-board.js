@@ -63,6 +63,23 @@ export function createMemberBoard({ document, board, reducedMotion }) {
       if (animatedMove.flags.includes('q')) { rookFrom = `${animatedMove.reverse?'d':'a'}${animatedMove.to[1]}`; rookTo = `${animatedMove.reverse?'a':'d'}${animatedMove.to[1]}`; }
       if (rookFrom) rookImage = transfer(rookFrom, rookTo);
     }
+    // Move surviving DOM nodes atomically before reconciling the board. A jump
+    // can swap occupied destinations; removing targets one by one would destroy
+    // another moving piece and make it appear at its destination (teleport).
+    const traveling = [];
+    for (const move of transitions) {
+      const image = cells.get(move.from)?.querySelector('.piece');
+      if (!image || !cells.has(move.to)) continue;
+      animations.get(image)?.cancel();
+      cells.get(move.from).classList.remove('is-moving');
+      traveling.push({move,image});
+    }
+    for (const {image} of traveling) image.remove();
+    for (const {move,image} of traveling) {
+      const target=cells.get(move.to), occupant=target.querySelector('.piece');
+      if(occupant){animations.get(occupant)?.cancel();occupant.remove();target.classList.remove('is-moving');}
+      target.prepend(image);
+    }
     for (const [square, cell] of cells) {
       const piece = shown.get(square);
       cell.classList.toggle('selected', selected === square);
@@ -84,7 +101,7 @@ export function createMemberBoard({ document, board, reducedMotion }) {
       const real=actual?.get(square); img.classList.toggle('premove-ghost', !!actual && (!real || real.color!==piece.color || real.type!==piece.type));
     }
     if (animatedMove) { animate(movingImage, animatedMove.from, animatedMove.to, interrupted.get(animatedMove.from)); if (rookImage) animate(rookImage, rookFrom, rookTo); }
-    for (const move of transitions) animate(cells.get(move.to)?.querySelector('.piece'), move.from, move.to, interrupted.get(move.from));
+    for (const {move,image} of traveling) if(image.parentElement===cells.get(move.to)) animate(image, move.from, move.to, interrupted.get(move.from));
   }
   return { render, cell: square => cells.get(square) };
 }

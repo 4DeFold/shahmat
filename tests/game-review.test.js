@@ -8,7 +8,7 @@ const tick=()=>new Promise(resolve=>setTimeout(resolve,25));
 test('accuracy uses loss of win expectation from the mover perspective',()=>{
  assert.equal(winExpectation(0),50);assert.ok(winExpectation(100)>50);assert.ok(winExpectation(-100)<50);assert.ok(moveAccuracy(0)>99.99);assert.ok(moveAccuracy(20)<moveAccuracy(2));
  const c=new Chess(),a=c.move('e4'),b=c.move('e5');const positions=[{win:50,best:'e2e4'},{win:49,best:'d7d5'},{win:60,best:null}];
- assert.equal(classifyMove(positions[0],positions[1],a),null);assert.equal(classifyMove(positions[1],positions[2],b),'mistake');
+ assert.equal(classifyMove(positions[0],positions[1],a),'best');assert.equal(classifyMove(positions[1],positions[2],b),'mistake');
  const summary=summarizeReview([a,b],positions);assert.ok(summary.w.accuracy>summary.b.accuracy);assert.equal(summary.b.counts.mistake,1);
 });
 test('UCI worker is bounded, handles side to move and cancellation',async()=>{
@@ -61,15 +61,16 @@ test('graph shows both accurate per-move accuracy and position assessment; keybo
  const createEngine=()=>({evaluate:async()=>({win:50,best:'e2e4'}),destroy(){}});
  let review;review=createGameReview({document:d,frame:d.querySelector('#frame'),host:d.querySelector('#rail'),createEngine,onSelect:i=>{selected.push(i);review.setIndex(i)}});
  review.start({moves:['e4','e5']});await new Promise(resolve=>setTimeout(resolve,100));
- const graph=d.querySelector('.review-graph'),area=graph.querySelector('[role=slider]');assert.equal(graph.hidden,false);assert.equal(graph.querySelectorAll('polyline').length,0);assert.equal(graph.querySelectorAll('.review-graph-line').length,2);
- assert.equal(area.getAttribute('aria-valuenow'),'2');assert.match(area.getAttribute('aria-valuetext'),/точность 100%/);
+ const graph=d.querySelector('.review-graph'),area=graph.querySelector('[role=slider]');assert.equal(graph.hidden,false);assert.equal(graph.querySelectorAll('polyline.eval').length,1);assert.equal(graph.querySelectorAll('.review-graph-fill').length,1);
+ assert.equal(area.getAttribute('aria-valuenow'),'2');assert.match(area.getAttribute('aria-valuetext'),/оценка белых 50%/);
  area.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'ArrowLeft',bubbles:true,cancelable:true}));assert.deepEqual(selected,[1]);assert.equal(area.getAttribute('aria-valuenow'),'1');
- area.getBoundingClientRect=()=>({left:10,width:200});area.dispatchEvent(new dom.window.MouseEvent('click',{clientX:10,bubbles:true}));assert.deepEqual(selected,[1,0]);assert.match(area.getAttribute('aria-valuetext'),/Начало/);
- [...graph.querySelectorAll('button')].find(b=>b.textContent==='Оценка').click();assert.match(area.getAttribute('aria-valuetext'),/оценка белых 50%/);assert.equal(graph.querySelectorAll('polyline.eval').length,1);
+ area.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'ArrowUp',bubbles:true,cancelable:true}));assert.equal(area.getAttribute('aria-valuenow'),'0');area.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true,cancelable:true}));assert.equal(area.getAttribute('aria-valuenow'),'2');
+ area.getBoundingClientRect=()=>({left:10,width:200});area.dispatchEvent(new dom.window.MouseEvent('click',{clientX:10,bubbles:true}));assert.deepEqual(selected,[1,0,2,0]);assert.match(area.getAttribute('aria-valuetext'),/Начало/);
+ [...graph.querySelectorAll('button')].find(b=>b.textContent==='Точность').click();review.setIndex(1);assert.match(area.getAttribute('aria-valuetext'),/точность 100%/);assert.equal(graph.querySelectorAll('.review-graph-line').length,2);
  review.clear();assert.equal(graph.hidden,true);review.destroy();dom.window.close();
 });
 
-test('ordinary moves do not receive labels or inflate counts',()=>{
+test('ordinary moves are counted without being treated as significant errors',()=>{
  const game=new Chess(),moves=['e4','e5','Nf3','Nc6'].map(x=>game.move(x));const positions=moves.map(()=>({win:50}));positions.push({win:50});
- const summary=summarizeReview(moves,positions);assert.deepEqual(summary.w.counts,{});assert.deepEqual(summary.b.counts,{});assert.ok(summary.w.accuracy>99.9);
+ const summary=summarizeReview(moves,positions);assert.equal(summary.w.counts.excellent,2);assert.equal(summary.b.counts.excellent,2);assert.ok(summary.w.accuracy>99.9);
 });

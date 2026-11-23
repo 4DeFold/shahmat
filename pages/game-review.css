@@ -43,3 +43,14 @@
 .review-graph-area svg{display:block;width:100%;height:100%;overflow:hidden}.review-graph-grid{stroke:var(--line);stroke-width:1;vector-effect:non-scaling-stroke}.review-graph-line{fill:none;stroke:#62a574;stroke-width:2;vector-effect:non-scaling-stroke;stroke-linejoin:round;stroke-linecap:round}.review-graph-line.b{stroke:#dd8c46}.review-graph-line.eval{stroke:var(--ink)}.review-graph-current{stroke:var(--ink);stroke-width:1;stroke-dasharray:3 3;opacity:.7;vector-effect:non-scaling-stroke;pointer-events:none}
 .review-graph-caption{margin-top:6px;min-height:16px;color:var(--muted);font-size:10px}
 @media(prefers-reduced-motion:reduce){.review-graph{animation:none}}
+
+/* Evaluation graph: centered zero line and filled advantage, like an analysis board. */
+.review-graph-area {height:160px;border-radius:8px;overflow:hidden;background:linear-gradient(180deg,color-mix(in srgb,var(--surface) 82%,var(--ink)),var(--surface))}
+.review-graph-fill {fill:#a8a8a8;fill-opacity:.5}
+.review-graph-line.eval {stroke:#df781d;stroke-width:2}
+.review-graph-current {stroke:#df781d;stroke-dasharray:none;opacity:.95}
+.review-graph-grid {stroke:var(--muted);opacity:.7}
+.review-graph-key.eval::before{background:#df781d}
+.review-move-mark[data-type=great],.review-move-mark[data-type=best]{background:#418c58}
+.review-move-mark[data-type=book]{background:#9a754c}.review-move-mark[data-type=miss]{background:#b77931}
+.review-board-mark[data-type=blunder],.review-move-mark[data-type=blunder] {font-size:10px}
