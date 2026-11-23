@@ -15,9 +15,9 @@
 
 /* Review glyphs are independent of the chess pieces and never intercept input. */
 .review-move-mark,.review-board-mark {display:inline-grid;place-items:center;flex:none;border-radius:50%;color:#fff;font:700 11px/1 system-ui,sans-serif;pointer-events:none;background:#508b58}
-.review-move-mark {width:16px;height:16px;margin-left:auto}
+.review-move-mark {width:16px;height:16px;margin:0 2px 0 0}
 .board .square:has(.review-board-mark) {z-index:6}
-.board .review-board-mark {position:absolute;right:1px;top:1px;width:clamp(13px,28%,23px);height:clamp(13px,28%,23px);z-index:7;font-size:clamp(9px,1.8cqw,15px);transform:rotate(calc(-1 * var(--board-angle)));box-shadow:0 1px 4px #0007;animation:review-in .2s ease both}
+.board .review-board-mark {position:absolute;right:1px;bottom:1px;width:clamp(13px,28%,23px);height:clamp(13px,28%,23px);z-index:7;font-size:clamp(9px,1.8cqw,15px);transform:rotate(calc(-1 * var(--board-angle)));box-shadow:0 1px 4px #0007;animation:review-in .2s ease both}
 .review-move-mark[data-type=brilliant],.review-board-mark[data-type=brilliant]{background:#328d88}
 .review-move-mark[data-type=excellent],.review-board-mark[data-type=excellent],.review-move-mark[data-type=good],.review-board-mark[data-type=good]{background:#60975f}
 .review-move-mark[data-type=inaccuracy],.review-board-mark[data-type=inaccuracy]{background:#ad851c}
@@ -29,3 +29,17 @@
 @media(max-width:700px){
  #member-game .board-area:has(.review-bar:not([hidden])), #bot-app .board-area:has(.review-bar:not([hidden])) {padding-right:18px}
 }
+
+/* The board is rotated for black, so local top-left is visual bottom-right. */
+.board.black .review-board-mark {left:1px;top:1px;right:auto;bottom:auto}
+.review-row>span.review-legend-mark {font:700 11px/1 system-ui,sans-serif;color:#fff;margin:0}
+.review-graph {margin-top:12px;padding:14px 0 10px;border-top:1px solid var(--line);font:12px/1.3 system-ui,sans-serif;color:var(--ink);animation:review-in .35s ease both}
+.review-graph[hidden]{display:none}
+.review-graph-header{display:flex;align-items:center;justify-content:space-between;gap:4px}.review-graph-header strong{font-size:12px}
+.review-graph-tabs {display:flex;gap:2px}.review-graph-tabs button{padding:5px;border:0;background:transparent;color:var(--muted);font:600 10px system-ui,sans-serif;cursor:pointer}.review-graph-tabs button[aria-pressed=true]{color:var(--ink);box-shadow:inset 0 -2px var(--ink)}
+.review-graph-legend {display:flex;gap:12px;min-height:16px;margin:8px 0 4px;font-size:10px;color:var(--muted)}
+.review-graph-key::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;background:currentColor}.review-graph-key.w::before{background:#62a574}.review-graph-key.b::before{background:#dd8c46}.review-graph-key.eval::before{background:var(--ink)}
+.review-graph-area{height:110px;background:var(--surface);border:1px solid var(--line);cursor:crosshair;touch-action:manipulation}.review-graph-area:focus-visible,.review-graph-tabs button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.review-graph-area svg{display:block;width:100%;height:100%;overflow:hidden}.review-graph-grid{stroke:var(--line);stroke-width:1;vector-effect:non-scaling-stroke}.review-graph-line{fill:none;stroke:#62a574;stroke-width:2;vector-effect:non-scaling-stroke;stroke-linejoin:round;stroke-linecap:round}.review-graph-line.b{stroke:#dd8c46}.review-graph-line.eval{stroke:var(--ink)}.review-graph-current{stroke:var(--ink);stroke-width:1;stroke-dasharray:3 3;opacity:.7;vector-effect:non-scaling-stroke;pointer-events:none}
+.review-graph-caption{margin-top:6px;min-height:16px;color:var(--muted);font-size:10px}
+@media(prefers-reduced-motion:reduce){.review-graph{animation:none}}

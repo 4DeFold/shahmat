@@ -16,7 +16,7 @@ const sound=createGameSound(window);
 const $=id=>document.getElementById(id), client=createClient('https://eswyxbyddkajysogtglp.supabase.co','sb_publishable_w9pinHWr8XK5F9CflsSJmQ_4KFMKzHS');
 const reduced=()=>window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const view=createMemberBoard({document,board:$('board'),reducedMotion:reduced});
-const review=createGameReview({document,frame:$('board').parentElement,host:$('archive-history')});
+const review=createGameReview({document,frame:$('board').parentElement,host:$('archive-history'),onSelect:showHistory});
 const annotations=createBoardAnnotations({document,board:$('board'),enabled:()=>!!current});
 let archiveScroll=null;function updateScroll(){archiveScroll?.destroy();archiveScroll=null;if(!reduced())archiveScroll=new Lenis({wrapper:$('archive-main'),content:$('archive-content'),lerp:.14,wheelMultiplier:1.1,autoRaf:true,allowNestedScroll:true});}updateScroll();window.matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change',updateScroll);
 let mode='all', rows=[], current=null, chess=new Chess(), timeline=null, index=0, offset=0, seq=0, visible=window.parent===window, user=null, username='Вы', hasMore=false, threatKeys=new Set();

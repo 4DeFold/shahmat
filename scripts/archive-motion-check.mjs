@@ -54,10 +54,30 @@ try {
   assert.match(await frame.locator('.review-person .review-rating').last().textContent(),/1690 ЯР/);
   const geometry=await frame.locator('.review-bar').evaluate(bar=>{const br=bar.getBoundingClientRect(),board=bar.parentElement.getBoundingClientRect();return {left:br.left,right:br.right,boardRight:board.right,width:br.width,viewport:innerWidth}});
   assert.ok(geometry.left>=geometry.boardRight-1 && geometry.right<=geometry.viewport+1 && geometry.width>=10,`bar must be outside right edge: ${JSON.stringify(geometry)}`);
-  assert.equal(await frame.locator('#move-list .review-move-mark').count(),4);
-  assert.equal(await frame.locator('[data-square=d5] .review-board-mark').getAttribute('data-type'),await frame.locator('[data-history-index="4"] .review-move-mark').getAttribute('data-type'));
-  await frame.locator('#history-prev').click();assert.equal(await frame.locator('[data-square=d5] .review-board-mark').getAttribute('data-type'),await frame.locator('[data-history-index="3"] .review-move-mark').getAttribute('data-type'));
+  // Compare every actually classified move; a quiet move deliberately has no badge.
+  for(let i=1;i<=4;i++) {
+   await frame.locator(`[data-history-index="${i}"]`).click();
+   const badge=frame.locator(`[data-history-index="${i}"] .review-move-mark`),boardMark=frame.locator('.review-board-mark');
+   if(await badge.count()) {
+    assert.equal(await boardMark.count(),1);const type=await badge.getAttribute('data-type');
+    assert.equal(await boardMark.getAttribute('data-type'),type);
+    assert.equal(await boardMark.textContent(),await badge.textContent());
+    assert.equal(await badge.textContent(),await frame.locator(`.review-${type} .review-legend-mark`).textContent());
+   } else assert.equal(await boardMark.count(),0);
+  }
   await frame.locator('#history-first').click();assert.equal(await frame.locator('.review-board-mark').count(),0);
+  const graph=frame.locator('.review-graph-area');await graph.waitFor();
+  await graph.focus();await page.keyboard.press('ArrowRight');assert.equal(await graph.getAttribute('aria-valuenow'),'1');
+  assert.equal(await graph.evaluate(el=>el===document.activeElement),true,'graph keeps focus during navigation');
+  await graph.click({position:{x:2,y:30}});assert.equal(await graph.getAttribute('aria-valuenow'),'0');
+  await frame.getByRole('button',{name:'Оценка',exact:true}).click();assert.match(await graph.getAttribute('aria-valuetext'),/оценка белых/);
+  await frame.getByRole('button',{name:'Точность',exact:true}).click();
+  // Exercise both board orientations even if Stockfish happens to find no errors.
+  const corners=await frame.locator('#board').evaluate(board=>{
+   board.style.transition='none';const cell=board.querySelector('[data-square=e4]'),mark=document.createElement('span');mark.className='review-board-mark';mark.style.animation='none';cell.append(mark);
+   return [false,true].map(black=>{board.classList.toggle('black',black);const c=cell.getBoundingClientRect(),m=mark.getBoundingClientRect();return {right:c.right-m.right,bottom:c.bottom-m.bottom}}).map((v,i,all)=>{if(i===all.length-1)mark.remove();return v});
+  });
+  for(const corner of corners)assert.ok(Math.abs(corner.right-1)<2&&Math.abs(corner.bottom-1)<2,`badge at bottom right: ${JSON.stringify(corners)}`);
   await frame.locator('#history-last').click();
   assert.match(await frame.locator('.review-bar').getAttribute('aria-label'),/белые \d+%/);
   assert.match(await frame.locator('.review-accuracy').first().textContent(),/^\d+%$/);

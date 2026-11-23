@@ -176,7 +176,7 @@ function switchLevel(next) {
   orbitSpeed=Math.min(7,Math.max(orbitSpeed,2.8)+.35); startOrbit();
 }
 $('bot-prev').addEventListener('click',()=>switchLevel(level-1)); $('bot-next').addEventListener('click',()=>switchLevel(level+1));
-const review=createGameReview({document,frame:$('target-board'),host:$('moves').parentElement});let reviewKey=null;
+const review=createGameReview({document,frame:$('target-board'),host:$('moves').parentElement,onSelect:showHistory});let reviewKey=null;
 function setPhase(value) {
   if(value==='finished' && game && reviewKey!==game.id){reviewKey=game.id;engine?.destroy();engine=null;review.setVisible(pageVisible&&!document.hidden);review.start({moves:chess.history(),flip:playerColor()==='b',names:()=>playerColor()==='w'?{w:'Вы',b:$('game-bot-name').textContent}:{b:'Вы',w:$('game-bot-name').textContent}});}
   else if(value!=='finished' && reviewKey){review.clear();reviewKey=null;}

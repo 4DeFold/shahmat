@@ -37,7 +37,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   let premove = [], historyIndex = null, nameForGame = null, nameTimer = null, drag = null, suppressClick = false, actionPending = false;
   let rankUnit = 'yar', ownScore = null, scores = null, ratingsKey = null, ratingsRequest = 0, ratingsRetryAt = 0;
   let ownRatingRequest = 0, ratingResult = null, resultRequest = 0, resultKey = null, resultTimer = null;
-  const review=createGameReview({document,frame:board.parentElement,host:$('moves')?.parentElement}); let reviewKey=null;
+  const review=createGameReview({document,frame:board.parentElement,host:$('moves')?.parentElement,onSelect:showHistory}); let reviewKey=null;
   const ratingCounts = Object.fromEntries(['player','opponent'].map(who => [who, createRatingCount($(who+'-rating'), win)]));
   async function refreshOwnRating() {
     if (!userId) return;

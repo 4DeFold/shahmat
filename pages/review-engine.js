@@ -2,18 +2,17 @@
 // https://lichess.org/page/accuracy (not a calibrated personal win probability).
 export const winExpectation = cp => 100 / (1 + Math.exp(-0.00368208 * Math.max(-4000,Math.min(4000,cp))));
 export const moveAccuracy = loss => Math.max(0,Math.min(100,103.1668 * Math.exp(-0.04354 * Math.max(0,loss)) - 3.1669));
+// Only flag meaningful losses; ordinary moves still contribute to accuracy.
 export function classifyMove(before,after,move) {
  const delta=move.color==='w' ? before.win-after.win : after.win-before.win;
- const uci=move.from+move.to+(move.promotion||'');
- if(before.best===uci && delta<3) return 'best';
- if(delta<2) return 'excellent'; if(delta<5) return 'good';
- if(delta<10) return 'inaccuracy'; if(delta<20) return 'mistake'; return 'blunder';
+ if(delta<5)return null;
+ if(delta<10)return 'inaccuracy'; if(delta<20)return 'mistake'; return 'blunder';
 }
 export function summarizeReview(moves,positions) {
  const summary={w:{accuracy:null,counts:{}},b:{accuracy:null,counts:{}}}, accuracy={w:[],b:[]};
  moves.forEach((move,i)=>{const before=positions[i],after=positions[i+1];if(!before||!after)return;
   const loss=move.color==='w'?before.win-after.win:after.win-before.win;
-  const type=classifyMove(before,after,move);summary[move.color].counts[type]=(summary[move.color].counts[type]||0)+1;accuracy[move.color].push(moveAccuracy(loss));
+  const type=classifyMove(before,after,move);if(type)summary[move.color].counts[type]=(summary[move.color].counts[type]||0)+1;accuracy[move.color].push(moveAccuracy(loss));
  });
  for(const color of ['w','b']) if(accuracy[color].length)summary[color].accuracy=accuracy[color].reduce((a,b)=>a+b,0)/accuracy[color].length;
  return summary;
