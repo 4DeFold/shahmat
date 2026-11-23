@@ -9,7 +9,7 @@ const session={access_token:token,token_type:'bearer',expires_in:3600,expires_at
 const browser=await engine.launch({headless:true});
 try {
  for(const viewport of [{width:1440,height:900},{width:390,height:844}]) for(const motion of ['no-preference','reduce']) {
-  const page=await browser.newPage({viewport,reducedMotion:motion}),errors=[];page.on('pageerror',e=>errors.push(e.message));
+  const page=await browser.newPage({viewport,reducedMotion:motion}),errors=[];let releaseArchive;const archiveGate=new Promise(resolve=>releaseArchive=resolve);page.on('pageerror',e=>errors.push(e.message));
   await page.addInitScript(s=>localStorage.setItem('sb-eswyxbyddkajysogtglp-auth-token',JSON.stringify(s)),session);
   await page.route('https://eswyxbyddkajysogtglp.supabase.co/**',route=>{
    const p=new URL(route.request().url()).pathname, method=route.request().method();
@@ -17,12 +17,16 @@ try {
    if(method==='OPTIONS')return route.fulfill({status:204,body:'',headers});
    if(p==='/auth/v1/user')return route.fulfill({json:user,headers});
    if(p==='/rest/v1/profiles')return route.fulfill({json:{username:'Alice'},headers});
-   if(p.endsWith('/my_archive_all'))return route.fulfill({json:[{id:'fixture',mode:'blitz',my_color:'b',white_name:'Bob',black_name:'Alice',moves:['e4','d5','exd5','Qxd5'],result:'draw'}],headers});
+   if(p.endsWith('/my_archive_all'))return archiveGate.then(()=>route.fulfill({json:[{id:'fixture',mode:'blitz',my_color:'b',white_name:'Bob',black_name:'Alice',moves:['e4','d5','exd5','Qxd5'],result:'draw'}],headers}));
    if(p.endsWith('/my_archive_stats'))return route.fulfill({json:{bullet:0,blitz:1,rapid:0,classical:0,bot:0},headers});
    if(p==='/functions/v1/matchplay')return route.fulfill({json:{game:null},headers});
    return route.fulfill({json:[],headers});
   });
-  await page.goto(base+'/archive');const frame=page.frameLocator('#archive-frame');await frame.locator('.archive-card').first().click();
+  await page.goto(base+'/archive');const frame=page.frameLocator('#archive-frame');
+  await frame.locator('.archive-loading-overlay .particle-loading:not([hidden])').waitFor();
+  const loader=await frame.locator('.archive-loading-overlay .particle-loading').evaluate(el=>{const r=el.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2,w:innerWidth,h:innerHeight}});
+  assert.ok(Math.abs(loader.x-loader.w/2)<1 && Math.abs(loader.y-loader.h/2)<1,`loader is centered: ${JSON.stringify(loader)}`);
+  releaseArchive();await frame.locator('.archive-card').first().click();
   await frame.locator('#archive-detail:not([hidden])').waitFor();
   assert.match(await frame.locator('#archive-bottom-avatar').getAttribute('src'),/bN\.svg$/);
   assert.match(await frame.locator('#archive-top-avatar').getAttribute('src'),/wN\.svg$/);
@@ -33,7 +37,11 @@ try {
   if(motion==='no-preference') {
    assert.equal(await frame.locator('.capture-flight').count(),1,'captured piece flies into strip');
    assert.equal(await frame.locator('#archive-opponent-captured img').first().evaluate(el=>el.style.opacity),'0');
-   await frame.locator('#history-prev').click(); assert.equal(await frame.locator('.capture-flight').count(),0,'rewind cancels flight');
+   await frame.locator('#history-prev').click();
+   assert.equal(await frame.locator('.capture-flight').count(),1,'rewind launches reverse flight');
+   assert.equal(await frame.locator('[data-square=d5] .piece').evaluate(el=>el.style.opacity),'0','restored piece is hidden during reverse flight');
+   await frame.locator('#history-next').click();assert.equal(await frame.locator('.capture-flight').count(),1,'rapid forward cancels reverse flight');
+   await frame.locator('#history-prev').click();assert.equal(await frame.locator('.capture-flight').count(),1,'rapid rewind launches new reverse flight');
   } else assert.equal(await frame.locator('.capture-flight').count(),0);
   await page.locator('#nav-archive').focus();
   for(const key of ['w','s','w','s','w','s']) await page.keyboard.press(key);

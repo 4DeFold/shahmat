@@ -1,7 +1,7 @@
 import {pieceSrc as themedPieceSrc,setPublicPiece} from './piece-theme.js';
 import {applyProfileTheme,isProfileImage,profileAvatarColor} from './profile-theme.js';
 import { Chess } from 'chess.js';
-import {renderCaptures,renderThreats} from './board-insights.js';
+import {renderCaptures,renderThreats,cancelCaptureFlights} from './board-insights.js';
 import { premoveTargets, validPremove, normalizePremove, projectPremoves } from './premove.js';
 import { createBoardAnnotations } from './board-annotations.js';
 import { createMemberBoard } from './member-board.js';
@@ -182,7 +182,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     const count=chess.history().length, old=historyIndex??count;
     historyIndex=index>=count?null:Math.max(0,index);
     const target=historyIndex??count, transitions=historyTransition(chess,old,target);
-    annotations.clear(); selected=null; renderBoard(null,transitions,target===old+1 ? chess.history({verbose:true})[target-1] : null); renderHistory();
+    annotations.clear(); selected=null; renderBoard(null,transitions,Math.abs(target-old)===1 ? chess.history({verbose:true})[Math.max(old,target)-1] : null,target===old-1?'backward':'forward'); renderHistory();
     const move=historySoundMove(chess,old,target); if(move) sound.play(move);
     if(historyIndex!==null)setStatus(`Просмотр позиции: ход ${historyIndex} из ${count}.`);else statusGame();
   }
@@ -191,14 +191,15 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     if (chess.turn() === currentColor() && !premove.length) return chess.moves({ square, verbose:true });
     return premoveTargets(projected(), square, currentColor());
   }
-  function renderBoard(animatedMove = null, transitions = [], captureMove = animatedMove) {
+  function renderBoard(animatedMove = null, transitions = [], captureMove = animatedMove, direction = 'forward') {
+    cancelCaptureFlights($('player-captured'),$('opponent-captured'));
     syncAvatarColors();
     const color = currentColor(), shown = historyIndex === null ? projected() : displayChess();
     const legal = selected && historyIndex === null ? legalFor(selected).map(move => move.to) : [];
     const last = historyIndex === null ? latestMove : shown.history({ verbose:true }).at(-1);
     boardView.render({ shown, selected, legal, last, premoves: historyIndex === null ? premove : [], actual: historyIndex === null && premove.length ? chess : null, premoveMode: (chess.turn() !== color || premove.length > 0) && historyIndex === null, transitions, animatedMove: historyIndex === null ? animatedMove : null });
     const actualShown=historyIndex===null?chess:shown;
-    renderThreats(actualShown,color,boardView,threatKeys);renderCaptures(actualShown,color,$('player-captured'),$('opponent-captured'),{board,move:captureMove});
+    renderThreats(actualShown,color,boardView,threatKeys);renderCaptures(actualShown,color,$('player-captured'),$('opponent-captured'),{board,move:captureMove,direction});
     // Establish initial rotation before the board changes sides.
     if (board.classList.contains('waiting') && snapshot) void board.offsetWidth;
     board.classList.toggle('waiting', !snapshot); board.classList.toggle('black', !!snapshot && color === 'b');

@@ -1,6 +1,6 @@
 import {pieceSrc as themedPieceSrc} from './piece-theme.js';
 import { Chess } from 'chess.js';
-import {renderCaptures,renderThreats} from './board-insights.js';
+import {renderCaptures,renderThreats,cancelCaptureFlights} from './board-insights.js';
 import { premoveTargets, validPremove, normalizePremove, projectPremoves } from './premove.js';
 import { createBoardAnnotations } from './board-annotations.js';
 import { createClient } from '@supabase/supabase-js';
@@ -186,7 +186,8 @@ const playerColor=()=>game?.player_color==='b'?'b':'w';
 const playerWon=()=>game?.status===(playerColor()==='w'?'white_win':'black_win');
 function projected() { return premove.length ? projectPremoves(chess,premove,playerColor()) : chess; }
 function shownChess() { if(historyIndex===null)return projected();const p=new Chess();chess.history().slice(0,historyIndex).forEach(m=>p.move(m));return p; }
-function draw(move=null,transitions=[],captureMove=move) {
+function draw(move=null,transitions=[],captureMove=move,direction='forward') {
+  cancelCaptureFlights($('bot-player-captured'),$('bot-opponent-captured'));
   const shown=shownChess(), isLive=historyIndex===null;
   const playerAvatar=$('bot-player-avatar-image'); if(playerAvatar && !playerAvatar.classList.contains('custom-profile-avatar')) { const src=piece(playerColor(),'n'); if(playerAvatar.getAttribute('src')!==src)playerAvatar.src=src; }
   const botPiece=piece(playerColor()==='w'?'b':'w',BOT_LEVELS[level].piece);
@@ -194,14 +195,14 @@ function draw(move=null,transitions=[],captureMove=move) {
   const legal=selected&&isLive?(chess.turn()===playerColor()&&!premove.length?chess.moves({square:selected,verbose:true}):premoveTargets(shown,selected,playerColor())).map(m=>m.to):[];
   const displayedLast=isLive?last:shown.history({verbose:true}).at(-1);
   boardView.render({shown,selected,legal,last:displayedLast,premoves:isLive?premove:[],actual:isLive&&premove.length?chess:null,premoveMode:chess.turn()!==playerColor()||premove.length>0,animatedMove:isLive?move:null,transitions});
-  const actualShown=isLive?chess:shown;renderCaptures(actualShown,playerColor(),$('bot-player-captured'),$('bot-opponent-captured'),{board,move:captureMove});renderThreats(actualShown,playerColor(),boardView,threatKeys);
+  const actualShown=isLive?chess:shown;renderCaptures(actualShown,playerColor(),$('bot-player-captured'),$('bot-opponent-captured'),{board,move:captureMove,direction});renderThreats(actualShown,playerColor(),boardView,threatKeys);
 }
 function setThreat(code,down){if(!['KeyQ','KeyE'].includes(code))return;if(down&&(!pageVisible||!['playing','finished'].includes(phase)))return;if(down)threatKeys.add(code);else threatKeys.delete(code);draw();}
 for(const type of ['keydown','keyup'])document.addEventListener(type,e=>{if(!['KeyQ','KeyE'].includes(e.code))return;if(type==='keydown'&&(e.ctrlKey||e.metaKey||e.altKey||e.target.closest?.('input,textarea,select,[contenteditable]:not([contenteditable=false])')||document.querySelector('dialog[open]')))return;setThreat(e.code,type==='keydown');});window.addEventListener('blur',()=>{setThreat('KeyQ',false);setThreat('KeyE',false);});
 const renderMoves=createMoveHistory({document,list:$('move-list'),count:$('move-count'),onSelect:showHistory});
 function history() { const length=chess.history().length,index=historyIndex??length;renderMoves(chess,historyIndex);$('history-first').disabled=$('history-prev').disabled=index===0;$('history-next').disabled=$('history-last').disabled=index===length; }
 function showHistory(index) {
- const length=chess.history().length,old=historyIndex??length; historyIndex=index>=length?null:Math.max(0,index); selected=null; annotations.clear();draw(null,historyTransition(chess,old,historyIndex??length),(historyIndex??length)===old+1?chess.history({verbose:true})[old]:null);history();const move=historySoundMove(chess,old,historyIndex??length);if(move)sound.play(move);
+ const length=chess.history().length,old=historyIndex??length; historyIndex=index>=length?null:Math.max(0,index); selected=null; annotations.clear();draw(null,historyTransition(chess,old,historyIndex??length),Math.abs((historyIndex??length)-old)===1?chess.history({verbose:true})[Math.max(old,historyIndex??length)-1]:null,(historyIndex??length)===old-1?'backward':'forward');history();const move=historySoundMove(chess,old,historyIndex??length);if(move)sound.play(move);
  status(historyIndex!==null?`Просмотр позиции: ход ${historyIndex} из ${length}.`:phase==='finished'?'Партия завершена.':chess.turn()===playerColor()?'Ваш ход.':'Ход бота.');
 }
 function navigateHistory(key,code='') { if(!pageVisible || !['playing','finished'].includes(phase) || promotion || document.querySelector('dialog[open]'))return false;const length=chess.history().length,target=historyKeyTarget(key,code,historyIndex??length,length);if(target===null)return false;showHistory(target);return true; }
