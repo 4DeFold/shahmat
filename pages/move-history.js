@@ -52,18 +52,19 @@ export function createHistoryTimeline(chess) {
   }};
 }
 export function createMoveHistory({document,list,count,onSelect}) {
-  const buttons=[], moves=[]; let lastIndex=-1,lastCount=-1,marker=null,markerAnimation=null;
+  const buttons=[], moves=[]; let lastIndex=-1,lastCount=-1,marker=null,markerAnimation=null,lastScore=null;
   function moveMarker(button) {
     if(!marker){marker=document.createElement('span');marker.className='history-marker';marker.setAttribute('aria-hidden','true');list.append(marker);list.classList.add('has-history-marker');}
     if(!button){marker.hidden=true;markerAnimation?.cancel();return;}
     const old=!marker.hidden?marker.getBoundingClientRect():null;markerAnimation?.cancel();markerAnimation=null;marker.hidden=false;const outer=list.getBoundingClientRect(),r=button.getBoundingClientRect();
     const x=r.left-outer.left+list.scrollLeft-list.clientLeft,y=r.top-outer.top+list.scrollTop-list.clientTop;Object.assign(marker.style,{width:`${r.width}px`,height:`${r.height}px`,transform:`translate(${x}px,${y}px)`});
-    if(old?.width&&r.width&&marker.animate&&!document.defaultView.matchMedia?.('(prefers-reduced-motion: reduce)').matches){const dx=old.left-r.left,dy=old.top-r.top;markerAnimation=marker.animate([{transform:`translate(${x+dx}px,${y+dy}px)`,width:`${old.width}px`,height:`${old.height}px`},{transform:`translate(${x}px,${y}px)`,width:`${r.width}px`,height:`${r.height}px`}],{duration:360,easing:'cubic-bezier(.22,1,.36,1)'});}
+    if(old?.width&&r.width&&marker.animate&&!document.defaultView.matchMedia?.('(prefers-reduced-motion: reduce)').matches){const dx=old.left-r.left,dy=old.top-r.top;markerAnimation=marker.animate([{transform:`translate(${x+dx}px,${y+dy}px)`},{transform:`translate(${x}px,${y}px)`}],{duration:360,easing:'cubic-bezier(.22,1,.36,1)'});}
   }
   list.addEventListener('click',event=>{const button=event.target.closest('[data-history-index]');if(button)onSelect(Number(button.dataset.historyIndex));});
   return function render(chess,index,cachedScore=null) {
-    const score=cachedScore || chess.history({verbose:true}); let common=0;
+    const score=cachedScore || chess.history({verbose:true}); let common=score===lastScore ? moves.length : 0;
     while(common<moves.length&&common<score.length&&moves[common]===score[common].san)common++;
+    lastScore=cachedScore;
     while(buttons.length>common){const button=buttons.pop(), row=button.parentElement; button.remove();if(!row.querySelector('button'))row.remove();moves.pop();}
     for(let i=common;i<score.length;i++) {
       const move=score[i]; let row=buttons.at(-1)?.parentElement;
@@ -73,7 +74,9 @@ export function createMoveHistory({document,list,count,onSelect}) {
       const text=document.createElement('span');text.textContent=move.piece==='p'?move.san:move.san.replace(/^[KQRBN]/,'');button.append(text);row.insertBefore(button,row.querySelector('.history-times'));buttons.push(button);moves.push(move.san);
     }
     const active=index??score.length;
-    buttons.forEach((button,i)=>{button.classList.toggle('current',i===active-1);if(i===active-1)button.setAttribute('aria-current','step');else button.removeAttribute('aria-current');});
+    const oldButton=buttons[lastIndex-1], newButton=buttons[active-1];
+    if(oldButton && oldButton!==newButton){oldButton.classList.remove('current');oldButton.removeAttribute('aria-current');}
+    if(newButton){newButton.classList.add('current');newButton.setAttribute('aria-current','step');}
     const button=buttons[active-1];
     if(button&&(lastIndex!==active||(index===null&&lastCount!==score.length))){const top=button.getBoundingClientRect().top-list.getBoundingClientRect().top+list.scrollTop,bottom=top+button.offsetHeight;if(top<list.scrollTop)list.scrollTop=top;else if(bottom>list.scrollTop+list.clientHeight)list.scrollTop=bottom-list.clientHeight;}
     if(lastIndex!==active||lastCount!==score.length)moveMarker(button);lastIndex=active;lastCount=score.length; if(count)count.textContent=String(Math.ceil(score.length/2)).padStart(2,'0');
