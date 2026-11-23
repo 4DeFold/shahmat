@@ -6,12 +6,13 @@ export const controls = {
   rapid:['10+0','10+5','15+0','15+10'], classical:['30+0','30+20','60+0','60+40'],
 };
 const icon = body => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+// Silhouettes extracted from the supplied reference; masks follow the current theme.
+const symbol = name => `<span class="choice-symbol symbol-${name}" aria-hidden="true"></span>`;
 const info = {
- bullet:{name:'Пуля',icon:icon('<path d="M7 19 5 17l9-9c2-2 4-3 6-3 0 2-1 4-3 6l-9 9Z"/><path d="m8 14 3 3M5 19l-2 2"/>')},
- blitz:{name:'Блиц',icon:icon('<path d="M12 22c-4 0-7-3-7-7 0-3 2-6 4-8 0 3 2 3 2 3 1-3 2-5 4-7 0 4 4 6 4 12 0 4-3 7-7 7Z"/><path d="M9 18c0-2 1-3 3-5 0 3 3 3 3 5a3 3 0 0 1-6 0Z"/>')},
- // Rabbit and turtle: Lucide Icons, ISC license; see licenses/lucide-icons.txt.
- rapid:{name:'Рапид',icon:icon('<g stroke-width="1.05"><path d="M13 16a3 3 0 0 1 2.24 5"/><path d="M18 12h.01"/><path d="M18 21h-8a4 4 0 0 1-4-4 7 7 0 0 1 7-7h.2L9.6 6.4a1 1 0 1 1 2.8-2.8L15.8 7h.2c3.3 0 6 2.7 6 6v1a2 2 0 0 1-2 2h-1a3 3 0 0 0-3 3"/><path d="M20 8.54V4a2 2 0 1 0-4 0v3"/><path d="M7.612 12.524a3 3 0 1 0-1.6 4.3"/></g>')},
- classical:{name:'Классика',icon:icon('<g stroke-width="1.05"><path d="m12 10 2 4v3a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-3a8 8 0 1 0-16 0v3a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-3l2-4h4Z"/><path d="M4.82 7.9 8 10M15.18 7.9 12 10M16.93 10H20a2 2 0 0 1 0 4H2"/></g>')},
+ bullet:{name:'Пуля',icon:symbol('bullet')},
+ blitz:{name:'Блиц',icon:symbol('blitz')},
+ rapid:{name:'Рапид',icon:symbol('rapid')},
+ classical:{name:'Классика',icon:symbol('classical')},
 };
 export function lastThree(moves) {
   if (!Array.isArray(moves) || moves.length < 3) return null;
@@ -43,7 +44,8 @@ export function createOnlineCount(element, win) {
 
 export function createPlayLobby({document,client,onChoose,onOpenBoard}) {
  const win=document.defaultView, root=document.getElementById('play-lobby'), shell=document.getElementById('member-game');
- const stage=document.getElementById('lobby-stage'), back=document.getElementById('lobby-back');
+ const stage=document.getElementById('lobby-stage'), back=document.getElementById('lobby-back'), siteOnline=document.getElementById('lobby-site-online');
+ const siteCounter=siteOnline ? createOnlineCount(siteOnline.querySelector('#lobby-site-online-value'),win) : null;
  let screen='kinds',kind='rated',mode=null, selectedTime=null, timers=[], demoGames=[], fetching=null, visible=true, disposed=false, active=false;
  let counts=null, counters=[], pollTimer=null, pollInFlight=false, pollGeneration=0;
  const reduced=()=>win.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -244,7 +246,7 @@ export function createPlayLobby({document,client,onChoose,onOpenBoard}) {
   clearTransitions();const wasHidden=back.hidden, showBack=next!=='kinds';
   const previousBoard=fromBoard?snapshotBoard():null;
   const snapshot=previousBoard?null:snapshotStage(source);if(!showBack&&snapshot)animateBack(wasHidden,true);
-  clear();counters.forEach(x=>x.counter.destroy());counters=[];screen=next;shell.classList.add('lobby-open');root.hidden=false;back.hidden=!showBack;
+  clear();counters.forEach(x=>x.counter.destroy());counters=[];screen=next;if(siteOnline)siteOnline.hidden=next!=='kinds';shell.classList.add('lobby-open');root.hidden=false;back.hidden=!showBack;
   const first=!stage.children.length;stage.className=`lobby-stage stage-${screen}${first?' stage-initial':''}`;stage.replaceChildren();
   if(showBack)animateBack(previousBoard?true:wasHidden,false);
   if(screen==='kinds'){
@@ -274,5 +276,5 @@ export function createPlayLobby({document,client,onChoose,onOpenBoard}) {
  back.addEventListener('click',()=>show(screen==='controls'?'modes':'kinds',{backwards:true}));
  const onResize=()=>clearTransitions();win.addEventListener('resize',onResize);
  show('kinds');
- return {activate(){active=true;startPolling();return load();},show,showControls,openBoard,setVisible(value){visible=value;if(visible&&!root.hidden){if(screen==='kinds'){void load();startDemos();}startPolling();}else{clearTransitions();clear();stopPolling();}},destroy(){disposed=true;root.removeEventListener('pointermove',specular);root.removeEventListener('pointerleave',resetSpecular);win.removeEventListener('resize',onResize);clear();clearTransitions();stopPolling();counters.forEach(x=>x.counter.destroy());}};
+ return {setSiteOnline(value){siteCounter?.set(value);siteOnline?.setAttribute('aria-label', Number.isSafeInteger(value) && value >= 0 ? `Онлайн на сайте: ${value}` : 'Онлайн на сайте: нет соединения');},activate(){active=true;startPolling();return load();},show,showControls,openBoard,setVisible(value){visible=value;if(visible&&!root.hidden){if(screen==='kinds'){void load();startDemos();}startPolling();}else{clearTransitions();clear();stopPolling();}},destroy(){siteCounter?.destroy();disposed=true;root.removeEventListener('pointermove',specular);root.removeEventListener('pointerleave',resetSpecular);win.removeEventListener('resize',onResize);clear();clearTransitions();stopPolling();counters.forEach(x=>x.counter.destroy());}};
 }

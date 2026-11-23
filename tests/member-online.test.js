@@ -65,6 +65,8 @@ test('matched players can only submit legal moves on their turn; black sees flip
   await app.ui.open(B); await flush();
   assert.equal(app.$('board').firstElementChild.dataset.square, 'a8');
   assert.equal(app.$('board').classList.contains('black'), true);
+  assert.match(app.$('player-avatar-image').getAttribute('src'), /\/bN\.svg$/);
+  assert.match(app.$('opponent-avatar-image').getAttribute('src'), /\/wN\.svg$/);
   assert.equal(app.$('player-color'), null);
   assert.equal(app.$('player-clock-card').dataset.color, 'b');
   assert.equal(app.$('opponent-clock-card').dataset.color, 'w');

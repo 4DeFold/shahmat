@@ -42,3 +42,9 @@
 .archive-stats-grid dd {margin:6px 0 0;font:700 clamp(18px,2vw,25px) system-ui,sans-serif;color:var(--ink);font-variant-numeric:tabular-nums}
 @media(max-width:900px){.archive-stats-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:450px){.archive-stats-grid{gap:6px}.archive-stats-grid div{padding:9px}.archive-stats{margin-bottom:20px}}
+
+/* The loader overlays the visible page, never taking space in the card grid. */
+.archive-loading-overlay {position:fixed;inset:0;z-index:6;align-self:stretch;justify-self:stretch;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none}
+.archive-loading-overlay #archive-status {position:absolute;top:calc(50% + min(75px,17.5vw) + 8px);left:0;right:0;margin:0;text-align:center}
+.archive-loading-overlay .particle-loading {position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(150px,35vw)}
+#archive-app:has(.archive-detail:not([hidden])) .archive-loading-overlay {display:none}

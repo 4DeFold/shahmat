@@ -29,4 +29,5 @@ if (needsSession) {
 } else {
   document.getElementById('landing-screen').hidden = false;
   document.body.classList.add('startup-ready');
+  void import('./pages/guest-presence.js').then(({startGuestPresence}) => startGuestPresence(window)).catch(() => {});
 }

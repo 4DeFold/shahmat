@@ -1,3 +1,4 @@
+import './standalone-guest-presence.js';
 import {createGameSound} from './game-sound.js';
 const sound=createGameSound(window);
 import {pieceSrc as themedPieceSrc} from './piece-theme.js';
@@ -154,11 +155,11 @@ function render(move = null) {
   board.replaceChildren(fragment); annotations.refresh();
   document.getElementById('player-color').textContent = playerColor === 'w' ? 'Белые' : 'Чёрные';
   document.getElementById('bot-color').textContent = playerColor === 'w' ? 'Чёрные' : 'Белые';
-  document.getElementById('player-avatar').src = pieceSrc(playerColor, 'p');
+  document.getElementById('player-avatar').src = pieceSrc(playerColor, 'n');
   document.getElementById('bot-avatar').src = pieceSrc(playerColor === 'w' ? 'b' : 'w', 'n');
   status.textContent = resultText();
   animateMove(move);
-  renderCaptures(game,playerColor,document.getElementById('guest-player-captured'),document.getElementById('guest-bot-captured'));
+  renderCaptures(game,playerColor,document.getElementById('guest-player-captured'),document.getElementById('guest-bot-captured'),{board,move});
   renderHistory();
 }
 function playMove(move) {

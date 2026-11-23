@@ -79,3 +79,16 @@
 .lobby-board-ghost {position:absolute;z-index:0;pointer-events:none;box-sizing:border-box;display:grid;place-items:center;overflow:hidden}
 .lobby-board-ghost * {pointer-events:none!important}
 #member-game:not(.lobby-open) > .board-area,#member-game:not(.lobby-open) > .game-rail {position:relative;z-index:1}
+
+.kind-card {text-align:center;align-items:center}
+.kind-card .demo-frame {align-self:stretch}
+.lobby-site-online {color:var(--muted);font:12px system-ui,sans-serif;font-variant-numeric:tabular-nums;text-align:center;flex:none}
+.lobby-site-online[hidden] {display:none}
+
+/* Four clean silhouettes; the masks inherit the theme's foreground colour. */
+.choice-symbol {display:block;width:100%;height:100%;background:currentColor;mask-repeat:no-repeat;mask-position:center;mask-size:contain;-webkit-mask-repeat:no-repeat;-webkit-mask-position:center;-webkit-mask-size:contain}
+.symbol-bullet {mask-image:url('/icons/bullet.png');-webkit-mask-image:url('/icons/bullet.png')}
+.symbol-blitz {mask-image:url('/icons/blitz.png');-webkit-mask-image:url('/icons/blitz.png')}
+.symbol-rapid {mask-image:url('/icons/rapid.png');-webkit-mask-image:url('/icons/rapid.png')}
+.symbol-classical {mask-image:url('/icons/classical.png');-webkit-mask-image:url('/icons/classical.png')}
+@media(max-width:700px){.choice-icon{width:min(100%,48px);height:min(100%,48px)}}

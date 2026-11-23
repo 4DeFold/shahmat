@@ -1,7 +1,7 @@
 import {pieceSrc as themedPieceSrc,setPublicPiece} from './piece-theme.js';
 import {applyProfileTheme,isProfileImage,profileAvatarColor} from './profile-theme.js';
 import { Chess } from 'chess.js';
-import {renderCaptures,renderThreats} from './board-insights.js';
+import {renderCaptures,renderThreats,cancelCaptureFlights} from './board-insights.js';
 import { premoveTargets, validPremove, normalizePremove, projectPremoves } from './premove.js';
 import { createBoardAnnotations } from './board-annotations.js';
 import { createMemberBoard } from './member-board.js';
@@ -46,7 +46,17 @@ export function createMemberGame({ document, api, opponentName = async () => nul
       if (value) { ownScore = value; renderRatings(); }
     } catch { /* Keep the last known value on a temporary failure. */ }
   }
-  function setAvatar(who, value, set) { const img = $(`${who}-avatar-image`); if(!img)return; const custom=typeof value==='string' && /^data:image\/(?:png|jpeg);base64,/.test(value); if(who==='opponent')setPublicPiece(img,set,'b');else {delete img.dataset.pieceFixed;img.src=themedPieceSrc('w','n');}if(custom)img.src=value; img.classList.toggle('custom-profile-avatar',custom); }
+  const avatars = {player:{value:null,set:null},opponent:{value:null,set:null}};
+  function setAvatar(who, value, set) {
+    avatars[who]={value,set}; const img=$(`${who}-avatar-image`); if(!img)return;
+    const custom=typeof value==='string' && /^data:image\/(?:png|jpeg);base64,/.test(value), own=currentColor(), color=who==='player'?own:(own==='w'?'b':'w');
+    if(custom) img.src=value;
+    else if(who==='opponent') setPublicPiece(img,set,color);
+    else {delete img.dataset.pieceFixed;img.src=themedPieceSrc(color,'n');}
+    img.classList.toggle('custom-profile-avatar',custom);
+  }
+  function syncAvatarColors() { for(const who of ['player','opponent']) {const img=$(`${who}-avatar-image`);const expected=who==='player'?currentColor():(currentColor()==='w'?'b':'w');if(img && !img.classList.contains('custom-profile-avatar') && !img.getAttribute('src')?.endsWith(`/${expected}N.svg`)) setAvatar(who,avatars[who].value,avatars[who].set); } }
+
   function renderRatings() {
     for (const who of ['player','opponent']) {
       const base=who === 'player' ? (scores?.self || ownScore) : scores?.opponent; const record=ratingResult?.[who]; const data=record ? {...base, yar:record.after_yar, elo:record.after_elo ?? base?.elo} : base; ratingCounts[who].set(data?.[rankUnit], rankUnit, !!data); const badge=$(who+'-top-status'); if(badge){const place=Number(data?.topPlace);badge.hidden=!(place>=1&&place<=5);badge.textContent=badge.hidden?'':`Топ ${place}`;} const img=$(who+'-avatar-image');if(img)img.parentElement.style.backgroundColor=profileAvatarColor(data?.palette);
@@ -172,7 +182,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     const count=chess.history().length, old=historyIndex??count;
     historyIndex=index>=count?null:Math.max(0,index);
     const target=historyIndex??count, transitions=historyTransition(chess,old,target);
-    annotations.clear(); selected=null; renderBoard(null,transitions); renderHistory();
+    annotations.clear(); selected=null; renderBoard(null,transitions,Math.abs(target-old)===1 ? chess.history({verbose:true})[Math.max(old,target)-1] : null,target===old-1?'backward':'forward'); renderHistory();
     const move=historySoundMove(chess,old,target); if(move) sound.play(move);
     if(historyIndex!==null)setStatus(`Просмотр позиции: ход ${historyIndex} из ${count}.`);else statusGame();
   }
@@ -181,13 +191,15 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     if (chess.turn() === currentColor() && !premove.length) return chess.moves({ square, verbose:true });
     return premoveTargets(projected(), square, currentColor());
   }
-  function renderBoard(animatedMove = null, transitions = []) {
+  function renderBoard(animatedMove = null, transitions = [], captureMove = animatedMove, direction = 'forward') {
+    cancelCaptureFlights($('player-captured'),$('opponent-captured'));
+    syncAvatarColors();
     const color = currentColor(), shown = historyIndex === null ? projected() : displayChess();
     const legal = selected && historyIndex === null ? legalFor(selected).map(move => move.to) : [];
     const last = historyIndex === null ? latestMove : shown.history({ verbose:true }).at(-1);
     boardView.render({ shown, selected, legal, last, premoves: historyIndex === null ? premove : [], actual: historyIndex === null && premove.length ? chess : null, premoveMode: (chess.turn() !== color || premove.length > 0) && historyIndex === null, transitions, animatedMove: historyIndex === null ? animatedMove : null });
     const actualShown=historyIndex===null?chess:shown;
-    renderThreats(actualShown,color,boardView,threatKeys);renderCaptures(actualShown,color,$('player-captured'),$('opponent-captured'));
+    renderThreats(actualShown,color,boardView,threatKeys);renderCaptures(actualShown,color,$('player-captured'),$('opponent-captured'),{board,move:captureMove,direction});
     // Establish initial rotation before the board changes sides.
     if (board.classList.contains('waiting') && snapshot) void board.offsetWidth;
     board.classList.toggle('waiting', !snapshot); board.classList.toggle('black', !!snapshot && color === 'b');
@@ -340,7 +352,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     moving = true; modeControls(); selected = null; pending = null; promotion.hidden = true; latestMove = move;
     const increment = Math.max(0, Number(String(saved.time_control || '').split('+')[1]) || 0) * 1000;
     clockSync.beginMove(now(), increment); drawClocks();
-    renderBoard(animate ? move : null); renderHistory(); playSound(move); setStatus('Отправляем ход…');
+    renderBoard(animate ? move : null, [], move); renderHistory(); playSound(move); setStatus('Отправляем ход…');
     try {
       const result = await api({ action:'move', gameId:saved.id, version:saved.version, from, to, ...(piece ? { promotion:piece } : {}) });
       if (!result.game) throw Error('missing snapshot');

@@ -822,7 +822,7 @@ body.startup-ready #landing-screen:not([hidden]) .hero-reveal--tail { animation-
 .rating-columns { padding: 18px 18px 14px; color: var(--ink); opacity: .55; font: 600 11px/1 Arial,sans-serif; letter-spacing: .12em; text-transform: uppercase; }
 .rating-columns span:last-child, .rating-score { text-align: right; }
 .rating-list { list-style: none; padding: 0; margin: 0; }
-.rating-row { min-height: 74px; padding: 12px 18px; border-top: 1px solid var(--line); transition: background-color .25s ease; }
+.rating-row { min-height: 54px; padding: 6px 18px; border-top: 1px solid var(--line); transition: background-color .25s ease; }
 .rating-place { font: 400 17px/1 Georgia,serif; opacity: .55; font-variant-numeric: tabular-nums; }
 .rating-row:nth-child(-n+3) .rating-place { font-size: 23px; opacity: 1; }
 .rating-player { overflow-wrap: anywhere; font: 400 clamp(17px, 2vw, 21px)/1.3 'Charis SIL',Georgia,serif; }
@@ -831,7 +831,7 @@ body.startup-ready #landing-screen:not([hidden]) .hero-reveal--tail { animation-
 .rating-retry { margin: 0 18px 20px; padding: 8px 0; cursor: pointer; background: transparent; color: var(--ink); border: 0; border-bottom: 1px solid currentColor; font: inherit; }
 .rating-row-reveal { animation: rating-reveal .42s cubic-bezier(.22, 1, .36, 1) both; animation-delay: calc(var(--row, 0) * 24ms); }
 @keyframes rating-reveal { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-@media (max-width: 700px) { .rating-page { padding: 22px 0 60px; } .rating-heading { margin-bottom: 28px; } .rating-filters { gap: 6px; margin-bottom: 24px; } .rating-filter { padding: 10px 15px; font-size: 14px; } .rating-columns, .rating-row { grid-template-columns: 38px minmax(0, 1fr) auto; gap: 10px; padding-inline: 8px; } .rating-row { min-height: 64px; } .rating-score { font-size: 17px; } }
+@media (max-width: 700px) { .rating-page { padding: 22px 0 60px; } .rating-heading { margin-bottom: 28px; } .rating-filters { gap: 6px; margin-bottom: 24px; } .rating-filter { padding: 10px 15px; font-size: 14px; } .rating-columns, .rating-row { grid-template-columns: 38px minmax(0, 1fr) auto; gap: 10px; padding-inline: 8px; } .rating-row { min-height: 46px; } .rating-score { font-size: 17px; } }
 @media (prefers-reduced-motion: reduce) { .rating-filter, .rating-row { transition: none; } .rating-row-reveal { animation: none; } }
 
 /* Animata-inspired Fluid Tabs and a staggered, lightweight entrance. */
@@ -878,7 +878,7 @@ body.startup-ready #landing-screen:not([hidden]) .hero-reveal--tail { animation-
 .rating-filters:has(.rating-indicator.is-ready) .rating-filter[aria-pressed='true'] { background: transparent; }
 @media (hover:hover) { .rating-filter:hover:not([aria-pressed='true']) { transform: none; background: color-mix(in srgb, var(--ink) 8%, transparent); } }
 .rating-row-self { background: color-mix(in srgb, var(--accent) 15%, var(--page-background)); }
-.rating-self { position: sticky; bottom: 0; z-index: 5; display: grid; grid-template-columns: 64px minmax(0,1fr) auto; align-items: center; gap: 16px; min-height: 70px; padding: 12px 18px; border: 1px solid var(--line); background: var(--surface-raised); box-shadow: 0 -8px 22px #0002; font: 400 19px/1.3 'Charis SIL', Georgia, serif; }
+.rating-self { position: sticky; bottom: 0; z-index: 5; display: grid; grid-template-columns: 64px minmax(0,1fr) auto; align-items: center; gap: 16px; min-height: 52px; padding: 6px 18px; border: 1px solid var(--line); background: var(--surface-raised); box-shadow: 0 -8px 22px #0002; font: 400 19px/1.3 'Charis SIL', Georgia, serif; }
 .rating-self-score { text-align: right; font: 600 19px/1 Arial,sans-serif; font-variant-numeric: tabular-nums; }
 .rating-self-name { overflow-wrap: anywhere; }
 @media (max-width:700px) { .rating-filters { gap: 0; } .rating-self { grid-template-columns: 38px minmax(0,1fr) auto; gap: 10px; padding-inline: 8px; } }
@@ -1051,3 +1051,100 @@ body.startup-ready #landing-screen:not([hidden]) .hero-reveal--tail { animation-
 #dashboard-home { position:relative; overflow:hidden; }
 .home-particles-canvas { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
 #dashboard-home h2 { position:relative; z-index:1; }
+
+.rating-online { flex:none; width:9px; height:9px; border-radius:50%; background:#31a85b; box-shadow:0 0 0 2px var(--surface-raised); }
+
+/* Home: layered, theme-aware surfaces over the existing particles. */
+.home-page {min-height:calc(100svh - 80px);position:relative;overflow:hidden;color:var(--ink)}
+.home-content {position:relative;z-index:1;max-width:1100px;margin:auto;padding:clamp(28px,5vw,72px) 0 22px}
+.home-hero {display:grid;grid-template-columns:1.08fr .92fr;gap:clamp(24px,5vw,70px);align-items:center;min-height:440px}
+.home-intro {animation:home-rise .7s cubic-bezier(.22,1,.36,1) both}
+.home-eyebrow {display:flex;align-items:center;gap:9px;margin:0 0 24px;color:var(--muted, var(--ink));font:600 10px/1.2 system-ui,sans-serif;letter-spacing:.17em}
+.home-eyebrow span {width:7px;height:7px;background:#31a85b;border-radius:50%}
+#dashboard-home h2 {margin:0;font:400 clamp(45px,5.5vw,78px)/1.06 'Playfair Display',Georgia,serif;letter-spacing:-.045em}
+#dashboard-home h2 em {font-weight:400;color:var(--accent)}
+.home-period {color:var(--accent)}
+.home-description {max-width:390px;margin:24px 0 30px;color:var(--muted, var(--ink));font:400 17px/1.6 'Charis SIL',Georgia,serif}
+.home-actions {display:flex;flex-wrap:wrap;gap:10px}
+.home-actions a {display:inline-flex;align-items:center;justify-content:space-between;gap:28px;min-height:50px;padding:0 19px;text-decoration:none;font:600 14px system-ui,sans-serif;transition:transform .25s,background .25s}
+.home-primary {background:var(--button-background);color:var(--button-text)} .home-secondary {border:1px solid var(--line);background:var(--surface-raised);color:var(--ink)}
+.home-actions a:hover,.home-link:hover {transform:translateY(-4px)}
+.home-actions a:focus-visible,.home-link:focus-visible {outline:2px solid var(--foreground);outline-offset:3px}
+.home-art {position:relative;display:grid;place-items:center;aspect-ratio:1;max-width:450px;width:100%;justify-self:end;animation:home-rise .9s .1s both}
+.home-art-ring {position:absolute;inset:7%;border:1px solid var(--line);border-radius:50%}.ring-two {inset:0;opacity:.45}
+.home-art-board {position:relative;width:62%;aspect-ratio:1;transform:rotate(-9deg);box-shadow:0 25px 65px #0003;animation:home-float 7s ease-in-out infinite}
+.home-art-grid {position:absolute;inset:0;background-color:var(--board-light);background-image:conic-gradient(var(--board-dark) 25%,transparent 0 50%,var(--board-dark) 0 75%,transparent 0);background-size:25% 25%}
+.home-art-board img {position:absolute;inset:13%;width:74%;height:74%;filter:drop-shadow(0 14px 9px #0005);transform:rotate(9deg)}
+.home-art-caption,.home-art-number {position:absolute;color:var(--muted, var(--ink));font:600 10px system-ui,sans-serif;letter-spacing:.16em}.home-art-caption {top:13%;left:0}.home-art-number {right:0;bottom:13%}
+.home-section-heading {display:flex;align-items:end;justify-content:space-between;border-bottom:1px solid var(--line);padding-bottom:16px;margin:50px 0 0}.home-section-heading .home-eyebrow {margin-bottom:10px}.home-section-heading h3 {margin:0;font:400 clamp(28px,3vw,38px) 'Playfair Display',Georgia,serif;letter-spacing:-.03em}.home-section-heading>span {font-size:26px;color:var(--muted, var(--ink))}
+.home-links {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:16px}
+.home-link {position:relative;display:flex;flex-direction:column;align-items:flex-start;min-height:190px;padding:21px;border:1px solid var(--line);background:var(--surface-raised);color:var(--ink);text-decoration:none;transition:transform .3s,border-color .3s,box-shadow .3s}
+.home-link:hover {border-color:var(--foreground);box-shadow:0 12px 28px #0001}.home-link-index {font:600 10px system-ui,sans-serif;color:var(--muted, var(--ink));letter-spacing:.12em}.home-link-icon {font:32px/1 Georgia,serif;margin:18px 0}.home-link strong {font:400 22px 'Playfair Display',Georgia,serif}.home-link-description {max-width:230px;margin-top:8px;color:var(--muted, var(--ink));font:14px/1.4 'Charis SIL',Georgia,serif}.home-link-arrow {position:absolute;right:21px;top:19px;font-size:20px}
+.home-footer {display:flex;justify-content:space-between;gap:15px;margin:32px 0 0;color:var(--muted, var(--ink));font:600 9px system-ui,sans-serif;letter-spacing:.14em}
+@keyframes home-rise {from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes home-float {0%,100%{transform:rotate(-9deg) translateY(0)}50%{transform:rotate(-7deg) translateY(-9px)}}
+@media(max-width:700px){.home-page{min-height:calc(100svh - 90px)}.home-content{padding:28px 0 20px}.home-hero{grid-template-columns:1fr;min-height:0;gap:16px}.home-art{width:min(75%,290px);justify-self:center;grid-row:2}.home-description{margin:18px 0 22px}.home-section-heading{margin-top:30px}.home-links{grid-template-columns:1fr;gap:8px}.home-link{min-height:130px;padding:16px}.home-link-icon{margin:10px 0;font-size:25px}.home-link-description{max-width:none}.home-footer{font-size:8px}}
+@media(prefers-reduced-motion:reduce){.home-intro,.home-art,.home-art-board{animation:none}.home-actions a,.home-link{transition:none}.home-actions a:hover,.home-link:hover{transform:none}}
+
+/* Compact navigation while keeping full-size click targets. */
+@media (min-width:701px) {
+  .sidebar-brand { margin-bottom:16px; }
+  .sidebar-nav > .sidebar-item, .sidebar-account > .sidebar-item { padding-inline:16px; }
+}
+.rating-columns, .rating-row, .rating-self { grid-template-columns:40px minmax(0,1fr) auto; gap:10px; }
+.rating-avatar { border-radius:0; }
+.rating-avatar-wrap { position:relative;display:block;width:36px;height:36px;flex:0 0 36px; }
+.rating-avatar-wrap .rating-avatar { display:block;width:100%;height:100%; }
+.rating-online { position:absolute;right:-3px;bottom:-3px;z-index:1;width:11px;height:11px;border:2px solid var(--surface-raised);border-radius:50%;background:#31a85b;box-shadow:none; }
+@media(max-width:700px){.rating-columns,.rating-row,.rating-self {grid-template-columns:30px minmax(0,1fr) auto;gap:8px}.rating-avatar-wrap {width:30px;height:30px;flex-basis:30px}}
+.home-hero {min-height:0;grid-template-columns:1fr minmax(180px,320px);padding:clamp(25px,5vw,70px) 0;}
+.home-actions {margin-top:28px}
+.home-poster {margin:0;width:100%;max-width:320px;justify-self:end;overflow:hidden;box-shadow:0 18px 50px #0003;animation:home-rise .9s .1s both}
+.home-poster img {display:block;width:100%;height:auto}
+.home-links {margin-top:0}
+.home-link {min-height:135px;justify-content:space-between}
+.home-link-icon {margin:0}
+@media(max-width:700px){.home-hero{grid-template-columns:1fr 1fr;gap:18px;padding:20px 0 30px}.home-poster{width:100%;grid-row:auto}.home-actions{gap:8px}.home-actions a{min-height:44px;gap:8px;padding:0 12px;font-size:12px}#dashboard-home h2{font-size:clamp(30px,8vw,48px)}.home-links{grid-template-columns:1fr}.home-link{min-height:82px;flex-direction:row;align-items:center;justify-content:flex-start;gap:16px;padding:14px}.home-link-arrow{top:50%;transform:translateY(-50%)}}
+@media(prefers-reduced-motion:reduce){.home-poster{animation:none}}
+@media(max-width:360px){.home-hero{grid-template-columns:minmax(0,1fr);gap:22px}.home-poster{width:min(60%,220px);justify-self:center}.home-actions a{flex:1 1 auto}}
+
+/* Denser leaderboard: the image nearly fills each row without touching it. */
+.rating-columns,.rating-row,.rating-self {grid-template-columns:32px minmax(0,1fr) auto;gap:6px}
+.rating-row,.rating-self {padding-block:3px}
+.rating-avatar-wrap {width:46px;height:46px;flex-basis:46px}
+@media(max-width:700px){.rating-columns,.rating-row,.rating-self{grid-template-columns:28px minmax(0,1fr) auto;gap:4px}.rating-avatar-wrap{width:38px;height:38px;flex-basis:38px}}
+
+/* The home dashboard fits the viewport; links remain visible without scrolling. */
+.landing:has(.dashboard:not([hidden]) #dashboard-home:not([hidden])) {height:100dvh;min-height:0;padding:16px 32px 16px 219px;overflow:hidden}
+.landing:has(.dashboard:not([hidden]) #dashboard-home:not([hidden])) .dashboard,
+.landing:has(.dashboard:not([hidden]) #dashboard-home:not([hidden])) #page-content,
+#dashboard-home:not([hidden]) {height:100%;min-height:0}
+#dashboard-home:not([hidden]) {min-height:0}
+.home-content {height:100%;min-height:0;display:flex;flex-direction:column;justify-content:center;padding:0}
+.home-hero {flex:1 1 auto;min-height:0;padding:clamp(8px,2vh,24px) 0;grid-template-columns:minmax(0,1fr) minmax(0,320px)}
+.home-poster {height:100%;max-height:min(64dvh,560px);min-height:0;display:flex;align-items:center;justify-content:center;box-shadow:none}
+.home-poster img {height:100%;max-width:100%;width:auto;object-fit:contain;box-shadow:0 12px 32px #0003}
+.home-links {flex:none}
+.home-link {min-height:0;height:clamp(72px,14dvh,120px)}
+@media(max-width:700px),(max-height:500px) and (pointer:coarse){
+ .landing:has(.dashboard:not([hidden]) #dashboard-home:not([hidden])) {padding:72px 16px 12px}
+ .home-hero {grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;padding:8px 0 12px}
+ .home-intro {min-width:0}
+ #dashboard-home h2 {font-size:clamp(23px,6vw,38px)}
+ .home-actions {margin-top:16px;gap:6px}
+ .home-actions a {min-height:40px;padding:0 9px;font-size:11px;gap:6px}
+ .home-poster {width:100%;max-height:100%;justify-self:center}
+ .home-link {height:clamp(48px,9dvh,62px);padding:8px 12px;gap:12px}
+ .home-link-icon {font-size:24px;margin:0}
+ .home-link strong {font-size:19px}
+}
+@media(max-width:360px){.home-hero{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}.home-poster{width:100%}.home-actions a{flex:1 1 100%}}
+@media(max-height:500px){.home-links{grid-template-columns:repeat(3,minmax(0,1fr))}.home-link{height:50px;gap:6px}.home-link strong{font-size:15px}.home-link-icon{font-size:18px}.home-link-arrow{right:9px;font-size:15px}.home-actions{margin-top:8px}}
+/* Exceptionally short viewports can scroll instead of clipping controls. */
+@media(max-height:300px){
+ .landing:has(.dashboard:not([hidden]) #dashboard-home:not([hidden])){height:auto;min-height:100dvh;overflow:visible}
+ .landing:has(.dashboard:not([hidden]) #dashboard-home:not([hidden])) .dashboard,
+ .landing:has(.dashboard:not([hidden]) #dashboard-home:not([hidden])) #page-content,
+ #dashboard-home:not([hidden]),.home-content{height:auto}
+ .home-hero{min-height:150px}.home-poster{height:140px}
+}

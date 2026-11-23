@@ -52,7 +52,8 @@ try {
    assert.match(morph.sibling.at(-1).filter,/blur/);assert.ok(morph.back.length>=2);
   }else assert.equal(await page.locator('.lobby-ghost').count(),0);
   await checkCardEffect(page.locator('#lobby-stage .choice-card').nth(1));
-  assert.equal(await page.locator('#lobby-stage .choice-card').nth(2).locator('svg g').getAttribute('stroke-width'),'1.05');
+  assert.equal(await page.locator('#lobby-stage .choice-card .choice-symbol').count(),4);
+  for(const symbol of ['bullet','blitz','rapid','classical']) assert.match(await page.locator(`.symbol-${symbol}`).evaluate(el=>getComputedStyle(el).maskImage),new RegExp(`/icons/${symbol}\\.png`));
   await page.locator('#lobby-stage .choice-card').nth(1).click();await page.locator('#lobby-stage .time-card').first().waitFor();
   await checkCardEffect(page.locator('#lobby-stage .time-card').first());
   await page.locator('#lobby-back').click();await page.locator('#lobby-stage .choice-card').nth(1).waitFor();
