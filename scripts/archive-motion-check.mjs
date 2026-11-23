@@ -18,6 +18,7 @@ try {
    if(p==='/auth/v1/user')return route.fulfill({json:user,headers});
    if(p==='/rest/v1/profiles')return route.fulfill({json:{username:'Alice'},headers});
    if(p.endsWith('/my_archive_all'))return archiveGate.then(()=>route.fulfill({json:[{id:'fixture',mode:'blitz',my_color:'b',white_name:'Bob',black_name:'Alice',moves:['e4','d5','exd5','Qxd5'],result:'draw'}],headers}));
+   if(p.endsWith('/my_archive_ratings'))return route.fulfill({json:[{game_id:'fixture',white_yar:1240,black_yar:1690}],headers});
    if(p.endsWith('/my_archive_stats'))return route.fulfill({json:{bullet:0,blitz:1,rapid:0,classical:0,bot:0},headers});
    if(p==='/functions/v1/matchplay')return route.fulfill({json:{game:null},headers});
    return route.fulfill({json:[],headers});
@@ -49,6 +50,15 @@ try {
   await frame.locator('.review-title').getByText('Анализ партии',{exact:true}).waitFor({timeout:60000});
   assert.equal(await frame.locator('.review-person strong').first().textContent(),'Bob');
   assert.equal(await frame.locator('.review-person strong').last().textContent(),'Alice');
+  assert.match(await frame.locator('.review-person .review-rating').first().textContent(),/1240 ЯР/);
+  assert.match(await frame.locator('.review-person .review-rating').last().textContent(),/1690 ЯР/);
+  const geometry=await frame.locator('.review-bar').evaluate(bar=>{const br=bar.getBoundingClientRect(),board=bar.parentElement.getBoundingClientRect();return {left:br.left,right:br.right,boardRight:board.right,width:br.width,viewport:innerWidth}});
+  assert.ok(geometry.left>=geometry.boardRight-1 && geometry.right<=geometry.viewport+1 && geometry.width>=10,`bar must be outside right edge: ${JSON.stringify(geometry)}`);
+  assert.equal(await frame.locator('#move-list .review-move-mark').count(),4);
+  assert.equal(await frame.locator('[data-square=d5] .review-board-mark').getAttribute('data-type'),await frame.locator('[data-history-index="4"] .review-move-mark').getAttribute('data-type'));
+  await frame.locator('#history-prev').click();assert.equal(await frame.locator('[data-square=d5] .review-board-mark').getAttribute('data-type'),await frame.locator('[data-history-index="3"] .review-move-mark').getAttribute('data-type'));
+  await frame.locator('#history-first').click();assert.equal(await frame.locator('.review-board-mark').count(),0);
+  await frame.locator('#history-last').click();
   assert.match(await frame.locator('.review-bar').getAttribute('aria-label'),/белые \d+%/);
   assert.match(await frame.locator('.review-accuracy').first().textContent(),/^\d+%$/);
   assert.equal(await frame.locator('.review-brilliant b').first().textContent(),'—');

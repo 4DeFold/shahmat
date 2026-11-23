@@ -35,3 +35,20 @@ test('invalid scores and zero move games do not invent percentages',async()=>{
  review.start({moves:['invalid']});assert.equal(d.querySelector('.review-panel').hidden,true);
  review.start({moves:[]});await tick();assert.equal(d.querySelector('.review-accuracy').textContent,'—');review.destroy();dom.window.close();
 });
+
+test('move marks track analyzed plies, current board square and clear between games',async()=>{
+ const dom=new JSDOM('<div id="frame"><div class="board"><button data-square="e4" aria-label="e4"></button><button data-square="e5" aria-label="e5"></button><button data-square="d6" aria-label="d6"></button></div></div><div id="rail"><div class="moves"><ol id="move-list"></ol></div></div>'),d=dom.window.document;
+ const list=d.querySelector('#move-list');for(let i=1;i<=5;i++){const b=d.createElement('button');b.dataset.historyIndex=i;b.setAttribute('aria-label',`Ход ${i}`);list.append(b)}
+ const createEngine=()=>({evaluate:async()=>({win:50,best:'e2e4'}),destroy(){}});
+ const review=createGameReview({document:d,frame:d.querySelector('#frame'),host:d.querySelector('#rail'),createEngine});
+ review.start({moves:['e4','a6','e5','d5','exd6'],names:{w:{name:'Alice',rating:'(1234 ЯР)'},b:{name:'Bob',rating:'(987 ЯР)'}}});
+ await new Promise(resolve=>setTimeout(resolve,180));
+ assert.equal(list.querySelectorAll('.review-move-mark').length,5);assert.equal(list.querySelector('[data-history-index="1"] .review-move-mark').dataset.type,'best');
+ assert.match(list.querySelector('[data-history-index="1"]').getAttribute('aria-label'),/Лучший/);
+ assert.equal(d.querySelector('[data-square=d6] .review-board-mark').dataset.type,'excellent');
+ assert.equal(d.querySelector('.review-person strong').textContent,'Alice');assert.equal(d.querySelector('.review-person .review-rating').textContent,'(1234 ЯР)');
+ review.setIndex(1);assert.equal(d.querySelectorAll('.review-board-mark').length,1);assert.equal(d.querySelector('[data-square=e4] .review-board-mark').dataset.type,'best');
+ review.setIndex(0);assert.equal(d.querySelectorAll('.review-board-mark').length,0);
+ review.setIndex(5);review.clear();assert.equal(list.querySelectorAll('.review-move-mark').length,0);assert.equal(list.querySelector('[data-history-index="1"]').getAttribute('aria-label'),'Ход 1');assert.equal(d.querySelectorAll('.review-board-mark').length,0);
+ review.destroy();dom.window.close();
+});

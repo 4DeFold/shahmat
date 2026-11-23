@@ -1,4 +1,4 @@
-.review-bar {position:absolute;z-index:8;left:-12px;top:0;width:8px;height:100%;background:#27282b;box-shadow:0 0 0 1px #8886;overflow:hidden;pointer-events:none;animation:review-in .35s ease both}
+.review-bar {position:absolute;z-index:8;right:-12px;top:0;width:11px;height:100%;background:#27282b;box-shadow:0 0 0 1px #8886;overflow:hidden;pointer-events:none;animation:review-in .35s ease both}
 .review-bar[hidden],.review-panel[hidden] {display:none}
 .review-bar.is-leaving,.review-panel.is-leaving{animation:review-out .18s ease both;pointer-events:none}
 @keyframes review-out {to{opacity:0;translate:0 -4px}}
@@ -10,5 +10,22 @@
 .review-accuracy-label{margin-top:14px;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.08em}.review-table {display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0 14px}.review-person {display:grid;gap:3px;min-width:0;text-align:center}.review-person strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}.review-person small{color:var(--muted);font-size:10px}.review-accuracy {font-size:23px}
 .review-rows {display:grid;gap:2px}.review-row {display:grid;grid-template-columns:20px minmax(0,1fr) 34px 34px;align-items:center;gap:4px;padding:4px 2px;font-size:11px}.review-row b{text-align:center}.review-row>span:first-child{text-align:center;font-size:15px}.review-brilliant>span:first-child{color:#46a6a2}.review-best>span:first-child,.review-excellent>span:first-child{color:#5c9e67}.review-inaccuracy>span:first-child{color:#c49b36}.review-mistake>span:first-child{color:#d77e36}.review-blunder>span:first-child{color:#cf5252}.review-panel button{border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:7px;margin-top:8px;cursor:pointer}
 @keyframes review-in {from{opacity:0;translate:0 5px}to{opacity:1;translate:0 0}}
-@media(max-width:700px){.review-bar{left:0;width:6px}.review-panel{margin-top:10px;padding-top:10px}.review-accuracy{font-size:18px}.review-rows{grid-template-columns:1fr 1fr;column-gap:12px}}
+@media(max-width:700px){.review-bar{right:-12px;width:10px}.review-panel{margin-top:10px;padding-top:10px}.review-accuracy{font-size:18px}.review-rows{grid-template-columns:1fr 1fr;column-gap:12px}}
 @media(prefers-reduced-motion:reduce){.review-bar,.review-panel{animation:none}.review-bar-white{transition:none}}
+
+/* Review glyphs are independent of the chess pieces and never intercept input. */
+.review-move-mark,.review-board-mark {display:inline-grid;place-items:center;flex:none;border-radius:50%;color:#fff;font:700 11px/1 system-ui,sans-serif;pointer-events:none;background:#508b58}
+.review-move-mark {width:16px;height:16px;margin-left:auto}
+.board .square:has(.review-board-mark) {z-index:6}
+.board .review-board-mark {position:absolute;right:1px;top:1px;width:clamp(13px,28%,23px);height:clamp(13px,28%,23px);z-index:7;font-size:clamp(9px,1.8cqw,15px);transform:rotate(calc(-1 * var(--board-angle)));box-shadow:0 1px 4px #0007;animation:review-in .2s ease both}
+.review-move-mark[data-type=brilliant],.review-board-mark[data-type=brilliant]{background:#328d88}
+.review-move-mark[data-type=excellent],.review-board-mark[data-type=excellent],.review-move-mark[data-type=good],.review-board-mark[data-type=good]{background:#60975f}
+.review-move-mark[data-type=inaccuracy],.review-board-mark[data-type=inaccuracy]{background:#ad851c}
+.review-move-mark[data-type=mistake],.review-board-mark[data-type=mistake]{background:#c5782e}
+.review-move-mark[data-type=blunder],.review-board-mark[data-type=blunder]{background:#c44343}
+.review-person .review-rating {white-space:normal;overflow-wrap:anywhere;line-height:1.2}
+@media(prefers-reduced-motion:reduce){.board .review-board-mark{animation:none}}
+
+@media(max-width:700px){
+ #member-game .board-area:has(.review-bar:not([hidden])), #bot-app .board-area:has(.review-bar:not([hidden])) {padding-right:18px}
+}

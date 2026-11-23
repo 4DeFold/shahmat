@@ -63,6 +63,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     for (const who of ['player','opponent']) {
       const base=who === 'player' ? (scores?.self || ownScore) : scores?.opponent; const record=ratingResult?.[who]; const data=record ? {...base, yar:record.after_yar, elo:record.after_elo ?? base?.elo} : base; ratingCounts[who].set(data?.[rankUnit], rankUnit, !!data); const badge=$(who+'-top-status'); if(badge){const place=Number(data?.topPlace);badge.hidden=!(place>=1&&place<=5);badge.textContent=badge.hidden?'':`Топ ${place}`;} const img=$(who+'-avatar-image');if(img)img.parentElement.style.backgroundColor=profileAvatarColor(data?.palette);
     }
+    review.refresh();
   }
   function loadRatings(game) {
     const key = `${game.id}:${game.status}`;
@@ -176,7 +177,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   const renderMoves = createMoveHistory({document,list:$('move-list'),count:$('move-count'),onSelect:showHistory});
   function renderHistory() {
     const count=chess.history().length, index=historyIndex??count;
-    renderMoves(chess,historyIndex);
+    renderMoves(chess,historyIndex);review.syncHistory();
     $('history-first').disabled=$('history-prev').disabled=index===0;
     $('history-next').disabled=$('history-last').disabled=index===count;
   }
@@ -237,7 +238,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     Promise.resolve(opponentName(game.id)).then(profile => {
       if (nameForGame !== game.id || !profile) return;
       const name = typeof profile === 'string' ? profile : profile.username;
-      if (typeof name === 'string' && name) { opponentProfileName=name; revealName(name); $('opponent-profile-name').textContent = name; }
+      if (typeof name === 'string' && name) { opponentProfileName=name; revealName(name); $('opponent-profile-name').textContent = name; review.refresh(); }
       if (typeof profile === 'object' && 'bio' in profile) { const bio=profile.bio?.trim()||''; $('opponent-profile-bio').textContent=bio; $('opponent-profile-bio').hidden=!bio; if($('opponent-profile-bio-label')) $('opponent-profile-bio-label').hidden=!bio; }
       if(typeof profile === 'object') { applyProfileTheme(profileCard,profile.palette,profile.theme); const avatar=$('opponent-profile-avatar'),banner=$('opponent-profile-banner'); if(avatar){if(isProfileImage(profile.avatar))avatar.src=profile.avatar;else setPublicPiece(avatar,profile.piece_set,'b');avatar.classList.toggle('custom',isProfileImage(profile.avatar));} if(banner){banner.hidden=!isProfileImage(profile.banner);if(!banner.hidden)banner.src=profile.banner;} }
 
@@ -287,7 +288,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     // Confirming our optimistic move must not restart its animation or replace pieces.
     if (!alreadyDisplayed || clearedPremove) renderBoard(newMove);
     renderHistory(); drawClocks();
-    if(phase==='finished' && reviewKey!==game.id){reviewKey=game.id;review.setVisible(isVisible());review.start({moves:game.moves,flip:currentColor()==='b',names:()=>currentColor()==='w'?{w:$('player-name').textContent,b:$('opponent-name').textContent}:{b:$('player-name').textContent,w:$('opponent-name').textContent}});}
+    if(phase==='finished' && reviewKey!==game.id){reviewKey=game.id;review.setVisible(isVisible());review.start({moves:game.moves,flip:currentColor()==='b',names:()=>{const player={name:$('player-name').textContent,rating:$('player-rating').getAttribute('aria-label')||$('player-rating').textContent},opponent={name:opponentProfileName||$('opponent-name').getAttribute('aria-label')||$('opponent-name').textContent,rating:$('opponent-rating').getAttribute('aria-label')||$('opponent-rating').textContent};return currentColor()==='w'?{w:player,b:opponent}:{b:player,w:opponent}}});}
     else if(phase!=='finished' && reviewKey){review.clear();reviewKey=null;}
     if (historyIndex !== null) setStatus(`Просмотр позиции: ход ${historyIndex} из ${game.moves.length}.`); else statusGame();
     if (newMove && !moving) playSound(newMove);
@@ -602,7 +603,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     setOwnRating(value) { ownScore = value; renderRatings(); },
     setRatingUnit(value) { rankUnit = value === 'elo' ? 'elo' : 'yar'; renderRatings(); },
     setPlayerAvatar(value) { setAvatar('player',value); },
-    setPlayerName(value) { if (typeof value === 'string' && value && $('player-name')) $('player-name').textContent = value; },
+    setPlayerName(value) { if (typeof value === 'string' && value && $('player-name')) $('player-name').textContent = value; review.refresh(); },
     async open(id) {
       if (userId === id || destroyed) return;
       userId = id; modeControls();
