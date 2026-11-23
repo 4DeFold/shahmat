@@ -1,0 +1,17 @@
+// This graph uses the already-computed local review; it starts no engine work.
+export function createReviewGraph({document,onSelect}) {
+ const ns='http://www.w3.org/2000/svg',element=document.createElement('section');element.className='review-graph';element.hidden=true;element.setAttribute('aria-label','График оценки позиции');
+ const header=document.createElement('div');header.className='review-graph-header';const heading=document.createElement('strong');heading.textContent='График';header.append(heading);element.append(header);
+ const area=document.createElement('div');area.className='review-graph-area';area.setAttribute('role','slider');area.tabIndex=0;area.setAttribute('aria-label','Ход на графике оценки позиции');area.setAttribute('aria-valuemin','0');
+ const svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 1000 200');svg.setAttribute('preserveAspectRatio','none');svg.setAttribute('aria-hidden','true');area.append(svg);element.append(area);
+ const caption=document.createElement('div');caption.className='review-graph-caption';element.append(caption);
+ let moves=[],positions=[],index=0,ready=false;
+ const node=(name,attrs={})=>{const el=document.createElementNS(ns,name);for(const [key,value] of Object.entries(attrs))el.setAttribute(key,String(value));return el;};
+ const xOf=i=>moves.length?i/moves.length*1000:0, yOf=value=>192-Math.max(0,Math.min(100,value))*1.84;
+ function selection(){if(!ready)return;const marker=svg.querySelector('.review-graph-current');if(marker)marker.setAttribute('x1',xOf(index)),marker.setAttribute('x2',xOf(index));area.setAttribute('aria-valuemax',String(moves.length));area.setAttribute('aria-valuenow',String(index));const move=moves[index-1],label=move?`${Math.floor((index-1)/2)+1}${move.color==='w'?'.':'...'} ${move.san}`:'Начало';const value=positions[index]?.win;const text=value==null?label:`${label} · ${Math.round(value)}%`;area.setAttribute('aria-valuetext',text);caption.textContent=text;}
+ function draw(){if(!ready)return;svg.replaceChildren();svg.append(node('line',{x1:0,y1:100,x2:1000,y2:100,class:'review-graph-grid'}));const points=positions.map((p,i)=>`${xOf(i)},${yOf(p.win)}`).join(' ');svg.append(node('polygon',{points:`0,100 ${points} 1000,100`,class:'review-graph-fill'}));svg.append(node('polyline',{points,class:'review-graph-line eval'}));svg.append(node('line',{x1:0,x2:0,y1:0,y2:200,class:'review-graph-current'}));selection();}
+ function choose(target){if(!ready||!moves.length||typeof onSelect!=='function')return;onSelect(Math.max(0,Math.min(moves.length,target)))}
+ area.addEventListener('click',event=>{const box=area.getBoundingClientRect();if(box.width)choose(Math.round((event.clientX-box.left)/box.width*moves.length))});
+ area.addEventListener('keydown',event=>{let target;if(event.key==='ArrowLeft')target=index-1;else if(event.key==='ArrowRight')target=index+1;else if(event.key==='ArrowUp'||event.key==='Home')target=0;else if(event.key==='ArrowDown'||event.key==='End')target=moves.length;else return;event.preventDefault();event.stopPropagation();choose(target)});
+ return {element,setData(nextMoves,nextPositions){moves=nextMoves;positions=nextPositions;ready=moves.length>0&&positions.length===moves.length+1&&positions.every(Boolean);element.hidden=!ready;if(ready)draw()},setIndex(value){index=Math.max(0,Math.min(moves.length,value));selection()},clear(){ready=false;element.hidden=true;moves=[];positions=[];index=0;svg.replaceChildren()},destroy(){element.remove()}};
+}

@@ -18,6 +18,7 @@ try {
    if(p==='/auth/v1/user')return route.fulfill({json:user,headers});
    if(p==='/rest/v1/profiles')return route.fulfill({json:{username:'Alice'},headers});
    if(p.endsWith('/my_archive_all'))return archiveGate.then(()=>route.fulfill({json:[{id:'fixture',mode:'blitz',my_color:'b',white_name:'Bob',black_name:'Alice',moves:['e4','d5','exd5','Qxd5'],result:'draw'}],headers}));
+   if(p.endsWith('/my_archive_ratings'))return route.fulfill({json:[{game_id:'fixture',white_yar:1240,black_yar:1690}],headers});
    if(p.endsWith('/my_archive_stats'))return route.fulfill({json:{bullet:0,blitz:1,rapid:0,classical:0,bot:0},headers});
    if(p==='/functions/v1/matchplay')return route.fulfill({json:{game:null},headers});
    return route.fulfill({json:[],headers});
@@ -46,7 +47,64 @@ try {
   await page.locator('#nav-archive').focus();
   for(const key of ['w','s','w','s','w','s']) await page.keyboard.press(key);
   await frame.locator('#history-last:disabled').waitFor();
+  await frame.locator('.review-title').getByText('Анализ партии',{exact:true}).waitFor({timeout:60000});
+  assert.equal(await frame.locator('.review-person strong').first().textContent(),'Bob');
+  assert.equal(await frame.locator('.review-person strong').last().textContent(),'Alice');
+  assert.match(await frame.locator('.review-person .review-rating').first().textContent(),/1240 ЯР/);
+  assert.match(await frame.locator('.review-person .review-rating').last().textContent(),/1690 ЯР/);
+  const geometry=await frame.locator('.review-bar').evaluate(bar=>{const br=bar.getBoundingClientRect(),board=bar.parentElement.getBoundingClientRect();return {left:br.left,right:br.right,boardRight:board.right,width:br.width,viewport:innerWidth}});
+  assert.ok(geometry.left>=geometry.boardRight-1 && geometry.right<=geometry.viewport+1 && geometry.width>=10,`bar must be outside right edge: ${JSON.stringify(geometry)}`);
+  // Compare every actually classified move; a quiet move deliberately has no badge.
+  for(let i=1;i<=4;i++) {
+   await frame.locator(`[data-history-index="${i}"]`).click();
+   const badge=frame.locator(`[data-history-index="${i}"] .review-move-mark`),boardMark=frame.locator('.review-board-mark');
+   if(await badge.count()) {
+    assert.equal(await boardMark.count(),1);const type=await badge.getAttribute('data-type');
+    assert.equal(await boardMark.getAttribute('data-type'),type);
+    assert.equal(await boardMark.textContent(),await badge.textContent());
+    assert.equal(await badge.textContent(),await frame.locator(`.review-${type} .review-legend-mark`).textContent());
+   } else assert.equal(await boardMark.count(),0);
+  }
+  await frame.locator('#history-first').click();assert.equal(await frame.locator('.review-board-mark').count(),0);
+  const motionResult=await frame.locator('#board').evaluate((board,reduced)=>{
+   const queen=board.querySelector('[data-square=d8] .piece');queen.getAnimations().forEach(a=>a.finish());
+   document.querySelector('#history-last').click();const moved=board.querySelector('[data-square=d5] .piece');
+   return {same:queen===moved,animation:moved.getAnimations().some(a=>a.effect?.getKeyframes().some(k=>k.translate&&k.translate!=='0px 0px')),reduced};
+  },motion==='reduce');
+  assert.equal(motionResult.same,true,'jump preserves moving piece');assert.equal(motionResult.animation,!motionResult.reduced,'jump animates unless motion is reduced');
+  const graph=frame.locator('.review-graph-area');await graph.waitFor();
+  await graph.focus();await page.keyboard.press('ArrowUp');assert.equal(await graph.getAttribute('aria-valuenow'),'0');
+  await page.keyboard.press('ArrowDown');assert.equal(await graph.getAttribute('aria-valuenow'),'4');
+  await page.keyboard.press('ArrowUp');assert.equal(await graph.getAttribute('aria-valuenow'),'0');
+  await page.keyboard.press('ArrowRight');assert.equal(await graph.getAttribute('aria-valuenow'),'1');
+  assert.equal(await graph.evaluate(el=>el===document.activeElement),true,'graph keeps focus during navigation');
+  await graph.click({position:{x:2,y:30}});assert.equal(await graph.getAttribute('aria-valuenow'),'0');
+  assert.match(await graph.getAttribute('aria-valuetext'),/· \d+%/);
+  assert.equal(await frame.locator('.review-graph button').count(),0);assert.doesNotMatch(await frame.locator('.review-graph').textContent(),/Оценка белых|Точность/);
+  const theme=await frame.locator('.review-graph').evaluate(el=>{const root=document.documentElement,old=root.style.getPropertyValue('--accent');root.style.setProperty('--accent','#24c576');const line=getComputedStyle(el.querySelector('polyline')).stroke,marker=getComputedStyle(el.querySelector('.review-graph-current')).stroke;root.style.setProperty('--accent',old);return {line,marker}});
+  assert.equal(theme.line,'rgb(36, 197, 118)');assert.equal(theme.marker,theme.line);
+  const badgeColor=await frame.locator('#move-list').evaluate(list=>{const badge=document.createElement('span');badge.className='review-move-mark';badge.textContent='!';const button=list.querySelector('button');button.append(badge);const color=getComputedStyle(badge).color;badge.remove();return color});assert.equal(badgeColor,'rgb(255, 255, 255)');
+  // Exercise both board orientations even if Stockfish happens to find no errors.
+  const corners=await frame.locator('#board').evaluate(board=>{
+   board.style.transition='none';const cell=board.querySelector('[data-square=e4]'),mark=document.createElement('span');mark.className='review-board-mark';mark.style.animation='none';cell.append(mark);
+   return [false,true].map(black=>{board.classList.toggle('black',black);const c=cell.getBoundingClientRect(),m=mark.getBoundingClientRect();return {right:c.right-m.right,bottom:c.bottom-m.bottom}}).map((v,i,all)=>{if(i===all.length-1)mark.remove();return v});
+  });
+  for(const corner of corners)assert.ok(Math.abs(corner.right-1)<2&&Math.abs(corner.bottom-1)<2,`badge at bottom right: ${JSON.stringify(corners)}`);
+  await frame.locator('#history-last').click();
+  assert.match(await frame.locator('.review-bar').getAttribute('aria-label'),/белые \d+%/);
+  assert.match(await frame.locator('.review-accuracy').first().textContent(),/^\d+%$/);
+  assert.equal(await frame.locator('.review-brilliant b').first().textContent(),'—');
   assert.equal(await frame.locator('[data-square=d5] .piece').getAttribute('src'),'/pieces/cburnett/bQ.svg');
-  assert.deepEqual(errors,[]);await page.close();console.log(`✓ archive ${viewport.width} ${motion}: rapid navigation, capture and avatars`);
+  // The archive rail and its nested move list use the same wheel smoothing as the main archive.
+  const rail=frame.locator('.game-rail'),list=frame.locator('#move-list');
+  await list.evaluate(el=>{for(let i=0;i<50;i++){const row=document.createElement('li');row.textContent='1. e4 e5';row.style.minHeight='30px';el.append(row)}el.scrollTop=0});
+  await list.hover();await page.mouse.wheel(0,120);await page.waitForTimeout(180);
+  assert.ok(await list.evaluate(el=>el.scrollTop)>0,'move list scrolls');
+  if(motion==='no-preference')assert.equal(await list.evaluate(el=>el.classList.contains('lenis')),true,'move list uses Lenis');
+  else assert.equal(await list.evaluate(el=>el.classList.contains('lenis')),false,'reduced motion keeps native scroll');
+  await rail.evaluate(el=>el.scrollTop=0);await frame.locator('#archive-back').hover();await page.mouse.wheel(0,120);await page.waitForTimeout(180);
+  assert.ok(await rail.evaluate(el=>el.scrollTop)>0,'rail scrolls');
+  if(motion==='no-preference')assert.equal(await rail.evaluate(el=>el.classList.contains('lenis')),true,'rail uses Lenis');
+  assert.deepEqual(errors,[]);await page.close();console.log(`✓ archive ${viewport.width} ${motion}: review, smooth scrolling, navigation and capture`);
  }
 }finally{await browser.close();}

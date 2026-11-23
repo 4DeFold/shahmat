@@ -1,3 +1,4 @@
+import '../smooth-scroll.js';
 import {installLoadingIndicators} from './loading-indicators.js';
 installLoadingIndicators(document, {embeddedFrame:true});
 import {createGameSound} from './game-sound.js';

@@ -35,8 +35,8 @@ export function createBoardAnnotations({ document, board, enabled = () => true }
       const circle=document.createElementNS(ns,'circle'); for(const [key,value] of Object.entries({cx:from.x,cy:from.y,r:47,fill:'none',stroke:color,'stroke-width':preview?6:8})) circle.setAttribute(key,String(value)); group.append(circle);
     } else {
       const dx=to.x-from.x,dy=to.y-from.y,len=Math.hypot(dx,dy),ux=dx/len,uy=dy/len, endX=to.x-ux*13,endY=to.y-uy*13, baseX=endX-ux*38,baseY=endY-uy*38;
-      const line=document.createElementNS(ns,'line'); for(const [key,value] of Object.entries({x1:from.x,y1:from.y,x2:baseX,y2:baseY,stroke:color,'stroke-width':preview?8:10,'stroke-linecap':'round','stroke-opacity':preview?'.7':'1'})) line.setAttribute(key,String(value));
-      const head=document.createElementNS(ns,'polygon'); head.setAttribute('points',`${endX},${endY} ${baseX-uy*24},${baseY+ux*24} ${baseX+uy*24},${baseY-ux*24}`); head.setAttribute('fill',color); head.setAttribute('fill-opacity',preview?'.7':'1'); group.append(line,head);
+      const line=document.createElementNS(ns,'line'); for(const [key,value] of Object.entries({x1:from.x,y1:from.y,x2:baseX,y2:baseY,stroke:color,'stroke-width':preview?8:10,'stroke-linecap':'round','stroke-opacity':'.55'})) line.setAttribute(key,String(value));
+      const head=document.createElementNS(ns,'polygon'); head.setAttribute('points',`${endX},${endY} ${baseX-uy*24},${baseY+ux*24} ${baseX+uy*24},${baseY-ux*24}`); head.setAttribute('fill',color); head.setAttribute('fill-opacity','.55'); group.append(line,head);
     }
     svg.append(group); return group;
   }

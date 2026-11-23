@@ -12,7 +12,7 @@ function setup(){
 test('right-drag toggles arrows, clicks mark squares, colors, clearing and disposal',()=>{
  const {dom,doc,board,tool,event}=setup();
  event('e2','pointerdown');event('e4','pointermove');assert.equal(board.querySelectorAll('.annotation-preview').length,1);event('e4','pointerup');
- const line=board.querySelector('[data-annotation="e2-e4"] line');assert.equal(line.getAttribute('x1'),'450');assert.equal(line.getAttribute('y1'),'650');assert.equal(line.getAttribute('stroke'),'#15781B');
+ const line=board.querySelector('[data-annotation="e2-e4"] line');assert.equal(line.getAttribute('x1'),'450');assert.equal(line.getAttribute('y1'),'650');assert.equal(line.getAttribute('stroke'),'#15781B');assert.equal(line.getAttribute('stroke-opacity'),'.55');assert.equal(board.querySelector('[data-annotation="e2-e4"] polygon').getAttribute('fill-opacity'),'.55');
  event('e2','pointerdown');event('e4','pointerup');assert.equal(board.querySelectorAll('.annotation-item').length,0);
  event('d5','pointerdown',{shiftKey:true});event('d5','pointerup');assert.equal(board.querySelector('circle').getAttribute('stroke'),'#882020');
  tool.refresh();assert.equal(board.querySelectorAll('circle').length,1);

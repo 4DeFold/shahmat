@@ -63,6 +63,7 @@ test('matched players can only submit legal moves on their turn; black sees flip
     return { game: chess.history().length ? game({ moves:chess.history(), turn:chess.turn() }) : game({ moves:['e4'], turn:'b' }) };
   }); t.after(() => app.close());
   await app.ui.open(B); await flush();
+  assert.equal(app.dom.window.document.querySelector('.review-panel').hidden,true, 'analysis is unavailable during active play');
   assert.equal(app.$('board').firstElementChild.dataset.square, 'a8');
   assert.equal(app.$('board').classList.contains('black'), true);
   assert.match(app.$('player-avatar-image').getAttribute('src'), /\/bN\.svg$/);

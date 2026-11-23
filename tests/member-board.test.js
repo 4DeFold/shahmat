@@ -50,3 +50,18 @@ test('reduced motion disables movement and blur', () => {
   const { dom, view, animations } = setup(true), chess = new Chess(); update(view, chess);
   update(view, chess, chess.move('e4')); assert.equal(animations.length, 0); dom.window.close();
 });
+
+test('history jumps move original surviving piece nodes atomically, even to occupied squares', async () => {
+  const {historyTransition}=await import('../pages/move-history.js');
+  const {dom,view,animations}=setup(),chess=new Chess();
+  update(view,chess);const king=view.cell('e1').querySelector('.piece'),knight=view.cell('g1').querySelector('.piece'),rook=view.cell('h1').querySelector('.piece'),bishop=view.cell('f1').querySelector('.piece');
+  ['e4','e5','Nf3','Nc6','Bc4','Nf6','O-O'].forEach(m=>chess.move(m));
+  view.render({shown:chess,transitions:historyTransition(chess,0,7)});
+  assert.equal(view.cell('g1').querySelector('.piece'),king);assert.equal(view.cell('f3').querySelector('.piece'),knight);
+  assert.equal(view.cell('f1').querySelector('.piece'),rook);assert.equal(view.cell('c4').querySelector('.piece'),bishop);
+  assert.equal(animations.length,historyTransition(chess,0,7).length);
+  view.render({shown:new Chess(),transitions:historyTransition(chess,7,0)});
+  assert.equal(view.cell('e1').querySelector('.piece'),king);assert.equal(view.cell('g1').querySelector('.piece'),knight);
+  assert.equal(view.cell('h1').querySelector('.piece'),rook);assert.equal(view.cell('f1').querySelector('.piece'),bishop);
+  dom.window.close();
+});

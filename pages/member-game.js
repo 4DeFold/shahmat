@@ -1,3 +1,4 @@
+import {createGameReview} from './game-review.js';
 import {pieceSrc as themedPieceSrc,setPublicPiece} from './piece-theme.js';
 import {applyProfileTheme,isProfileImage,profileAvatarColor} from './profile-theme.js';
 import { Chess } from 'chess.js';
@@ -36,6 +37,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   let premove = [], historyIndex = null, nameForGame = null, nameTimer = null, drag = null, suppressClick = false, actionPending = false;
   let rankUnit = 'yar', ownScore = null, scores = null, ratingsKey = null, ratingsRequest = 0, ratingsRetryAt = 0;
   let ownRatingRequest = 0, ratingResult = null, resultRequest = 0, resultKey = null, resultTimer = null;
+  const review=createGameReview({document,frame:board.parentElement,host:$('moves')?.parentElement,onSelect:showHistory}); let reviewKey=null;
   const ratingCounts = Object.fromEntries(['player','opponent'].map(who => [who, createRatingCount($(who+'-rating'), win)]));
   async function refreshOwnRating() {
     if (!userId) return;
@@ -61,6 +63,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     for (const who of ['player','opponent']) {
       const base=who === 'player' ? (scores?.self || ownScore) : scores?.opponent; const record=ratingResult?.[who]; const data=record ? {...base, yar:record.after_yar, elo:record.after_elo ?? base?.elo} : base; ratingCounts[who].set(data?.[rankUnit], rankUnit, !!data); const badge=$(who+'-top-status'); if(badge){const place=Number(data?.topPlace);badge.hidden=!(place>=1&&place<=5);badge.textContent=badge.hidden?'':`Топ ${place}`;} const img=$(who+'-avatar-image');if(img)img.parentElement.style.backgroundColor=profileAvatarColor(data?.palette);
     }
+    review.refresh();
   }
   function loadRatings(game) {
     const key = `${game.id}:${game.status}`;
@@ -174,7 +177,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   const renderMoves = createMoveHistory({document,list:$('move-list'),count:$('move-count'),onSelect:showHistory});
   function renderHistory() {
     const count=chess.history().length, index=historyIndex??count;
-    renderMoves(chess,historyIndex);
+    renderMoves(chess,historyIndex);review.syncHistory();
     $('history-first').disabled=$('history-prev').disabled=index===0;
     $('history-next').disabled=$('history-last').disabled=index===count;
   }
@@ -198,6 +201,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     const legal = selected && historyIndex === null ? legalFor(selected).map(move => move.to) : [];
     const last = historyIndex === null ? latestMove : shown.history({ verbose:true }).at(-1);
     boardView.render({ shown, selected, legal, last, premoves: historyIndex === null ? premove : [], actual: historyIndex === null && premove.length ? chess : null, premoveMode: (chess.turn() !== color || premove.length > 0) && historyIndex === null, transitions, animatedMove: historyIndex === null ? animatedMove : null });
+    review.setIndex(historyIndex??chess.history().length);
     const actualShown=historyIndex===null?chess:shown;
     renderThreats(actualShown,color,boardView,threatKeys);renderCaptures(actualShown,color,$('player-captured'),$('opponent-captured'),{board,move:captureMove,direction});
     // Establish initial rotation before the board changes sides.
@@ -234,7 +238,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     Promise.resolve(opponentName(game.id)).then(profile => {
       if (nameForGame !== game.id || !profile) return;
       const name = typeof profile === 'string' ? profile : profile.username;
-      if (typeof name === 'string' && name) { opponentProfileName=name; revealName(name); $('opponent-profile-name').textContent = name; }
+      if (typeof name === 'string' && name) { opponentProfileName=name; revealName(name); $('opponent-profile-name').textContent = name; review.refresh(); }
       if (typeof profile === 'object' && 'bio' in profile) { const bio=profile.bio?.trim()||''; $('opponent-profile-bio').textContent=bio; $('opponent-profile-bio').hidden=!bio; if($('opponent-profile-bio-label')) $('opponent-profile-bio-label').hidden=!bio; }
       if(typeof profile === 'object') { applyProfileTheme(profileCard,profile.palette,profile.theme); const avatar=$('opponent-profile-avatar'),banner=$('opponent-profile-banner'); if(avatar){if(isProfileImage(profile.avatar))avatar.src=profile.avatar;else setPublicPiece(avatar,profile.piece_set,'b');avatar.classList.toggle('custom',isProfileImage(profile.avatar));} if(banner){banner.hidden=!isProfileImage(profile.banner);if(!banner.hidden)banner.src=profile.banner;} }
 
@@ -284,6 +288,8 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     // Confirming our optimistic move must not restart its animation or replace pieces.
     if (!alreadyDisplayed || clearedPremove) renderBoard(newMove);
     renderHistory(); drawClocks();
+    if(phase==='finished' && reviewKey!==game.id){reviewKey=game.id;review.setVisible(isVisible());review.start({moves:game.moves,flip:currentColor()==='b',names:()=>{const player={name:$('player-name').textContent,rating:$('player-rating').getAttribute('aria-label')||$('player-rating').textContent},opponent={name:opponentProfileName||$('opponent-name').getAttribute('aria-label')||$('opponent-name').textContent,rating:$('opponent-rating').getAttribute('aria-label')||$('opponent-rating').textContent};return currentColor()==='w'?{w:player,b:opponent}:{b:player,w:opponent}}});}
+    else if(phase!=='finished' && reviewKey){review.clear();reviewKey=null;}
     if (historyIndex !== null) setStatus(`Просмотр позиции: ход ${historyIndex} из ${game.moves.length}.`); else statusGame();
     if (newMove && !moving) playSound(newMove);
     if (!moving) playQueuedPremove();
@@ -530,7 +536,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     if (phase !== 'finished') return;
     const chosen = selection || (mode ? {kind:'rated',timeControl:`${times[mode]/60000}+0`} : null);
     const chosenMode = mode;
-    annotations.clear(); onGameChanged(null); cancelTimer(); generation++; snapshot = null;
+    annotations.clear(); review.clear();reviewKey=null; onGameChanged(null); cancelTimer(); generation++; snapshot = null;
     clearRatingResult(); scores = null; ratingsKey = null; ratingsRetryAt = 0; ratingsRequest++; renderRatings();
     clockSync.clear(); chess = new Chess(); latestMove = null; phase = 'idle';
     mode = chosenMode; selection = chosen; void refreshOwnRating();
@@ -597,7 +603,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
     setOwnRating(value) { ownScore = value; renderRatings(); },
     setRatingUnit(value) { rankUnit = value === 'elo' ? 'elo' : 'yar'; renderRatings(); },
     setPlayerAvatar(value) { setAvatar('player',value); },
-    setPlayerName(value) { if (typeof value === 'string' && value && $('player-name')) $('player-name').textContent = value; },
+    setPlayerName(value) { if (typeof value === 'string' && value && $('player-name')) $('player-name').textContent = value; review.refresh(); },
     async open(id) {
       if (userId === id || destroyed) return;
       userId = id; modeControls();
@@ -615,9 +621,9 @@ export function createMemberGame({ document, api, opponentName = async () => nul
       } catch { /* Polling will retry. */ } finally { hintInFlight = false; }})();
     },
     online() { if (isVisible()) resume(); },
-    hide() { clearThreats(); onGameChanged(null); const wasVisible = isVisible(); viewVisible = false; if (wasVisible) pause(); },
-    show() { if(snapshot?.status==='active'&&browserVisible)onGameChanged(snapshot.id); const wasVisible = isVisible(); const wasShown = viewVisible; viewVisible = true; if (!wasShown) revealPieces(); if (!wasVisible && isVisible()) resume(); },
-    browserVisibility(value) { if(!value)onGameChanged(null);else if(viewVisible&&snapshot?.status==='active')onGameChanged(snapshot.id); const wasVisible = isVisible(); browserVisible = value; if (wasVisible && !isVisible()) pause(); else if (!wasVisible && isVisible()) resume(); },
-    destroy() { destroyed = true; clearRatingResult(); ownRatingRequest++; Object.values(ratingCounts).forEach(count => count.destroy()); onGameChanged(null); document.removeEventListener('keydown',onThreatDown); document.removeEventListener('keyup',onThreatUp); win.removeEventListener('blur',clearThreats); document.removeEventListener('keydown', onPremoveKey); document.removeEventListener('keydown', onHistoryKey); annotations.destroy(); generation++; cancelDrag(); cancelTimer(); clearInterval(clockInterval); clearInterval(nameTimer); revealAnimations.forEach(animation => animation.cancel()); Object.values(clocks).forEach(clock => clock.destroy()); searchLoader.destroy(); profileLoader.destroy(); sound.destroy(); },
+    hide() { review.setVisible(false);clearThreats(); onGameChanged(null); const wasVisible = isVisible(); viewVisible = false; if (wasVisible) pause(); },
+    show() { if(snapshot?.status==='active'&&browserVisible)onGameChanged(snapshot.id); const wasVisible = isVisible(); const wasShown = viewVisible; viewVisible = true; review.setVisible(isVisible()); if (!wasShown) revealPieces(); if (!wasVisible && isVisible()) resume(); },
+    browserVisibility(value) { if(!value)onGameChanged(null);else if(viewVisible&&snapshot?.status==='active')onGameChanged(snapshot.id); const wasVisible = isVisible(); browserVisible = value; review.setVisible(isVisible()); if (wasVisible && !isVisible()) pause(); else if (!wasVisible && isVisible()) resume(); },
+    destroy() { destroyed = true; review.destroy();clearRatingResult(); ownRatingRequest++; Object.values(ratingCounts).forEach(count => count.destroy()); onGameChanged(null); document.removeEventListener('keydown',onThreatDown); document.removeEventListener('keyup',onThreatUp); win.removeEventListener('blur',clearThreats); document.removeEventListener('keydown', onPremoveKey); document.removeEventListener('keydown', onHistoryKey); annotations.destroy(); generation++; cancelDrag(); cancelTimer(); clearInterval(clockInterval); clearInterval(nameTimer); revealAnimations.forEach(animation => animation.cancel()); Object.values(clocks).forEach(clock => clock.destroy()); searchLoader.destroy(); profileLoader.destroy(); sound.destroy(); },
   };
 }
