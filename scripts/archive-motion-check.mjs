@@ -79,8 +79,11 @@ try {
   await page.keyboard.press('ArrowRight');assert.equal(await graph.getAttribute('aria-valuenow'),'1');
   assert.equal(await graph.evaluate(el=>el===document.activeElement),true,'graph keeps focus during navigation');
   await graph.click({position:{x:2,y:30}});assert.equal(await graph.getAttribute('aria-valuenow'),'0');
-  await frame.getByRole('button',{name:'Оценка',exact:true}).click();assert.match(await graph.getAttribute('aria-valuetext'),/оценка белых/);
-  await frame.getByRole('button',{name:'Точность',exact:true}).click();
+  assert.match(await graph.getAttribute('aria-valuetext'),/· \d+%/);
+  assert.equal(await frame.locator('.review-graph button').count(),0);assert.doesNotMatch(await frame.locator('.review-graph').textContent(),/Оценка белых|Точность/);
+  const theme=await frame.locator('.review-graph').evaluate(el=>{const root=document.documentElement,old=root.style.getPropertyValue('--accent');root.style.setProperty('--accent','#24c576');const line=getComputedStyle(el.querySelector('polyline')).stroke,marker=getComputedStyle(el.querySelector('.review-graph-current')).stroke;root.style.setProperty('--accent',old);return {line,marker}});
+  assert.equal(theme.line,'rgb(36, 197, 118)');assert.equal(theme.marker,theme.line);
+  const badgeColor=await frame.locator('#move-list').evaluate(list=>{const badge=document.createElement('span');badge.className='review-move-mark';badge.textContent='!';const button=list.querySelector('button');button.append(badge);const color=getComputedStyle(badge).color;badge.remove();return color});assert.equal(badgeColor,'rgb(255, 255, 255)');
   // Exercise both board orientations even if Stockfish happens to find no errors.
   const corners=await frame.locator('#board').evaluate(board=>{
    board.style.transition='none';const cell=board.querySelector('[data-square=e4]'),mark=document.createElement('span');mark.className='review-board-mark';mark.style.animation='none';cell.append(mark);
@@ -92,6 +95,16 @@ try {
   assert.match(await frame.locator('.review-accuracy').first().textContent(),/^\d+%$/);
   assert.equal(await frame.locator('.review-brilliant b').first().textContent(),'—');
   assert.equal(await frame.locator('[data-square=d5] .piece').getAttribute('src'),'/pieces/cburnett/bQ.svg');
-  assert.deepEqual(errors,[]);await page.close();console.log(`✓ archive ${viewport.width} ${motion}: rapid navigation, capture and avatars`);
+  // The archive rail and its nested move list use the same wheel smoothing as the main archive.
+  const rail=frame.locator('.game-rail'),list=frame.locator('#move-list');
+  await list.evaluate(el=>{for(let i=0;i<50;i++){const row=document.createElement('li');row.textContent='1. e4 e5';row.style.minHeight='30px';el.append(row)}el.scrollTop=0});
+  await list.hover();await page.mouse.wheel(0,120);await page.waitForTimeout(180);
+  assert.ok(await list.evaluate(el=>el.scrollTop)>0,'move list scrolls');
+  if(motion==='no-preference')assert.equal(await list.evaluate(el=>el.classList.contains('lenis')),true,'move list uses Lenis');
+  else assert.equal(await list.evaluate(el=>el.classList.contains('lenis')),false,'reduced motion keeps native scroll');
+  await rail.evaluate(el=>el.scrollTop=0);await frame.locator('#archive-back').hover();await page.mouse.wheel(0,120);await page.waitForTimeout(180);
+  assert.ok(await rail.evaluate(el=>el.scrollTop)>0,'rail scrolls');
+  if(motion==='no-preference')assert.equal(await rail.evaluate(el=>el.classList.contains('lenis')),true,'rail uses Lenis');
+  assert.deepEqual(errors,[]);await page.close();console.log(`✓ archive ${viewport.width} ${motion}: review, smooth scrolling, navigation and capture`);
  }
 }finally{await browser.close();}

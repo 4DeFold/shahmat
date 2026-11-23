@@ -56,17 +56,17 @@ test('move marks track analyzed plies, current board square and clear between ga
  review.destroy();dom.window.close();
 });
 
-test('graph shows both accurate per-move accuracy and position assessment; keyboard and pointer select plies',async()=>{
+test('graph shows position assessment only; keyboard and pointer select plies',async()=>{
  const dom=new JSDOM('<div id="frame"></div><div id="rail"><div class="moves"></div></div>'),d=dom.window.document,selected=[];
  const createEngine=()=>({evaluate:async()=>({win:50,best:'e2e4'}),destroy(){}});
  let review;review=createGameReview({document:d,frame:d.querySelector('#frame'),host:d.querySelector('#rail'),createEngine,onSelect:i=>{selected.push(i);review.setIndex(i)}});
  review.start({moves:['e4','e5']});await new Promise(resolve=>setTimeout(resolve,100));
  const graph=d.querySelector('.review-graph'),area=graph.querySelector('[role=slider]');assert.equal(graph.hidden,false);assert.equal(graph.querySelectorAll('polyline.eval').length,1);assert.equal(graph.querySelectorAll('.review-graph-fill').length,1);
- assert.equal(area.getAttribute('aria-valuenow'),'2');assert.match(area.getAttribute('aria-valuetext'),/оценка белых 50%/);
+ assert.equal(area.getAttribute('aria-valuenow'),'2');assert.match(area.getAttribute('aria-valuetext'),/· 50%/);
  area.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'ArrowLeft',bubbles:true,cancelable:true}));assert.deepEqual(selected,[1]);assert.equal(area.getAttribute('aria-valuenow'),'1');
  area.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'ArrowUp',bubbles:true,cancelable:true}));assert.equal(area.getAttribute('aria-valuenow'),'0');area.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true,cancelable:true}));assert.equal(area.getAttribute('aria-valuenow'),'2');
  area.getBoundingClientRect=()=>({left:10,width:200});area.dispatchEvent(new dom.window.MouseEvent('click',{clientX:10,bubbles:true}));assert.deepEqual(selected,[1,0,2,0]);assert.match(area.getAttribute('aria-valuetext'),/Начало/);
- [...graph.querySelectorAll('button')].find(b=>b.textContent==='Точность').click();review.setIndex(1);assert.match(area.getAttribute('aria-valuetext'),/точность 100%/);assert.equal(graph.querySelectorAll('.review-graph-line').length,2);
+ assert.equal(graph.querySelectorAll('button').length,0);assert.doesNotMatch(graph.textContent,/Оценка белых|Точность/);review.setIndex(1);assert.match(area.getAttribute('aria-valuetext'),/· 50%/);assert.equal(graph.querySelectorAll('.review-graph-line').length,1);
  review.clear();assert.equal(graph.hidden,true);review.destroy();dom.window.close();
 });
 

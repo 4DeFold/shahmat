@@ -36,21 +36,26 @@
 .review-graph {margin-top:12px;padding:14px 0 10px;border-top:1px solid var(--line);font:12px/1.3 system-ui,sans-serif;color:var(--ink);animation:review-in .35s ease both}
 .review-graph[hidden]{display:none}
 .review-graph-header{display:flex;align-items:center;justify-content:space-between;gap:4px}.review-graph-header strong{font-size:12px}
-.review-graph-tabs {display:flex;gap:2px}.review-graph-tabs button{padding:5px;border:0;background:transparent;color:var(--muted);font:600 10px system-ui,sans-serif;cursor:pointer}.review-graph-tabs button[aria-pressed=true]{color:var(--ink);box-shadow:inset 0 -2px var(--ink)}
-.review-graph-legend {display:flex;gap:12px;min-height:16px;margin:8px 0 4px;font-size:10px;color:var(--muted)}
-.review-graph-key::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;background:currentColor}.review-graph-key.w::before{background:#62a574}.review-graph-key.b::before{background:#dd8c46}.review-graph-key.eval::before{background:var(--ink)}
-.review-graph-area{height:110px;background:var(--surface);border:1px solid var(--line);cursor:crosshair;touch-action:manipulation}.review-graph-area:focus-visible,.review-graph-tabs button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
-.review-graph-area svg{display:block;width:100%;height:100%;overflow:hidden}.review-graph-grid{stroke:var(--line);stroke-width:1;vector-effect:non-scaling-stroke}.review-graph-line{fill:none;stroke:#62a574;stroke-width:2;vector-effect:non-scaling-stroke;stroke-linejoin:round;stroke-linecap:round}.review-graph-line.b{stroke:#dd8c46}.review-graph-line.eval{stroke:var(--ink)}.review-graph-current{stroke:var(--ink);stroke-width:1;stroke-dasharray:3 3;opacity:.7;vector-effect:non-scaling-stroke;pointer-events:none}
+.review-graph-area{height:110px;background:var(--surface);border:1px solid var(--line);cursor:crosshair;touch-action:manipulation}.review-graph-area:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.review-graph-area svg{display:block;width:100%;height:100%;overflow:hidden}.review-graph-grid{stroke:var(--line);stroke-width:1;vector-effect:non-scaling-stroke}.review-graph-line{fill:none;stroke:var(--accent, var(--ink));stroke-width:2;vector-effect:non-scaling-stroke;stroke-linejoin:round;stroke-linecap:round}.review-graph-line.eval{stroke:var(--ink)}.review-graph-current{stroke:var(--ink);stroke-width:1;stroke-dasharray:3 3;opacity:.7;vector-effect:non-scaling-stroke;pointer-events:none}
 .review-graph-caption{margin-top:6px;min-height:16px;color:var(--muted);font-size:10px}
 @media(prefers-reduced-motion:reduce){.review-graph{animation:none}}
 
 /* Evaluation graph: centered zero line and filled advantage, like an analysis board. */
 .review-graph-area {height:160px;border-radius:8px;overflow:hidden;background:linear-gradient(180deg,color-mix(in srgb,var(--surface) 82%,var(--ink)),var(--surface))}
-.review-graph-fill {fill:#a8a8a8;fill-opacity:.5}
-.review-graph-line.eval {stroke:#df781d;stroke-width:2}
-.review-graph-current {stroke:#df781d;stroke-dasharray:none;opacity:.95}
+.review-graph-fill {fill:var(--accent, var(--ink));fill-opacity:.28}
+.review-graph-line.eval {stroke:var(--accent, var(--ink));stroke-width:2.5}
+.review-graph-current {stroke:var(--accent, var(--ink));stroke-dasharray:none;opacity:.95}
 .review-graph-grid {stroke:var(--muted);opacity:.7}
-.review-graph-key.eval::before{background:#df781d}
 .review-move-mark[data-type=great],.review-move-mark[data-type=best]{background:#418c58}
 .review-move-mark[data-type=book]{background:#9a754c}.review-move-mark[data-type=miss]{background:#b77931}
 .review-board-mark[data-type=blunder],.review-move-mark[data-type=blunder] {font-size:10px}
+
+/* The generic move-list muted-span rule must not wash out move labels or marks. */
+.game-rail #move-list button {color:var(--ink)}
+.game-rail #move-list button.current {color:var(--control-ink)}
+.game-rail #move-list button > span:not(.review-move-mark) {color:inherit}
+.game-rail #move-list button > .review-move-mark {color:#fff;opacity:1;text-shadow:0 1px 1px #0009}
+.game-rail #move-list .history-piece {opacity:1;border-radius:4px;padding:1px;filter:drop-shadow(0 0 1px #0008)}
+.game-rail #move-list .history-piece[data-side=w] {background:var(--board-dark)}
+.game-rail #move-list .history-piece[data-side=b] {background:var(--board-light)}

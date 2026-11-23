@@ -1,3 +1,4 @@
+import '../smooth-scroll.js';
 import {createGameReview} from './game-review.js';
 import {installLoadingIndicators} from './loading-indicators.js';
 installLoadingIndicators(document, {embeddedFrame:true});

@@ -1,3 +1,4 @@
+import '../smooth-scroll.js';
 import {createGameReview} from './game-review.js';
 import {pieceSrc as themedPieceSrc} from './piece-theme.js';
 import { Chess } from 'chess.js';
