@@ -86,6 +86,8 @@ for(const name of requested){
     if(route==='rating'){
      await page.locator('.rating-row').first().waitFor();await page.waitForFunction(()=>document.querySelectorAll('.rating-row .rating-avatar')[1]?.getAttribute('src')==='/pieces/chessnut/wN.svg');
      for(const image of await page.locator('.rating-row .rating-avatar').all()) {const box=await image.boundingBox();const expected=viewport.width<=700?38:46;assert.ok(Math.abs(box.width-expected)<1&&Math.abs(box.height-expected)<1,`${name}: avatar ${JSON.stringify(box)}`);}
+     // Do not abort pending mocked avatar fetches during navigation in WebKit.
+     await page.waitForLoadState('networkidle');
     }
     if(route==='profile'){await page.locator('#profile-display-name').getByText('Alice').waitFor();await page.waitForLoadState('networkidle');}
    }
