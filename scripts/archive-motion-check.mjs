@@ -46,6 +46,12 @@ try {
   await page.locator('#nav-archive').focus();
   for(const key of ['w','s','w','s','w','s']) await page.keyboard.press(key);
   await frame.locator('#history-last:disabled').waitFor();
+  await frame.locator('.review-title').getByText('Анализ партии',{exact:true}).waitFor({timeout:60000});
+  assert.equal(await frame.locator('.review-person strong').first().textContent(),'Bob');
+  assert.equal(await frame.locator('.review-person strong').last().textContent(),'Alice');
+  assert.match(await frame.locator('.review-bar').getAttribute('aria-label'),/белые \d+%/);
+  assert.match(await frame.locator('.review-accuracy').first().textContent(),/^\d+%$/);
+  assert.equal(await frame.locator('.review-brilliant b').first().textContent(),'—');
   assert.equal(await frame.locator('[data-square=d5] .piece').getAttribute('src'),'/pieces/cburnett/bQ.svg');
   assert.deepEqual(errors,[]);await page.close();console.log(`✓ archive ${viewport.width} ${motion}: rapid navigation, capture and avatars`);
  }

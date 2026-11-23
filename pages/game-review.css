@@ -1,0 +1,14 @@
+.review-bar {position:absolute;z-index:8;left:-12px;top:0;width:8px;height:100%;background:#27282b;box-shadow:0 0 0 1px #8886;overflow:hidden;pointer-events:none;animation:review-in .35s ease both}
+.review-bar[hidden],.review-panel[hidden] {display:none}
+.review-bar.is-leaving,.review-panel.is-leaving{animation:review-out .18s ease both;pointer-events:none}
+@keyframes review-out {to{opacity:0;translate:0 -4px}}
+.review-bar-white {position:absolute;bottom:0;left:0;right:0;background:#f3f3f0;transition:height .35s ease}
+.review-bar.is-flipped .review-bar-white {bottom:auto;top:0}
+.review-bar.is-pending {opacity:.45}
+.review-panel {border-top:1px solid var(--line);margin-top:20px;padding:18px 0 8px;color:var(--ink);font-family:system-ui,sans-serif;animation:review-in .35s ease both}
+.review-title {font-size:13px;font-weight:700;letter-spacing:.04em}.review-note {font-size:10px;color:var(--muted);margin-top:4px}
+.review-accuracy-label{margin-top:14px;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.08em}.review-table {display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0 14px}.review-person {display:grid;gap:3px;min-width:0;text-align:center}.review-person strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}.review-person small{color:var(--muted);font-size:10px}.review-accuracy {font-size:23px}
+.review-rows {display:grid;gap:2px}.review-row {display:grid;grid-template-columns:20px minmax(0,1fr) 34px 34px;align-items:center;gap:4px;padding:4px 2px;font-size:11px}.review-row b{text-align:center}.review-row>span:first-child{text-align:center;font-size:15px}.review-brilliant>span:first-child{color:#46a6a2}.review-best>span:first-child,.review-excellent>span:first-child{color:#5c9e67}.review-inaccuracy>span:first-child{color:#c49b36}.review-mistake>span:first-child{color:#d77e36}.review-blunder>span:first-child{color:#cf5252}.review-panel button{border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:7px;margin-top:8px;cursor:pointer}
+@keyframes review-in {from{opacity:0;translate:0 5px}to{opacity:1;translate:0 0}}
+@media(max-width:700px){.review-bar{left:0;width:6px}.review-panel{margin-top:10px;padding-top:10px}.review-accuracy{font-size:18px}.review-rows{grid-template-columns:1fr 1fr;column-gap:12px}}
+@media(prefers-reduced-motion:reduce){.review-bar,.review-panel{animation:none}.review-bar-white{transition:none}}

@@ -1,3 +1,4 @@
+import {createGameReview} from './game-review.js';
 import {pieceSrc as themedPieceSrc} from './piece-theme.js';
 import { Chess } from 'chess.js';
 import {renderCaptures,renderThreats,cancelCaptureFlights} from './board-insights.js';
@@ -175,7 +176,10 @@ function switchLevel(next) {
   orbitSpeed=Math.min(7,Math.max(orbitSpeed,2.8)+.35); startOrbit();
 }
 $('bot-prev').addEventListener('click',()=>switchLevel(level-1)); $('bot-next').addEventListener('click',()=>switchLevel(level+1));
+const review=createGameReview({document,frame:$('target-board'),host:$('moves').parentElement});let reviewKey=null;
 function setPhase(value) {
+  if(value==='finished' && game && reviewKey!==game.id){reviewKey=game.id;engine?.destroy();engine=null;review.setVisible(pageVisible&&!document.hidden);review.start({moves:chess.history(),flip:playerColor()==='b',names:()=>playerColor()==='w'?{w:'Вы',b:$('game-bot-name').textContent}:{b:'Вы',w:$('game-bot-name').textContent}});}
+  else if(value!=='finished' && reviewKey){review.clear();reviewKey=null;}
   phase=value; shell.dataset.phase=value; $('return-button').textContent=value==='finished' && game?.status && game.status!=='draw' && !playerWon() ? 'Завершить' : 'К выбору бота'; const inGame=value==='playing'||value==='finished';
   showcase.inert=inGame||value==='launching'||value==='returning'; showcase.setAttribute('aria-hidden',String(inGame||value==='launching'||value==='returning'));
   $('bot-board-wrap').inert=!inGame; $('bot-board-wrap').setAttribute('aria-hidden',String(!inGame));
@@ -195,6 +199,7 @@ function draw(move=null,transitions=[],captureMove=move,direction='forward') {
   const legal=selected&&isLive?(chess.turn()===playerColor()&&!premove.length?chess.moves({square:selected,verbose:true}):premoveTargets(shown,selected,playerColor())).map(m=>m.to):[];
   const displayedLast=isLive?last:shown.history({verbose:true}).at(-1);
   boardView.render({shown,selected,legal,last:displayedLast,premoves:isLive?premove:[],actual:isLive&&premove.length?chess:null,premoveMode:chess.turn()!==playerColor()||premove.length>0,animatedMove:isLive?move:null,transitions});
+  review.setIndex(historyIndex??chess.history().length);
   const actualShown=isLive?chess:shown;renderCaptures(actualShown,playerColor(),$('bot-player-captured'),$('bot-opponent-captured'),{board,move:captureMove,direction});renderThreats(actualShown,playerColor(),boardView,threatKeys);
 }
 function setThreat(code,down){if(!['KeyQ','KeyE'].includes(code))return;if(down&&(!pageVisible||!['playing','finished'].includes(phase)))return;if(down)threatKeys.add(code);else threatKeys.delete(code);draw();}
@@ -393,6 +398,8 @@ showLevel(); draw(); startOrbit(); if(pageVisible) animateEntry(); $('bot-play')
 function setPlayerAvatar(value) { const img=$('bot-player-avatar-image'), custom=typeof value==='string'&&/^data:image\/(?:png|jpeg);base64,/.test(value); img.src=custom?value:piece(playerColor(),'n'); img.classList.toggle('custom-profile-avatar',custom); }
 startSessionMonitor({auth:supabase.auth,cachedId:cachedUserId(localStorageOrNull(window)),open:async id=>{ void Promise.all([supabase.from('profile_media').select('avatar').eq('user_id',id).maybeSingle(),supabase.from('profile_rewards').select('avatar_unlocked').eq('user_id',id).maybeSingle()]).then(([media,reward])=>{if(!destroyed&&userId===id)setPlayerAvatar(!reward.error&&reward.data?.avatar_unlocked?media.data?.avatar:null);}).catch(()=>{}); await restore(id); if(!destroyed) $('bot-play').disabled=false; },logout:()=>{ destroyed=true; ++generation; stopOrbit(); engine?.destroy(); store?.destroy(); clearInterval(timer); sound.destroy(); if(window.parent===window) location.replace('/'); },accountChanged:()=>location.reload()});
 window.addEventListener('online',()=>store?.flush());
+document.addEventListener('visibilitychange',()=>review.setVisible(pageVisible&&!document.hidden));
+window.addEventListener('pagehide',event=>{if(!event.persisted)review.destroy()});
 // If Play is pressed during the entrance, continue from the current opacity
 // rather than letting a still-running entrance override the launch fade.
 function fadeEntryIntoLaunch() {
@@ -427,8 +434,8 @@ window.addEventListener('message',event=>{
   if(event.data?.type==='shahmat-threat-key'){setThreat(event.data.code,!!event.data.down);return;}
   if(event.data?.type==='shahmat-history-key' && typeof event.data.key==='string') { handleNavigation(event.data.key,event.data.code); return; }
   if(event.data?.type==='shahmat-profile-updated') { setPlayerAvatar(event.data.avatar); return; }
-  if(event.data?.type==='shahmat-bot-hidden') { pageVisible=false;setThreat('KeyQ',false);setThreat('KeyE',false); stopOrbit(); return; }
-  if(event.data?.type==='shahmat-bot-shown') { const wasHidden=!pageVisible; pageVisible=true; startOrbit(); if(wasHidden) animateEntry(); return; }
+  if(event.data?.type==='shahmat-bot-hidden') { pageVisible=false;review.setVisible(false);setThreat('KeyQ',false);setThreat('KeyE',false); stopOrbit(); return; }
+  if(event.data?.type==='shahmat-bot-shown') { const wasHidden=!pageVisible; pageVisible=true;review.setVisible(!document.hidden); startOrbit(); if(wasHidden) animateEntry(); return; }
   if(event.data?.type!=='shahmat-appearance') return;
   const targets={'--page-background':'--bg','--foreground':'--ink','--surface':'--surface','--surface-raised':'--surface-alt','--line':'--line','--button-background':'--control','--button-text':'--control-ink','--accent':'--accent','--board-light':'--board-light','--board-dark':'--board-dark'};
   for(const [name,target] of Object.entries(targets)) { const value=event.data.colors?.[name]; if(typeof value==='string' && value) document.documentElement.style.setProperty(target,value); }
