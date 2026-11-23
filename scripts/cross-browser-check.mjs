@@ -73,6 +73,10 @@ for(const name of requested){
     return fulfill({json:[]});
    });
    await page.goto(`${base}/home`);await page.locator('#dashboard-home').waitFor({state:'visible'});
+   assert.equal(await page.locator('#dashboard-home a[data-page]').count(),5);
+   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),`${name} home: horizontal overflow`);
+   assert.equal(await page.locator('.home-art-board').evaluate(el=>getComputedStyle(el).animationName),'none',`${name} reduced motion`);
+   await page.locator('#dashboard-home [data-page=rating]').click(); await page.locator('#page-rating:not([hidden])').waitFor(); assert.equal(new URL(page.url()).pathname,'/rating');
    for(const route of ['rating','profile','settings','help']){
     await page.goto(`${base}/${route}`);await page.locator(`#page-${route}`).waitFor({state:'visible'});
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),`${name} ${viewport.width} ${route}: horizontal overflow`);
@@ -85,16 +89,19 @@ for(const name of requested){
    await page.goto(`${base}/game`);let f=page.frameLocator('#member-game-frame');
    await f.locator('#lobby-stage .kind-card').first().waitFor();
    assert.equal(await f.locator('#lobby-stage .kind-card').count(),2);
+   assert.equal(await f.locator('#lobby-site-online').isVisible(),true);
+   assert.equal(await f.locator('.kind-card strong').first().evaluate(el=>getComputedStyle(el.parentElement).textAlign),'center');
+   const siteBox=await f.locator('#lobby-site-online').boundingBox(); assert.ok(siteBox.y+siteBox.height<=viewport.height+1,`${name} online counter fits`);
    const rects=await f.locator('#lobby-stage .kind-card').evaluateAll(els=>els.map(e=>{const r=e.getBoundingClientRect();return {top:r.top,bottom:r.bottom,left:r.left,right:r.right,height:innerHeight,width:innerWidth}}));
    for(const r of rects)assert.ok(r.top>=0&&r.left>=0&&r.bottom<=r.height+1&&r.right<=r.width+1,`${name} lobby overflow ${JSON.stringify(rects)}`);
    if(viewport.width<=700)assert.ok(rects[0].bottom<=rects[1].top+1,`${name} mobile cards stacked`);
    await f.locator('#lobby-stage [data-kind=rated] .lobby-online-value').getByText('7').waitFor();
-   await press(f.locator('#lobby-stage [data-kind=rated]'));assert.equal(await f.locator('#lobby-stage .choice-card').count(),5);assert.ok(await f.locator('#lobby-stage .choice-card:disabled').isDisabled());
+   await press(f.locator('#lobby-stage [data-kind=rated]'));assert.equal(await f.locator('#lobby-stage .choice-card').count(),5);assert.equal(await f.locator('#lobby-site-online').isVisible(),false);assert.ok(await f.locator('#lobby-stage .choice-card:disabled').isDisabled());
    const checkLobbyFit=async()=>{const boxes=await f.locator('#lobby-stage .choice-card, #lobby-back').evaluateAll(els=>els.map(e=>{const r=e.getBoundingClientRect();return {top:r.top,bottom:r.bottom,left:r.left,right:r.right,height:innerHeight,width:innerWidth}}));for(const r of boxes)assert.ok(r.top>=0&&r.left>=0&&r.bottom<=r.height+1&&r.right<=r.width+1,`${name} choice overflow ${JSON.stringify(boxes)}`);assert.ok(boxes.at(-1).top>=Math.max(...boxes.slice(0,-1).map(b=>b.bottom))-1,'back below cards');};
    await checkLobbyFit();assert.equal(await f.locator('#lobby-stage .choice-icon svg').count(),5);
    await press(f.locator('#lobby-stage .choice-card').nth(1));assert.equal(await f.locator('#lobby-stage .time-card').count(),4);await checkLobbyFit();assert.equal(await f.locator('#lobby-stage .time-card .choice-icon').count(),0);await f.locator('#lobby-stage .time-card').first().locator('.lobby-online-value').getByText('7').waitFor();await press(f.locator('#lobby-stage .time-card').nth(0));
    await f.locator('#board .square').first().waitFor({state:'visible'});assert.equal(await f.locator('#board .square').count(),64);await checkBoardLayout(f,'online');
-   await page.goto(`${base}/archive`);f=page.frameLocator('#archive-frame');await f.locator('[data-count=total]').getByText('24').waitFor();assert.equal(await f.locator('[data-count=blitz]').textContent(),'16');await f.locator('.archive-card').first().click();assert.equal(await f.locator('#archive-stats').isVisible(),false);await f.locator('#archive-detail').waitFor({state:'visible'});assert.equal(await f.locator('#board .square').count(),64);await checkBoardLayout(f,'archive');assert.equal(await f.locator('#black-name').textContent(),'Бот 1 уровень');assert.match(await f.locator('#archive-top-avatar').getAttribute('src'),/bP\.svg$/);
+   await page.goto(`${base}/archive`);f=page.frameLocator('#archive-frame');assert.equal(await f.locator('#archive-main #archive-status').count(),1);await f.locator('[data-count=total]').getByText('24').waitFor();assert.equal(await f.locator('[data-count=blitz]').textContent(),'16');await f.locator('.archive-card').first().click();assert.equal(await f.locator('#archive-stats').isVisible(),false);await f.locator('#archive-detail').waitFor({state:'visible'});assert.equal(await f.locator('#board .square').count(),64);await checkBoardLayout(f,'archive');assert.equal(await f.locator('#black-name').textContent(),'Бот 1 уровень');assert.match(await f.locator('#archive-top-avatar').getAttribute('src'),/bP\.svg$/);
    await page.goto(`${base}/watch`);f=page.frameLocator('#watch-frame');await f.locator('[data-game-id=fixture]').click();await f.locator('#white-name').getByText('Alice').waitFor();await checkBoardLayout(f,'watch');assert.equal(await f.locator('#white-captured img').count(),1);assert.equal(await f.locator('#black-captured img').count(),1);await f.locator('#history-prev').click();assert.equal(await f.locator('[data-square=g1] .piece').count(),1);
    await page.goto(`${base}/bot`);f=page.frameLocator('#bot-game-frame');await press(f.locator('#bot-play:not([disabled])'));await f.locator('#bot-app[data-phase=playing]').waitFor();await checkBoardLayout(f,'bot');assert.equal(await f.locator('#game-bot-name').textContent(),'Бот 1 уровень');assert.match(await f.locator('#game-bot-piece').getAttribute('src'),/bP\.svg$/);await press(f.locator('[data-square=e2]'));await press(f.locator('[data-square=e4]'));await f.locator('[data-square=e5] .piece').waitFor();
    await page.goto(`${base}/play`);await page.locator('#board .piece').first().waitFor();await checkBoardLayout(page,'guest');await press(page.locator('[data-square=e2]'));await press(page.locator('[data-square=e4]'));await page.locator('[data-square=e4] .piece').waitFor();

@@ -107,3 +107,15 @@ test('mode changes reuse and reorder player elements', async () => {
  const view=createRatingView(root,client);await view.refresh();const alice=root.querySelectorAll('.rating-row')[0],bob=root.querySelectorAll('.rating-row')[1];
  root.querySelector('[data-rating-mode="rapid"]').click();await tick();assert.equal(root.querySelectorAll('.rating-row')[0],bob);assert.equal(root.querySelectorAll('.rating-row')[1],alice);assert.equal(alice.querySelector('.rating-place').textContent,'2');view.destroy();dom.window.close();
 });
+
+test('online dots follow presence changes and survive leaderboard rendering', async () => {
+  const dom=new JSDOM(html); const root=dom.window.document.querySelector('section');
+  const client={rpc:async fn=>({data:fn==='rank_leaderboard'?[{username:'Alice',yar:1000},{username:'Bob',yar:900}]:[]})};
+  const view=createRatingView(root,client);
+  view.setOnlineNames(new Set(['Alice'])); await view.refresh();
+  assert.equal(root.querySelectorAll('.rating-online').length,1);
+  assert.equal(root.querySelector('.rating-online').parentElement.dataset.profileName,'Alice');
+  view.setOnlineNames(new Set(['Bob'])); assert.equal(root.querySelector('.rating-online').parentElement.dataset.profileName,'Bob');
+  view.setOnlineNames(null); assert.equal(root.querySelector('.rating-online'),null);
+  view.destroy(); dom.window.close();
+});

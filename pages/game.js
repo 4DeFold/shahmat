@@ -31,7 +31,8 @@ const ui = createMemberGame({ document, onGameChanged:changeGame, onMoveCommitte
 lobby=createPlayLobby({document,client:supabase,onChoose:value=>ui.configureMatch(value)});
 document.getElementById('change-selection').addEventListener('click',()=>lobby.show('controls',{fromBoard:true}));
 const ownProfileCard=createProfileCard(document.getElementById('member-game'),supabase,name=>{if(window.parent!==window)window.parent.postMessage({type:'shahmat-open-profile',username:name},window.location.origin);else location.href=`/profile?player=${encodeURIComponent(name)}`;});
-const updateOnline = createOnlineCounter(document);
+const updateClockOnline = createOnlineCounter(document);
+const updateOnline = value => { updateClockOnline(value); lobby.setSiteOnline(value); };
 let stopOnline = null, stopHeartbeat = null;
 // A preloaded embedded game stays paused until its parent shows the view.
 if (window.parent !== window) { lobby.setVisible(false); ui.hide(); }

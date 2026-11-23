@@ -19,7 +19,16 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
   const motionPreference = win.matchMedia?.('(prefers-reduced-motion: reduce)');
   const cache = new Map(), pending = new Map();
   const freshness = 15000;
-  let mode = 'overall', sequence = 0, destroyed = false, indicatorFrame = null;
+  let mode = 'overall', sequence = 0, destroyed = false, indicatorFrame = null, onlineNames = null;
+  function updateOnlineIndicators() {
+    for (const person of root.querySelectorAll('.rating-person')) {
+      const name = person.dataset.profileName;
+      let dot = person.querySelector('.rating-online');
+      const online = !!name && !!onlineNames?.has(name);
+      if (online && !dot) { dot = root.ownerDocument.createElement('span'); dot.className = 'rating-online'; dot.setAttribute('role', 'img'); dot.setAttribute('aria-label', 'В сети'); person.append(dot); }
+      else if (!online) dot?.remove();
+    }
+  }
   let motionFrame = null, motionItems = [];
   const visualScores = new WeakMap();
 
@@ -158,6 +167,7 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
         if (Math.abs(dx)>.5 || Math.abs(dy)>.5) row.animate([{transform:`translate(${dx}px,${dy}px)`},{transform:'translate(0,0)'}],{duration:600,easing:'cubic-bezier(.22,1,.36,1)'});
       } else if (previous.size && row.animate) row.animate([{opacity:0,transform:'translateY(8px)'},{opacity:1,transform:'none'}],{duration:350,easing:'ease-out'});
     }
+    updateOnlineIndicators();
     if (animated.length) animateItems(animated);
     void loadAvatars(data);
     status.hidden = data.length > 0;
@@ -220,7 +230,7 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
       stopElement(selfScore);
       selfScore.textContent = formatScore(player);
       if (Number.isFinite(target)) { if (!Number.isFinite(from)) visualScores.set(selfScore,target); } else visualScores.delete(selfScore);
-      self.hidden = false;
+      self.hidden = false; updateOnlineIndicators();
       {
         void Promise.all([client.rpc('profile_avatars',{p_names:[ownName]}),client.rpc('profile_avatar_themes',{p_names:[ownName]}),client.rpc('profile_piece_sets',{p_names:[ownName]})]).then(([images,themes,sets])=>{if(destroyed||request!==sequence)return;const image=self.querySelector('.rating-avatar');if(!image)return;image.style.backgroundColor=profileAvatarColor(themes.data?.[0]?.palette);const avatar=images.data?.[0]?.avatar;if(/^data:image\/(?:png|jpeg);base64,/.test(avatar||'')){image.src=avatar;image.classList.add('has-custom-avatar');}else {setPublicPiece(image,sets.data?.[0]?.piece_set);image.classList.remove('has-custom-avatar');}}).catch(()=>{});
       }
@@ -283,6 +293,7 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
   root.addEventListener('click', onClick);
   return {
     refresh,
+    setOnlineNames(names) { onlineNames = names; updateOnlineIndicators(); },
     invalidate() { cache.clear(); avatarRequest++; },
     setUnit(value) {
       const next = value === 'elo' ? 'elo' : 'yar';

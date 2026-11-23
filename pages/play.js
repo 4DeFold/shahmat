@@ -1,3 +1,4 @@
+import './standalone-guest-presence.js';
 import {createGameSound} from './game-sound.js';
 const sound=createGameSound(window);
 import {pieceSrc as themedPieceSrc} from './piece-theme.js';

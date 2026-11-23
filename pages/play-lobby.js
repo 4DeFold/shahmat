@@ -43,7 +43,8 @@ export function createOnlineCount(element, win) {
 
 export function createPlayLobby({document,client,onChoose,onOpenBoard}) {
  const win=document.defaultView, root=document.getElementById('play-lobby'), shell=document.getElementById('member-game');
- const stage=document.getElementById('lobby-stage'), back=document.getElementById('lobby-back');
+ const stage=document.getElementById('lobby-stage'), back=document.getElementById('lobby-back'), siteOnline=document.getElementById('lobby-site-online');
+ const siteCounter=siteOnline ? createOnlineCount(siteOnline.querySelector('#lobby-site-online-value'),win) : null;
  let screen='kinds',kind='rated',mode=null, selectedTime=null, timers=[], demoGames=[], fetching=null, visible=true, disposed=false, active=false;
  let counts=null, counters=[], pollTimer=null, pollInFlight=false, pollGeneration=0;
  const reduced=()=>win.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -244,7 +245,7 @@ export function createPlayLobby({document,client,onChoose,onOpenBoard}) {
   clearTransitions();const wasHidden=back.hidden, showBack=next!=='kinds';
   const previousBoard=fromBoard?snapshotBoard():null;
   const snapshot=previousBoard?null:snapshotStage(source);if(!showBack&&snapshot)animateBack(wasHidden,true);
-  clear();counters.forEach(x=>x.counter.destroy());counters=[];screen=next;shell.classList.add('lobby-open');root.hidden=false;back.hidden=!showBack;
+  clear();counters.forEach(x=>x.counter.destroy());counters=[];screen=next;if(siteOnline)siteOnline.hidden=next!=='kinds';shell.classList.add('lobby-open');root.hidden=false;back.hidden=!showBack;
   const first=!stage.children.length;stage.className=`lobby-stage stage-${screen}${first?' stage-initial':''}`;stage.replaceChildren();
   if(showBack)animateBack(previousBoard?true:wasHidden,false);
   if(screen==='kinds'){
@@ -274,5 +275,5 @@ export function createPlayLobby({document,client,onChoose,onOpenBoard}) {
  back.addEventListener('click',()=>show(screen==='controls'?'modes':'kinds',{backwards:true}));
  const onResize=()=>clearTransitions();win.addEventListener('resize',onResize);
  show('kinds');
- return {activate(){active=true;startPolling();return load();},show,showControls,openBoard,setVisible(value){visible=value;if(visible&&!root.hidden){if(screen==='kinds'){void load();startDemos();}startPolling();}else{clearTransitions();clear();stopPolling();}},destroy(){disposed=true;root.removeEventListener('pointermove',specular);root.removeEventListener('pointerleave',resetSpecular);win.removeEventListener('resize',onResize);clear();clearTransitions();stopPolling();counters.forEach(x=>x.counter.destroy());}};
+ return {setSiteOnline(value){siteCounter?.set(value);siteOnline?.setAttribute('aria-label', Number.isSafeInteger(value) && value >= 0 ? `Онлайн на сайте: ${value}` : 'Онлайн на сайте: нет соединения');},activate(){active=true;startPolling();return load();},show,showControls,openBoard,setVisible(value){visible=value;if(visible&&!root.hidden){if(screen==='kinds'){void load();startDemos();}startPolling();}else{clearTransitions();clear();stopPolling();}},destroy(){siteCounter?.destroy();disposed=true;root.removeEventListener('pointermove',specular);root.removeEventListener('pointerleave',resetSpecular);win.removeEventListener('resize',onResize);clear();clearTransitions();stopPolling();counters.forEach(x=>x.counter.destroy());}};
 }

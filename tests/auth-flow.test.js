@@ -8,7 +8,7 @@ const shellHtml = await readFile('pages/app-shell.html', 'utf8');
 const pageHtml = (await Promise.all(['home', 'game-view', 'profile', 'settings', 'help'].map(name => readFile(`pages/${name}.html`, 'utf8')))).join('');
 // Unit tests preload views; browser checks verify the actual lazy loading.
 const html = rootHtml.replace('    </main>', shellHtml.replace('<div id="page-content"></div>', `<div id="page-content">${pageHtml}</div>`) + '    </main>');
-const source = 'const installLoadingIndicators = () => {}; const installPieceTheme = () => {}; const setPieceSet = () => {}; const selectedPieceSet = () => "cburnett"; const validPieceSet = () => "cburnett";\n' + (await readFile('app.js', 'utf8')).replace(/import .*?;\n/g, '').replace('export const appReady = initialize();', 'initialize();');
+const source = 'const guestPresenceId = () => "guest:test"; const installLoadingIndicators = () => {}; const installPieceTheme = () => {}; const setPieceSet = () => {}; const selectedPieceSet = () => "cburnett"; const validPieceSet = () => "cburnett";\n' + (await readFile('app.js', 'utf8')).replace(/import .*?;\n/g, '').replace('export const appReady = initialize();', 'initialize();');
 const tick = () => new Promise(resolve => setTimeout(resolve, 10));
 async function setup({ existing = false, palette = 'monochrome', failSave = false, systemDark = false, initialStorage = {}, saveHandler = null, getUserHandler = null, userId = 'user-1', otpReady = true, autoConfirm = false, signupError = null, signInHandler = null, url = 'https://example.com', accessToken = null, feedbackHandler = null } = {}) {
   const dom = new JSDOM(html, { runScripts: 'outside-only', url });
@@ -212,6 +212,7 @@ test('session errors show a retry path instead of leaving an indefinite black sc
   window.requestAnimationFrame = cb => cb();
   window.scrollTo = () => {};
   window.createClient = () => ({ auth: { getSession: async () => ({ error: new Error('offline') }) } });
+  window.startOnlinePresence = () => () => {}; window.startMatchHeartbeat = () => () => {};
   window.eval(source.replace("import.meta.env.VITE_EMAIL_OTP_READY === 'true'", 'true')); await tick();
   assert.equal(window.document.body.classList.contains('startup-ready'), true);
   assert.equal(window.document.getElementById('auth-screen').hidden, false);
@@ -301,7 +302,8 @@ test('sidebar navigates between pages, moves the dashboard to profile and return
   const { $, click, document, window } = await setup({ existing: true, palette: 'forest' });
   const pageButton = name => document.querySelector(`#dashboard-screen [data-page="${name}"]`);
   assert.equal($('dashboard-home').hidden, false);
-  assert.equal($('dashboard-home').textContent.trim(), 'Главная');
+  assert.match($('page-home-title').textContent, /Каждая партия/);
+  assert.equal($('dashboard-home').querySelectorAll('a[data-page]').length, 5);
   assert.equal($('page-profile').hidden, true);
   assert.ok($('page-settings').contains($('dashboard-palettes')));
   assert.equal($('page-profile').contains($('dashboard-palettes')), false);
@@ -331,6 +333,8 @@ test('sidebar navigates between pages, moves the dashboard to profile and return
   assert.equal(window.location.pathname, '/home');
   assert.equal(document.activeElement, $('page-home-title'));
   assert.equal($('page-profile').hidden, true);
+  document.querySelector('#dashboard-home [data-page=game]').click(); await tick();
+  assert.equal(window.location.pathname, '/game'); assert.equal($('page-game').hidden, false);
   await click('account-toggle');
   document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
   assert.equal($('account-menu').hidden, true);

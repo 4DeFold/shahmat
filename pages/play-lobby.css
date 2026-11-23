@@ -79,3 +79,8 @@
 .lobby-board-ghost {position:absolute;z-index:0;pointer-events:none;box-sizing:border-box;display:grid;place-items:center;overflow:hidden}
 .lobby-board-ghost * {pointer-events:none!important}
 #member-game:not(.lobby-open) > .board-area,#member-game:not(.lobby-open) > .game-rail {position:relative;z-index:1}
+
+.kind-card {text-align:center;align-items:center}
+.kind-card .demo-frame {align-self:stretch}
+.lobby-site-online {color:var(--muted);font:12px system-ui,sans-serif;font-variant-numeric:tabular-nums;text-align:center;flex:none}
+.lobby-site-online[hidden] {display:none}

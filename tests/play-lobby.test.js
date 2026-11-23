@@ -16,7 +16,8 @@ test('lobby steps preserve kind and exact time; custom is disabled and back work
  try{
   await lobby.activate();const d=dom.window.document;
   assert.equal(d.querySelectorAll('.kind-card').length,2);
-  d.querySelector('[data-kind=friendly]').click();assert.equal(d.querySelectorAll('.choice-card').length,5);assert.equal(d.querySelector('.choice-card:disabled').textContent.includes('Кастом'),true);
+  lobby.setSiteOnline(42); assert.equal(d.querySelector('#lobby-site-online-value').textContent,'42'); assert.equal(d.querySelector('#lobby-site-online').hidden,false);
+  d.querySelector('[data-kind=friendly]').click(); assert.equal(d.querySelector('#lobby-site-online').hidden,true);assert.equal(d.querySelectorAll('.choice-card').length,5);assert.equal(d.querySelector('.choice-card:disabled').textContent.includes('Кастом'),true);
   d.querySelectorAll('.choice-card')[1].click();assert.equal(d.querySelectorAll('.time-card').length,4);assert.deepEqual(controls.blitz,['3+0','3+2','5+0','5+3']);
   d.getElementById('lobby-back').click();assert.equal(d.querySelectorAll('.choice-card').length,5);
   d.querySelectorAll('.choice-card')[1].click();d.querySelectorAll('.time-card')[1].click();
