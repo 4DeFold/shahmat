@@ -302,7 +302,7 @@ test('sidebar navigates between pages, moves the dashboard to profile and return
   const { $, click, document, window } = await setup({ existing: true, palette: 'forest' });
   const pageButton = name => document.querySelector(`#dashboard-screen [data-page="${name}"]`);
   assert.equal($('dashboard-home').hidden, false);
-  assert.match($('page-home-title').textContent, /Каждая партия/);
+  assert.match($('page-home-title').textContent, /Шахматы/);
   assert.equal($('dashboard-home').querySelectorAll('a[data-page]').length, 5);
   assert.equal($('page-profile').hidden, true);
   assert.ok($('page-settings').contains($('dashboard-palettes')));

@@ -442,6 +442,7 @@ $('dashboard-screen').addEventListener('click', event => {
   if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
   event.preventDefault();
   setSidebarOpen(false);
+  if (link.dataset.page === currentPage() && !(link.dataset.page === 'profile' && $('page-profile')?.dataset.profileOther === 'true')) return;
   if(link.dataset.page === 'profile' && $('page-profile')?.dataset.profileOther === 'true' && currentPage()==='profile') { delete $('page-profile').dataset.profileOther; updateProfileAppearance(); showProfileData(()=>profileView?.show(profile,appearanceUserId)); }
   void showPage(link.dataset.page, { updateHistory: true, focus: true });
 });
@@ -455,7 +456,7 @@ document.addEventListener('click', event => {
 document.addEventListener('keydown', event => {
   if (!['game','bot','watch','archive'].includes(currentPage()) || $('dashboard-screen').hidden || event.defaultPrevented || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey || event.target.closest?.('input, textarea, select, [contenteditable]:not([contenteditable=false]), [role=textbox]') || document.querySelector('dialog[open]')) return;
   const key=({KeyA:'a',KeyD:'d',KeyW:'w',KeyS:'s'})[event.code]||event.key;
-  if (['ArrowLeft','ArrowRight','a','d'].includes(key) || (currentPage()!=='watch' && ['ArrowUp','ArrowDown','w','s'].includes(key)) || (key==='Enter' && currentPage()==='bot' && !event.target.closest?.('button,a'))) { event.preventDefault(); $(({game:'member-game-frame',bot:'bot-game-frame',watch:'watch-frame',archive:'archive-frame'})[currentPage()])?.contentWindow?.postMessage({type:'shahmat-history-key',key,code:event.code},window.location.origin); }
+  if (['ArrowLeft','ArrowRight','a','d'].includes(key) || ['ArrowUp','ArrowDown','w','s'].includes(key) || (key==='Enter' && currentPage()==='bot' && !event.target.closest?.('button,a'))) { event.preventDefault(); $(({game:'member-game-frame',bot:'bot-game-frame',watch:'watch-frame',archive:'archive-frame'})[currentPage()])?.contentWindow?.postMessage({type:'shahmat-history-key',key,code:event.code},window.location.origin); }
 });
 // Forward held physical Q/E keys when the shell, rather than the frame, has focus.
 for (const type of ['keydown','keyup']) document.addEventListener(type,event=>{

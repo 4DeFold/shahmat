@@ -114,8 +114,8 @@ test('online dots follow presence changes and survive leaderboard rendering', as
   const view=createRatingView(root,client);
   view.setOnlineNames(new Set(['Alice'])); await view.refresh();
   assert.equal(root.querySelectorAll('.rating-online').length,1);
-  assert.equal(root.querySelector('.rating-online').parentElement.dataset.profileName,'Alice');
-  view.setOnlineNames(new Set(['Bob'])); assert.equal(root.querySelector('.rating-online').parentElement.dataset.profileName,'Bob');
+  assert.equal(root.querySelector('.rating-online').closest('.rating-person').dataset.profileName,'Alice');
+  view.setOnlineNames(new Set(['Bob'])); assert.equal(root.querySelector('.rating-online').closest('.rating-person').dataset.profileName,'Bob');
   view.setOnlineNames(null); assert.equal(root.querySelector('.rating-online'),null);
   view.destroy(); dom.window.close();
 });

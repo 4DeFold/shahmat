@@ -231,6 +231,8 @@ test('unfinished game ignores stale countdown and member games never start one',
 test('black side starts with bot move, persists orientation, allows black moves and reports mate', async () => {
   const app = setup({ random: 0.9 });
   assert.equal(app.document.querySelector('#player-color').textContent, 'Чёрные');
+  assert.match(app.document.querySelector('#player-avatar').getAttribute('src'), /\/bN\.svg$/);
+  assert.match(app.document.querySelector('#bot-avatar').getAttribute('src'), /\/wN\.svg$/);
   assert.equal(app.document.querySelector('#bot-color').textContent, 'Белые');
   assert.equal(app.document.querySelector('#board').firstElementChild.dataset.square, 'h1');
   assert.equal(app.document.querySelector('#status').textContent, 'Бот думает…');

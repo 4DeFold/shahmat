@@ -41,6 +41,12 @@ jobs:
             cp /tmp/particles-test.log /tmp/browser-test.log
           fi
           if [ "$result" -eq 0 ]; then
+            RESPONSIVE_BASE_URL=http://127.0.0.1:4271 node scripts/archive-motion-check.mjs > /tmp/archive-motion.log 2>&1
+            result=$?
+            cat /tmp/archive-motion.log
+            cp /tmp/archive-motion.log /tmp/browser-test.log
+          fi
+          if [ "$result" -eq 0 ]; then
             RESPONSIVE_BASE_URL=http://127.0.0.1:4271 node scripts/search-loader-check.mjs > /tmp/loader-test.log 2>&1
             result=$?
             cat /tmp/loader-test.log

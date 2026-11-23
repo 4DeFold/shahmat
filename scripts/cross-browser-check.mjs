@@ -74,8 +74,9 @@ for(const name of requested){
    });
    await page.goto(`${base}/home`);await page.locator('#dashboard-home').waitFor({state:'visible'});
    assert.equal(await page.locator('#dashboard-home a[data-page]').count(),5);
+   await page.waitForFunction(()=>document.querySelector('.home-poster img')?.naturalWidth>0);
    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),`${name} home: horizontal overflow`);
-   assert.equal(await page.locator('.home-art-board').evaluate(el=>getComputedStyle(el).animationName),'none',`${name} reduced motion`);
+   assert.equal(await page.locator('.home-poster').evaluate(el=>getComputedStyle(el).animationName),'none',`${name} reduced motion`);
    await page.locator('#dashboard-home [data-page=rating]').click(); await page.locator('#page-rating:not([hidden])').waitFor(); assert.equal(new URL(page.url()).pathname,'/rating');
    for(const route of ['rating','profile','settings','help']){
     await page.goto(`${base}/${route}`);await page.locator(`#page-${route}`).waitFor({state:'visible'});

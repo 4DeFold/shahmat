@@ -26,17 +26,18 @@ export function createMemberBoard({ document, board, reducedMotion }) {
     target.prepend(image);
     return image;
   }
-  function animate(image, from, to) {
+  function animate(image, from, to, interrupted = null) {
     if (!image?.animate || reducedMotion()) return;
     const step = board.clientWidth / 8;
     if (!step) return;
-    const dx = (files.indexOf(from[0]) - files.indexOf(to[0])) * step;
-    const dy = (Number(to[1]) - Number(from[1])) * step;
+    let dx = (files.indexOf(from[0]) - files.indexOf(to[0])) * step;
+    let dy = (Number(to[1]) - Number(from[1])) * step;
+    if(interrupted) { dx+=interrupted.x; dy+=interrupted.y; }
+    animations.get(image)?.cancel();
     const animation = image.animate([
-      { translate:`${dx}px ${dy}px`, filter:'blur(0px)' },
-      { offset:.28, filter:'blur(.75px)' },
-      { translate:'0px 0px', filter:'blur(0px)' },
-    ], { duration: 165, easing:'cubic-bezier(.2,.7,.25,1)' });
+      { translate:`${dx}px ${dy}px` },
+      { translate:'0px 0px' },
+    ], { duration: 190, easing:'cubic-bezier(.2,.7,.25,1)' });
     const cell = image.parentElement;
     cell.classList.add('is-moving');
     animations.set(image, animation);
@@ -47,6 +48,15 @@ export function createMemberBoard({ document, board, reducedMotion }) {
   function render({ shown, selected, legal = [], premove, premoves = [], actual, last, animatedMove, transitions = [], premoveMode = false }) {
     const moves = new Set(legal), checked = (actual || shown).isCheck(), turn = (actual || shown).turn();
     let movingImage = null, rookImage = null, rookFrom, rookTo;
+    // Read in-flight visual offsets before any DOM mutations; repeated shortcuts
+    // continue from the visible position instead of stacking animations.
+    const interrupted=new Map();
+    for (const move of [...transitions,...(animatedMove?[animatedMove]:[])]) {
+      const cell=cells.get(move.from), image=cell?.querySelector('.piece');
+      if(!image || !animations.has(image))continue;
+      const r=image.getBoundingClientRect(), c=cell.getBoundingClientRect(), sign=board.classList.contains('black')?-1:1;
+      interrupted.set(move.from,{x:sign*(r.left+r.width/2-c.left-c.width/2),y:sign*(r.top+r.height/2-c.top-c.height/2)});
+    }
     if (animatedMove) {
       movingImage = transfer(animatedMove.from, animatedMove.to);
       if (animatedMove.flags.includes('k')) { rookFrom = `${animatedMove.reverse?'f':'h'}${animatedMove.to[1]}`; rookTo = `${animatedMove.reverse?'h':'f'}${animatedMove.to[1]}`; }
@@ -73,8 +83,8 @@ export function createMemberBoard({ document, board, reducedMotion }) {
       if (img.getAttribute('src') !== src) img.setAttribute('src', src);
       const real=actual?.get(square); img.classList.toggle('premove-ghost', !!actual && (!real || real.color!==piece.color || real.type!==piece.type));
     }
-    if (animatedMove) { animate(movingImage, animatedMove.from, animatedMove.to); if (rookImage) animate(rookImage, rookFrom, rookTo); }
-    for (const move of transitions) animate(cells.get(move.to)?.querySelector('.piece'), move.from, move.to);
+    if (animatedMove) { animate(movingImage, animatedMove.from, animatedMove.to, interrupted.get(animatedMove.from)); if (rookImage) animate(rookImage, rookFrom, rookTo); }
+    for (const move of transitions) animate(cells.get(move.to)?.querySelector('.piece'), move.from, move.to, interrupted.get(move.from));
   }
   return { render, cell: square => cells.get(square) };
 }

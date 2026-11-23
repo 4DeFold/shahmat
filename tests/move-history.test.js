@@ -10,8 +10,8 @@ test('history movement maps piece identities through jumps, captures and castlin
 test('history shortcuts jump to start/end and preserve single-step navigation', async () => {
   const {historyKeyTarget} = await import('../pages/move-history.js');
   for (const [key,code,target] of [
-    ['ArrowDown','ArrowDown',0], ['ы','KeyS',0], ['s','KeyS',0],
-    ['ArrowUp','ArrowUp',9], ['ц','KeyW',9], ['w','KeyW',9],
+    ['ArrowDown','ArrowDown',9], ['ы','KeyS',9], ['s','KeyS',9],
+    ['ArrowUp','ArrowUp',0], ['ц','KeyW',0], ['w','KeyW',0],
     ['ArrowLeft','ArrowLeft',3], ['ф','KeyA',3], ['ArrowRight','ArrowRight',5], ['в','KeyD',5],
   ]) assert.equal(historyKeyTarget(key,code,4,9), target);
   assert.equal(historyKeyTarget('ArrowLeft','ArrowLeft',0,9),0);
@@ -23,4 +23,14 @@ test('history shortcuts jump to start/end and preserve single-step navigation', 
 test('history sounds track the crossed move in either direction and ignore unchanged positions',async()=>{
  const {historySoundMove}=await import('../pages/move-history.js');const c=new Chess();['e4','d5','exd5','Qxd5'].forEach(m=>c.move(m));
  assert.equal(historySoundMove(c,0,0),null);assert.equal(historySoundMove(c,3,4).piece,'q');assert.equal(historySoundMove(c,4,3).piece,'q');assert.equal(historySoundMove(c,0,3).captured,'p');assert.equal(historySoundMove(c,3,0).captured,'p');
+});
+
+test('cached archive timeline reproduces positions and identity transitions for arbitrary jumps', async()=>{
+ const {createHistoryTimeline}=await import('../pages/move-history.js');
+ const c=new Chess();['e4','a6','e5','d5','exd6','cxd6','Nf3','Nf6'].forEach(m=>c.move(m));
+ const timeline=createHistoryTimeline(c);
+ for(let i=0;i<=timeline.moves.length;i++){
+  const position=new Chess(); c.history().slice(0,i).forEach(m=>position.move(m)); assert.equal(timeline.fens[i],position.fen());
+  for(let j=0;j<=timeline.moves.length;j++) assert.deepEqual(timeline.transitions(i,j),historyTransition(c,i,j));
+ }
 });

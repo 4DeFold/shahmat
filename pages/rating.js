@@ -23,9 +23,10 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
   function updateOnlineIndicators() {
     for (const person of root.querySelectorAll('.rating-person')) {
       const name = person.dataset.profileName;
-      let dot = person.querySelector('.rating-online');
+      const avatar = person.querySelector('.rating-avatar-wrap'); if (!avatar) continue;
+      let dot = avatar.querySelector('.rating-online');
       const online = !!name && !!onlineNames?.has(name);
-      if (online && !dot) { dot = root.ownerDocument.createElement('span'); dot.className = 'rating-online'; dot.setAttribute('role', 'img'); dot.setAttribute('aria-label', 'В сети'); person.append(dot); }
+      if (online && !dot) { dot = root.ownerDocument.createElement('span'); dot.className = 'rating-online'; dot.setAttribute('role', 'img'); dot.setAttribute('aria-label', 'В сети'); avatar.append(dot); }
       else if (!online) dot?.remove();
     }
   }
@@ -139,7 +140,8 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
         const place=root.ownerDocument.createElement('span'); place.className='rating-place';
         const person=root.ownerDocument.createElement('button'); person.type='button'; person.className='rating-person rating-profile-trigger'; person.dataset.profileName=nameText;
         const avatar=root.ownerDocument.createElement('img'); avatar.className='rating-avatar'; avatar.alt=''; avatar.src='/pieces/cburnett/wN.svg';
-        const name=root.ownerDocument.createElement('span'); name.className='rating-player'; name.textContent=nameText; person.append(avatar,name);
+        const avatarWrap=root.ownerDocument.createElement('span'); avatarWrap.className='rating-avatar-wrap'; avatarWrap.append(avatar);
+        const name=root.ownerDocument.createElement('span'); name.className='rating-player'; name.textContent=nameText; person.append(avatarWrap,name);
         const score=root.ownerDocument.createElement('span'); score.className='rating-score'; row.append(place,person,score); fresh.push(row);
         if (animate && !previous.size) animated.push({el:name,type:'name',value:nameText});
       }

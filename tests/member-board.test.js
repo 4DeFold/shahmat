@@ -26,7 +26,7 @@ test('board retains cells and moving image; only the move is animated', () => {
   assert.equal(target.querySelector('img'), piece); assert.equal(view.cell('d2').querySelector('img'), neighbor);
   assert.equal(board.querySelectorAll('.square').length, 64); assert.equal(animations.length, 1);
   assert.equal(animations[0].keyframes[0].translate, '0px 100px');
-  assert.match(animations[0].keyframes[1].filter, /blur/); assert.ok(animations[0].timing.duration < 200);
+  assert.equal(animations[0].keyframes[1].translate, '0px 0px'); assert.ok(animations[0].timing.duration < 250);
   update(view, chess, null, 'd2', ['d4']); assert.equal(animations.length, 1, 'selection does not restart the motion');
   dom.window.close();
 });
