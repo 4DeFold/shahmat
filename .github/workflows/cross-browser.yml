@@ -31,9 +31,14 @@ jobs:
           npm run preview -- --port 4271 > /tmp/preview.log 2>&1 &
           for i in $(seq 1 30); do curl -fsS "$RESPONSIVE_BASE_URL" >/dev/null && curl -fsS http://127.0.0.1:4271 >/dev/null && break; sleep 1; done
           set +e
-          RESPONSIVE_BASE_URL=http://127.0.0.1:4271 node scripts/archive-motion-check.mjs > /tmp/browser-test.log 2>&1
+          RESPONSIVE_BASE_URL=http://127.0.0.1:4271 node scripts/puzzle-check.mjs > /tmp/browser-test.log 2>&1
           result=$?
           cat /tmp/browser-test.log
+          if [ "$result" -eq 0 ]; then
+            RESPONSIVE_BASE_URL=http://127.0.0.1:4271 node scripts/archive-motion-check.mjs > /tmp/browser-test.log 2>&1
+            result=$?
+            cat /tmp/browser-test.log
+          fi
           if [ "$result" -eq 0 ]; then
             RESPONSIVE_BASE_URL=http://127.0.0.1:4271 npm run test:cross-browser > /tmp/cross-browser.log 2>&1
             result=$?
