@@ -2,7 +2,7 @@
 // Move feedback uses board-local coordinates, so it also works on a rotated board.
 const files = 'abcdefgh';
 const names = { k:'король', q:'ферзь', r:'ладья', b:'слон', n:'конь', p:'пешка' };
-import {pieceSrc} from './piece-theme.js';
+import {setBoardPiece} from './board-pieces.js';
 
 export function createMemberBoard({ document, board, reducedMotion }) {
   const cells = new Map(), animations = new WeakMap();
@@ -95,9 +95,8 @@ export function createMemberBoard({ document, board, reducedMotion }) {
       if (cell.getAttribute('aria-pressed') !== pressed) cell.setAttribute('aria-pressed', pressed);
       let img = cell.querySelector('.piece');
       if (!piece) { if (img) { animations.get(img)?.cancel(); cell.classList.remove('is-moving'); img.remove(); } continue; }
-      const src = pieceSrc(piece.color, piece.type);
       if (!img) { img = document.createElement('img'); img.className = 'piece'; img.alt = ''; img.draggable = false; cell.prepend(img); }
-      if (img.getAttribute('src') !== src) img.setAttribute('src', src);
+      setBoardPiece(img,piece.color,piece.type);
       const real=actual?.get(square); img.classList.toggle('premove-ghost', !!actual && (!real || real.color!==piece.color || real.type!==piece.type));
     }
     if (animatedMove) { animate(movingImage, animatedMove.from, animatedMove.to, interrupted.get(animatedMove.from)); if (rookImage) animate(rookImage, rookFrom, rookTo); }

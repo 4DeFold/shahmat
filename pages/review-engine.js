@@ -24,7 +24,7 @@ export function summarizeReview(moves,positions) {
 }
 // One lightweight single-threaded worker per visible review; bounded time and
 // nodes per position, never runs on a server or during an unfinished game.
-export function createReviewEngine({WorkerClass=globalThis.Worker,timeout=30000}={}) {
+export function createReviewEngine({WorkerClass=globalThis.Worker,timeout=90000,searchTimeout=15000}={}) {
  if(!WorkerClass)throw Error('Движок недоступен');
  const worker=new WorkerClass('/stockfish/stockfish-17.1-lite-single-03e3232.js');
  let stopped=false,ready=false,pending=null,resolveReady,rejectReady;
@@ -32,6 +32,7 @@ export function createReviewEngine({WorkerClass=globalThis.Worker,timeout=30000}
  const timer=setTimeout(()=>fail(Error('Движок не ответил')),timeout);
  function fail(error){if(stopped)return;stopped=true;clearTimeout(timer);worker.terminate();rejectReady(error);if(pending){clearTimeout(pending.timer);pending.reject(error);pending=null}}
  worker.onerror=()=>fail(Error('Движок недоступен'));
+ worker.onmessageerror=()=>fail(Error('Ошибка связи с движком'));
  worker.onmessage=event=>{for(const line of String(event.data).split('\n')){
   if(line.trim()==='uciok'){worker.postMessage('setoption name Threads value 1');worker.postMessage('setoption name Hash value 8');worker.postMessage('isready')}
   else if(line.trim()==='readyok'&&!ready){ready=true;clearTimeout(timer);resolveReady()}
@@ -47,5 +48,5 @@ export function createReviewEngine({WorkerClass=globalThis.Worker,timeout=30000}
  }};
  worker.postMessage('uci');
  return {async evaluate(fen){await initialized;if(stopped)throw Error('Движок остановлен');if(pending)throw Error('Движок занят');if(typeof fen!=='string'||/[\r\n]/.test(fen))throw Error('Некорректная позиция');
-  return new Promise((resolve,reject)=>{pending={resolve,reject,cp:null,depth:-1,sign:fen.split(' ')[1]==='b'?-1:1,timer:setTimeout(()=>fail(Error('Движок не ответил')),timeout)};worker.postMessage(`position fen ${fen}`);worker.postMessage('go depth 12 nodes 18000 movetime 200')});},destroy(){fail(Error('Движок остановлен'))}};
+  return new Promise((resolve,reject)=>{pending={resolve,reject,cp:null,depth:-1,sign:fen.split(' ')[1]==='b'?-1:1,timer:setTimeout(()=>fail(Error('Движок не ответил')),searchTimeout)};worker.postMessage(`position fen ${fen}`);worker.postMessage('go depth 12 nodes 18000 movetime 200')});},destroy(){fail(Error('Движок остановлен'))}};
 }

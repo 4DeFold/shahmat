@@ -1,5 +1,7 @@
 import {installPieceTheme} from './piece-theme.js';
 installPieceTheme();
+import {installBoardPieces} from './board-pieces.js';
+installBoardPieces();
 // Read only the active account's local settings; guests never need an API call.
 const system = window.matchMedia('(prefers-color-scheme: dark)');
 const palettes = new Set(['monochrome', 'gray', 'forest', 'atelier', 'wood', 'earth', 'ocean', 'amber', 'lavender', 'sand']);

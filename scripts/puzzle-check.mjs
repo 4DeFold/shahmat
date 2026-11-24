@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';import {Chess} from 'chess.js';import {chromium,firefox,webkit} from 'playwright';
-const browser=await ({chromium,firefox,webkit})[process.env.BROWSER||'chromium'].launch({headless:true}),base=process.env.RESPONSIVE_BASE_URL||'http://127.0.0.1:4271';
+const browser=await ({chromium,firefox,webkit})[process.env.BROWSER||'chromium'].launch({headless:true,...(process.env.CHROMIUM_PATH&&(!process.env.BROWSER||process.env.BROWSER==='chromium')?{executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox']}: {})}),base=process.env.RESPONSIVE_BASE_URL||'http://127.0.0.1:4271';
 const rows=JSON.parse(readFileSync('public/puzzles/tactics.json')).puzzles.map(row=>{const [id,fen,moves,rating,themes]=row.split('|');return {id,fen,moves:moves.split(' '),rating,themes}});
 const id='12345678-1234-1234-1234-123456789012',user={id,aud:'authenticated',role:'authenticated',user_metadata:{}},token=['e30',Buffer.from(JSON.stringify({sub:id,exp:Math.floor(Date.now()/1000)+3600,role:'authenticated'})).toString('base64url'),'x'].join('.');
 const session={access_token:token,token_type:'bearer',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,refresh_token:'mock',user};

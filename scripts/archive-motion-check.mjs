@@ -6,7 +6,7 @@ const base=process.env.RESPONSIVE_BASE_URL||'http://127.0.0.1:4270';
 const id='12345678-1234-1234-1234-123456789012',user={id,aud:'authenticated',role:'authenticated',user_metadata:{}};
 const token=['e30',Buffer.from(JSON.stringify({sub:id,exp:Math.floor(Date.now()/1000)+3600,role:'authenticated'})).toString('base64url'),'x'].join('.');
 const session={access_token:token,token_type:'bearer',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,refresh_token:'mock',user};
-const browser=await engine.launch({headless:true});
+const browser=await engine.launch({headless:true,...(process.env.CHROMIUM_PATH&&(!process.env.BROWSER||process.env.BROWSER==='chromium')?{executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox']}: {})});
 try {
  for(const viewport of [{width:1440,height:900},{width:390,height:844}]) for(const motion of ['no-preference','reduce']) {
   const page=await browser.newPage({viewport,reducedMotion:motion}),errors=[];let releaseArchive;const archiveGate=new Promise(resolve=>releaseArchive=resolve);page.on('pageerror',e=>errors.push(e.message));
@@ -94,7 +94,7 @@ try {
   assert.match(await frame.locator('.review-bar').getAttribute('aria-label'),/белые \d+%/);
   assert.match(await frame.locator('.review-accuracy').first().textContent(),/^\d+%$/);
   assert.equal(await frame.locator('.review-brilliant b').first().textContent(),'—');
-  assert.equal(await frame.locator('[data-square=d5] .piece').getAttribute('src'),'/pieces/cburnett/bQ.svg');
+  assert.equal(await frame.locator('[data-square=d5] .piece').getAttribute('data-board-color'),'b');assert.equal(await frame.locator('[data-square=d5] .piece').getAttribute('data-board-type'),'Q');
   // The archive rail and its nested move list use the same wheel smoothing as the main archive.
   const rail=frame.locator('.game-rail'),list=frame.locator('#move-list');
   await list.evaluate(el=>{for(let i=0;i<50;i++){const row=document.createElement('li');row.textContent='1. e4 e5';row.style.minHeight='30px';el.append(row)}el.scrollTop=0});

@@ -34,7 +34,7 @@ test('board opens at starting position, modes are explicit and a real request st
   assert.equal(app.$('opponent-clock-label').hidden, true);
   assert.equal(app.$('player-clock').getAttribute('aria-label'), '00:00');
   assert.equal(app.$('opponent-clock').getAttribute('aria-label'), '00:00');
-  assert.equal(app.$('board').querySelector('[data-square=e2] img').getAttribute('src'), '/pieces/cburnett/wP.svg');
+  assert.equal(app.$('board').querySelector('[data-square=e2] img').dataset.boardColor+app.$('board').querySelector('[data-square=e2] img').dataset.boardType, 'wP');
   assert.deepEqual([...app.$('mode-list').querySelectorAll('input')].map(input => input.value), ['bullet','blitz','rapid','classical']);
   assert.equal(app.$('start-search').disabled, true); assert.equal(app.$('start-search').hidden, true);
   assert.equal(app.$('search-loader').hidden, true);
@@ -240,8 +240,8 @@ test('hiding during a move ignores stale replies and reconciles on return', asyn
   const board = app.$('board'); board.querySelector('[data-square=e2]').click(); board.querySelector('[data-square=e4]').click();
   app.ui.hide(); position = game({ moves:['e4','e5'], turn:'w' });
   finish({ game:game({ moves:['e4'], turn:'b' }) }); await flush(); app.ui.show(); await flush();
-  assert.equal(board.querySelector('[data-square=e4] img').getAttribute('src'), '/pieces/cburnett/wP.svg');
-  assert.equal(board.querySelector('[data-square=e5] img').getAttribute('src'), '/pieces/cburnett/bP.svg');
+  assert.equal(board.querySelector('[data-square=e4] img').dataset.boardColor+board.querySelector('[data-square=e4] img').dataset.boardType, 'wP');
+  assert.equal(board.querySelector('[data-square=e5] img').dataset.boardColor+board.querySelector('[data-square=e5] img').dataset.boardType, 'bP');
   assert.match(app.$('status').textContent, /Ваш ход/);
 });
 
@@ -535,7 +535,7 @@ test('capture premove lets the player select an underpromotion',async t=>{
  assert.equal(app.$('promotion').hidden,false);app.$('promotion-options').querySelector('[aria-label="конь"]').click();
  assert.equal(app.$('promotion').hidden,true);assert.ok(app.$('board').querySelector('[data-square=a8].premove'));
  current=game({moves:[...opening,'hxg2'],turn:'w'});app.ui.hide();app.ui.show();await flush();
- assert.equal(sent.length,1);assert.equal(sent[0].promotion,'n');assert.match(app.$('board').querySelector('[data-square=a8] img').src,/wN.svg/);
+ assert.equal(sent.length,1);assert.equal(sent[0].promotion,'n');assert.equal(app.$('board').querySelector('[data-square=a8] img').dataset.boardColor+app.$('board').querySelector('[data-square=a8] img').dataset.boardType,'wN');
 });
 
 test('history keys navigate half-moves and incoming moves do not dislodge a past position', async t => {

@@ -34,7 +34,7 @@ test('board retains cells and moving image; only the move is animated', () => {
 test('capture, en passant, castling and promotion keep the position correct', () => {
   const { dom, board, view } = setup(), chess = new Chess();
   for (const san of ['e4','d5','exd5']) { update(view, chess); const move = chess.move(san); update(view, chess, move); }
-  assert.equal(view.cell('d5').querySelector('img').getAttribute('src'), '/pieces/cburnett/wP.svg');
+  assert.equal(view.cell('d5').querySelector('img').dataset.boardColor+view.cell('d5').querySelector('img').dataset.boardType, 'wP');
   assert.equal(board.querySelectorAll('.piece').length, 31);
   const ep = new Chess('4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 1'); update(view, ep);
   update(view, ep, ep.move('exd6')); assert.equal(view.cell('d5').querySelector('.piece'), null);
@@ -42,7 +42,7 @@ test('capture, en passant, castling and promotion keep the position correct', ()
   const king = view.cell('e1').querySelector('img'), rook = view.cell('h1').querySelector('img');
   update(view, castle, castle.move('O-O')); assert.equal(view.cell('g1').querySelector('img'), king); assert.equal(view.cell('f1').querySelector('img'), rook);
   const promotion = new Chess('7k/P7/8/8/8/8/8/7K w - - 0 1'); update(view, promotion);
-  update(view, promotion, promotion.move('a8=Q+')); assert.equal(view.cell('a8').querySelector('img').getAttribute('src'), '/pieces/cburnett/wQ.svg');
+  update(view, promotion, promotion.move('a8=Q+')); assert.equal(view.cell('a8').querySelector('img').dataset.boardColor+view.cell('a8').querySelector('img').dataset.boardType, 'wQ');
   dom.window.close();
 });
 

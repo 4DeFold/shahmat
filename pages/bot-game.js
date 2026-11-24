@@ -1,3 +1,4 @@
+import {setBoardPiece} from './board-pieces.js';
 import '../smooth-scroll.js';
 import {createGameReview} from './game-review.js';
 import {pieceSrc as themedPieceSrc} from './piece-theme.js';
@@ -67,7 +68,7 @@ function renderDemo(demo,move=null) {
     let img=cell.firstElementChild;
     if(!p) { img?.remove(); continue; }
     if(!img) { img=document.createElement('img'); img.alt=''; cell.append(img); }
-    const src=piece(p.color,p.type); if(img.getAttribute('src')!==src) img.src=src;
+    setBoardPiece(img,p.color,p.type);
   }
   const label=demo.chess.isCheckmate()?'МАТ':demo.chess.isStalemate()?'ПАТ':demo.chess.isCheck()?'ШАХ':'';
   demo.label.hidden=!label; demo.label.textContent=label;
@@ -269,7 +270,7 @@ function attempt(from,to) {
   if(chess.turn()!==playerColor() && premove.length>=20){status('Можно добавить не более 20 предварительных ходов.');return true;}
   if(moves.some(m=>m.promotion)) {
     promotion={from,to,premove:chess.turn()!==playerColor()}; reveal('promotion',true); const options=$('promotion-options'); options.replaceChildren();
-    for(const type of ['q','r','b','n']) { const button=document.createElement('button'); button.type='button'; button.setAttribute('aria-label',names[type]); const img=document.createElement('img'); img.src=piece(playerColor(),type); img.alt=''; button.append(img); button.addEventListener('click',()=>{ if(!promotion)return; const choice=promotion; promotion=null; reveal('promotion',false); if(choice.premove && chess.turn()!==playerColor()) { if(premove.length>=20)return; premove.push({from:choice.from,to:choice.to,promotion:type}); selected=null; draw(); status('Предварительный ход готов. До 20 ходов; пустая клетка отменяет очередь.'); } else play({from:choice.from,to:choice.to,promotion:type}); }); options.append(button); } options.firstElementChild.focus();
+    for(const type of ['q','r','b','n']) { const button=document.createElement('button'); button.type='button'; button.setAttribute('aria-label',names[type]); const img=document.createElement('img'); setBoardPiece(img,playerColor(),type); img.alt=''; button.append(img); button.addEventListener('click',()=>{ if(!promotion)return; const choice=promotion; promotion=null; reveal('promotion',false); if(choice.premove && chess.turn()!==playerColor()) { if(premove.length>=20)return; premove.push({from:choice.from,to:choice.to,promotion:type}); selected=null; draw(); status('Предварительный ход готов. До 20 ходов; пустая клетка отменяет очередь.'); } else play({from:choice.from,to:choice.to,promotion:type}); }); options.append(button); } options.firstElementChild.focus();
   } else if(chess.turn()!==playerColor()) { if(premove.length>=20){status('Можно добавить не более 20 предварительных ходов.');return true;} premove.push({from,to}); selected=null; draw(); status('Предварительный ход готов. До 20 ходов; пустая клетка отменяет очередь.'); } else play({from,to});
   return true;
 }
@@ -284,7 +285,7 @@ board.addEventListener('click',event=>{
 board.addEventListener('pointerdown',event=>{ if(event.button===2 && premove.length) { premove=[]; selected=null; draw(); status('Ход бота.'); } if(event.button!==0||phase!=='playing'||promotion||historyIndex!==null) return; const cell=event.target.closest('[data-square]'); if(cell && projected().get(cell.dataset.square)?.color===playerColor()) drag={from:cell.dataset.square,x:event.clientX,y:event.clientY,pointer:event.pointerId,ghost:null,cell}; });
 board.addEventListener('pointermove',event=>{
   if(!drag||drag.pointer!==event.pointerId) return;
-  if(!drag.ghost && Math.hypot(event.clientX-drag.x,event.clientY-drag.y)>5) { board.setPointerCapture?.(event.pointerId); selected=drag.from; draw(); drag.ghost=document.createElement('img'); drag.ghost.className='drag-ghost'; drag.ghost.src=piece(playerColor(),projected().get(drag.from).type); drag.ghost.alt=''; drag.ghost.style.setProperty('--drag-size',`${drag.cell.getBoundingClientRect().width}px`); drag.cell.classList.add('dragging'); document.body.append(drag.ghost); }
+  if(!drag.ghost && Math.hypot(event.clientX-drag.x,event.clientY-drag.y)>5) { board.setPointerCapture?.(event.pointerId); selected=drag.from; draw(); drag.ghost=document.createElement('img'); drag.ghost.className='drag-ghost'; setBoardPiece(drag.ghost,playerColor(),projected().get(drag.from).type); drag.ghost.alt=''; drag.ghost.style.setProperty('--drag-size',`${drag.cell.getBoundingClientRect().width}px`); drag.cell.classList.add('dragging'); document.body.append(drag.ghost); }
   if(drag.ghost) drag.ghost.style.transform=`translate3d(${event.clientX}px,${event.clientY}px,0) translate(-50%,-50%)`;
 });
 function cancelDrag() { if(!drag)return; drag.ghost?.remove(); drag.cell.classList.remove('dragging'); drag=null; }

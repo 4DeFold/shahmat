@@ -5,6 +5,10 @@ const categories=[['brilliant','💎','Блестящий'],['great','🌟','О�
 const unavailable=new Set(['brilliant','great','book','miss']);
 const highlighted=new Set(['inaccuracy','mistake','blunder']);
 const categoryByKey=new Map(categories.map(([key,icon,label])=>[key,{icon,label}]));
+// Bounded in-memory cache: no game history is persisted or sent to a server.
+const evaluationCache=new Map(),cacheLimit=512;
+function remember(fen,value){if(!Number.isFinite(value?.win)||!Number.isFinite(value?.cp))return;evaluationCache.delete(fen);evaluationCache.set(fen,value);if(evaluationCache.size>cacheLimit)evaluationCache.delete(evaluationCache.keys().next().value)}
+
 // A review is deliberately created only for a finished game, and is stopped
 // whenever its view is hidden. Results are kept in memory for that review only.
 export function createGameReview({document,frame,host,onSelect,createEngine=createReviewEngine}) {
@@ -36,7 +40,7 @@ export function createGameReview({document,frame,host,onSelect,createEngine=crea
   if(done && !game.graphReady){game.graphReady=true;graph.setData(game.moves,game.positions)}
   graph.setIndex(index);panel.replaceChildren();
   const title=document.createElement('div');title.className='review-title';title.textContent=game.error?'Анализ недоступен':done?'Анализ партии':`Анализ ${completed}/${game.positions.length}`;panel.append(title);
-  const note=document.createElement('div');note.className='review-note';note.textContent=done?'Быстрая оценка Stockfish':'Локальный анализ';note.title='Приблизительная оценка: ограниченное время анализа. Некоторые категории пока не определяются.';panel.append(note);
+  const note=document.createElement('div');note.className='review-note';note.textContent=done?'Быстрая оценка Stockfish':game.retrying?'Перезапуск движка…':'Локальный анализ';note.title='Приблизительная оценка: ограниченное время анализа. Некоторые категории пока не определяются.';panel.append(note);
   const accuracyLabel=document.createElement('div');accuracyLabel.className='review-accuracy-label';accuracyLabel.textContent='Точность';panel.append(accuracyLabel);
   const table=document.createElement('div');table.className='review-table';
   const names=typeof game.names==='function'?game.names():game.names;
@@ -46,17 +50,32 @@ export function createGameReview({document,frame,host,onSelect,createEngine=crea
   if(game.error){const retry=document.createElement('button');retry.type='button';retry.textContent='Повторить';retry.addEventListener('click',()=>{game.error=false;paint();void work()});panel.append(retry)}
  }
  async function work(){if(!game||!visible||destroyed||working||game.error)return;const pending=game.positions.some(x=>!x);if(!pending)return;
-  let token=++run;working=true;try{engine=createEngine();while(game&&visible&&token===run){let i=game.positions[index]?game.positions.findIndex(x=>!x):index;if(i<0)break;
-   const position=await engine.evaluate(game.fens[i]);if(token!==run||!game)break;game.positions[i]=position;updateHistoryMark(i-1);updateHistoryMark(i);paint();
-   await new Promise(resolve=>setTimeout(resolve,15));
-  }}catch(e){if(token===run&&game){game.error=true;paint()}}finally{if(token===run){engine?.destroy();engine=null;working=false}}
+  const token=++run;working=true;let failures=0;
+  try{while(game&&visible&&token===run){
+   let i=game.positions[index]?game.positions.findIndex(x=>!x):index;if(i<0)break;
+   try{
+    if(!engine)engine=createEngine();
+    const position=await engine.evaluate(game.fens[i]);if(token!==run||!game)break;
+    if(!Number.isFinite(position?.win)||position.win<0||position.win>100)throw Error('Некорректная оценка');
+    failures=0;game.retrying=false;game.positions[i]=position;if(createEngine===createReviewEngine)remember(game.fens[i],position);
+    // Fill repeated positions without starting a duplicate search.
+    game.fens.forEach((fen,n)=>{if(fen===game.fens[i]&&!game.positions[n])game.positions[n]=position});
+    game.historyBound=false;syncHistory();paint();
+    await new Promise(resolve=>setTimeout(resolve,15));
+   }catch(error){
+    if(token!==run||!game||!visible)break;
+    engine?.destroy();engine=null;
+    if(++failures>1){game.error=true;game.retrying=false;paint();break}
+    game.retrying=true;paint();await new Promise(resolve=>setTimeout(resolve,1000));
+   }
+  }}finally{if(token===run){engine?.destroy();engine=null;working=false}}
  }
  function start({moves,flip=false,names={}}){stop();cancelLeave();graph.clear();removeBoardMark();clearHistoryMarks();let replay=new Chess(),list=[];try{for(const san of moves||[])list.push(replay.move(typeof san==='string'?san:san.san));}catch{game=null;bar.hidden=panel.hidden=true;return;}
-  const first=new Chess().fen(),positions=Array(list.length+1).fill(null),fens=[first,...list.map(m=>m.after)];
+  const first=new Chess().fen(),fens=[first,...list.map(m=>m.after)],positions=fens.map(fen=>createEngine===createReviewEngine?evaluationCache.get(fen)||null:null);
   // Checkmate is an engine result; game results by resignation/time are not a board evaluation.
   if(replay.isCheckmate())positions[list.length]={win:replay.turn()==='w'?0:100,cp:replay.turn()==='w'?-4000:4000,best:null};
   else if(replay.isDraw())positions[list.length]={win:50,cp:0,best:null};
-  game={moves:list,fens,positions,flip,names,error:false,historyBound:false,graphReady:false};index=list.length;bar.hidden=panel.hidden=false;syncHistory();paint();void work();
+  game={moves:list,fens,positions,flip,names,error:false,retrying:false,historyBound:false,graphReady:false};index=list.length;bar.hidden=panel.hidden=false;syncHistory();paint();void work();
  }
  return {start,clear(){stop();graph.clear();removeBoardMark();clearHistoryMarks();game=null;cancelLeave();if(bar.hidden&&panel.hidden)return;bar.setAttribute('aria-hidden','true');panel.setAttribute('aria-hidden','true');const reduce=document.defaultView?.matchMedia?.('(prefers-reduced-motion: reduce)').matches;if(reduce){bar.hidden=panel.hidden=true;cancelLeave();return;}bar.classList.add('is-leaving');panel.classList.add('is-leaving');leaveTimer=setTimeout(()=>{bar.hidden=panel.hidden=true;cancelLeave()},180)},setIndex(value){if(!game)return;index=Math.max(0,Math.min(game.moves.length,value));paint()},syncHistory,refresh(){if(game){syncHistory();paint()}},setVisible(value){visible=!!value;if(!visible)stop();else void work()},destroy(){destroyed=true;stop();graph.destroy();removeBoardMark();clearHistoryMarks();cancelLeave();bar.remove();panel.remove()}};
 }

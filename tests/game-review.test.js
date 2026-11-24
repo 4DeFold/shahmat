@@ -90,3 +90,18 @@ test('review shows verified move counts while analysis is still running',async()
  const review=createGameReview({document:d,frame:d.querySelector('#frame'),host:d.querySelector('#rail'),createEngine:engine});review.start({moves:['e4','e5','Nf3']});
  await new Promise(resolve=>setTimeout(resolve,80));assert.match(d.querySelector('.review-title').textContent,/Анализ 3\/4/);assert.equal(d.querySelector('.review-best b').textContent,'1');assert.equal(d.querySelector('.review-accuracy').textContent,'—');release();await new Promise(resolve=>setTimeout(resolve,80));assert.equal(d.querySelector('.review-title').textContent,'Анализ партии');review.destroy();dom.window.close();
 });
+
+test('review restarts once after a transient engine failure and retains progress',async()=>{
+ const dom=new JSDOM('<div id="frame"></div><div id="rail"><div class="moves"></div></div>'),d=dom.window.document;
+ let created=0,destroyed=0,calls=0;
+ const review=createGameReview({document:d,frame:d.querySelector('#frame'),host:d.querySelector('#rail'),createEngine:()=>{const n=++created;return {evaluate:async()=>{calls++;if(n===1&&calls===2)throw Error('temporary');return {win:50,cp:0}},destroy(){destroyed++}}}});
+ review.start({moves:['e4','e5']});await new Promise(r=>setTimeout(r,80));assert.match(d.querySelector('.review-title').textContent,/Анализ 1\/3/);assert.match(d.querySelector('.review-note').textContent,/Перезапуск/);
+ await new Promise(r=>setTimeout(r,1100));assert.equal(d.querySelector('.review-title').textContent,'Анализ партии');assert.equal(created,2);assert.ok(destroyed>=2);review.destroy();dom.window.close();
+});
+
+test('worker timeout, malformed scores and cancellation terminate pending work',async()=>{
+ class Worker{constructor(){Worker.last=this}postMessage(){}terminate(){this.terminated=true}emit(data){this.onmessage({data})}}
+ let e=createReviewEngine({WorkerClass:Worker,timeout:10});const waiting=e.evaluate(new Chess().fen());await assert.rejects(waiting,/не ответил/);assert.equal(Worker.last.terminated,true);
+ e=createReviewEngine({WorkerClass:Worker,timeout:1000,searchTimeout:15});Worker.last.emit('uciok');Worker.last.emit('readyok');const search=e.evaluate(new Chess().fen());await assert.rejects(search,/не ответил/);assert.equal(Worker.last.terminated,true);
+ e=createReviewEngine({WorkerClass:Worker,timeout:1000});Worker.last.emit('uciok');Worker.last.emit('readyok');const bad=e.evaluate(new Chess().fen());await Promise.resolve();Worker.last.emit('bestmove e2e4');await assert.rejects(bad,/Нет оценки/);e.destroy();
+});

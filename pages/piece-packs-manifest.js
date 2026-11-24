@@ -1,0 +1,2 @@
+// Generated from public/pieces; packs retain their original SVG artwork and licenses.
+export default {"celtic":"/piece-packs/celtic-82819c503583.json","chessnut":"/piece-packs/chessnut-b562143ee571.json","fantasy":"/piece-packs/fantasy-9c38e13851e9.json","firi":"/piece-packs/firi-6d13b9b04601.json","kiwen-suwi":"/piece-packs/kiwen-suwi-99cd5e517959.json","merida":"/piece-packs/merida-cd3dea14fed8.json","mono":"/piece-packs/mono-ac3a5d66c46b.json","rhosgfx":"/piece-packs/rhosgfx-1967a7fd5a37.json","spatial":"/piece-packs/spatial-db5459664eff.json"};
