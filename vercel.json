@@ -8,6 +8,7 @@
     { "source": "/bot", "destination": "/index.html" },
     { "source": "/game", "destination": "/index.html" },
     { "source": "/archive", "destination": "/index.html" },
+    { "source": "/puzzles", "destination": "/index.html" },
     { "source": "/watch", "destination": "/index.html" },
     { "source": "/rating", "destination": "/index.html" },
     { "source": "/login", "destination": "/index.html" },

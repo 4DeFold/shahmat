@@ -14,7 +14,7 @@ test('accuracy uses loss of win expectation from the mover perspective',()=>{
 test('UCI worker is bounded, handles side to move and cancellation',async()=>{
  class Worker {constructor(){Worker.last=this;this.messages=[]}postMessage(m){this.messages.push(m)}terminate(){this.terminated=true}emit(data){this.onmessage({data})}}
  const engine=createReviewEngine({WorkerClass:Worker,timeout:1000}),worker=Worker.last;worker.emit('uciok');worker.emit('readyok');
- const position=engine.evaluate(new Chess().fen());await Promise.resolve();assert.ok(worker.messages.includes('go depth 9 nodes 6000 movetime 100'));
+ const position=engine.evaluate(new Chess().fen());await Promise.resolve();assert.ok(worker.messages.includes('go depth 12 nodes 18000 movetime 200'));
  worker.emit('info depth 4 score cp 50 pv e2e4\nbestmove e2e4');const result=await position;assert.equal(result.best,'e2e4');assert.ok(result.win>50);
  const c=new Chess();c.move('e4');const black=engine.evaluate(c.fen());await Promise.resolve();worker.emit('info depth 4 score cp 50\nbestmove e7e5');assert.ok((await black).win<50);
  const pending=engine.evaluate(c.fen());await Promise.resolve();engine.destroy();await assert.rejects(pending,/остановлен/);assert.equal(worker.terminated,true);
@@ -73,4 +73,20 @@ test('graph shows position assessment only; keyboard and pointer select plies',a
 test('ordinary moves are counted without being treated as significant errors',()=>{
  const game=new Chess(),moves=['e4','e5','Nf3','Nc6'].map(x=>game.move(x));const positions=moves.map(()=>({win:50}));positions.push({win:50});
  const summary=summarizeReview(moves,positions);assert.equal(summary.w.counts.excellent,2);assert.equal(summary.b.counts.excellent,2);assert.ok(summary.w.accuracy>99.9);
+});
+
+test('game accuracy penalizes blunders using volatility and harmonic mean',()=>{
+ const c=new Chess(),moves=['e4','e5','Nf3','Nc6','Bc4','Nf6','d3','d6'].map(m=>c.move(m));
+ const positions=[50,50,50,50,50,15,15,15,15].map(win=>({win}));
+ const summary=summarizeReview(moves,positions);const naive=(3*100+moveAccuracy(35))/4;
+ assert.ok(summary.w.accuracy<naive);assert.equal(summary.b.accuracy,100);assert.ok(moveAccuracy(100)===0);
+ const partial=summarizeReview(moves,[null,...positions.slice(1)]);assert.ok(Number.isFinite(partial.w.accuracy));assert.equal(summarizeReview([],[]).w.accuracy,null);
+});
+
+test('review shows verified move counts while analysis is still running',async()=>{
+ const dom=new JSDOM('<div id="frame"></div><div id="rail"><div class="moves"></div></div>'),d=dom.window.document;
+ let release;const gate=new Promise(resolve=>release=resolve);let calls=0;
+ const engine=()=>({evaluate:async()=>{calls++;if(calls===4)await gate;return {win:50,best:'e2e4'}},destroy(){}});
+ const review=createGameReview({document:d,frame:d.querySelector('#frame'),host:d.querySelector('#rail'),createEngine:engine});review.start({moves:['e4','e5','Nf3']});
+ await new Promise(resolve=>setTimeout(resolve,80));assert.match(d.querySelector('.review-title').textContent,/Анализ 3\/4/);assert.equal(d.querySelector('.review-best b').textContent,'1');assert.equal(d.querySelector('.review-accuracy').textContent,'—');release();await new Promise(resolve=>setTimeout(resolve,80));assert.equal(d.querySelector('.review-title').textContent,'Анализ партии');review.destroy();dom.window.close();
 });

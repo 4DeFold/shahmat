@@ -41,6 +41,7 @@ function applyRankUnit(value) {
   if (swap) swap.setAttribute('aria-label', rankUnit === 'yar' ? 'Показаны Яры. Переключить на Эло' : 'Показано Эло. Переключить на Яры');
   ratingView?.setUnit(rankUnit);
   $('member-game-frame')?.contentWindow?.postMessage({ type:'shahmat-rank-unit', value:rankUnit }, window.location.origin);
+  $('puzzles-frame')?.contentWindow?.postMessage({ type:'shahmat-rank-unit', value:rankUnit }, window.location.origin);
 }
 const paletteNames = { monochrome:'Монохром', gray:'Графит', forest:'Лес', atelier:'Шахматный кабинет', wood:'Тёплое дерево', earth:'Сосновый бор', ocean:'Морская глубина', amber:'Янтарь', lavender:'Лаванда', sand:'Песчаный' };
 function updateProfileAppearance() {
@@ -194,7 +195,7 @@ let navigating = false;
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const accountMenu = $('account-menu');
 const accountToggle = $('account-toggle');
-const pages = new Set(['home', 'game', 'bot', 'rating', 'watch', 'archive', 'profile', 'settings', 'help']);
+const pages = new Set(['home', 'game', 'bot', 'rating', 'watch', 'archive', 'puzzles', 'profile', 'settings', 'help']);
 const sidebar = $('app-sidebar');
 const mobileMenuToggle = $('mobile-menu-toggle');
 let sidebarOpen = false;
@@ -266,6 +267,7 @@ const pageLoaders = {
   rating: () => import('./pages/rating.html?raw'),
   watch: () => import('./pages/watch-view.html?raw'),
   archive: () => import('./pages/archive-view.html?raw'),
+  puzzles: () => import('./pages/puzzles-view.html?raw'),
   profile: () => import('./pages/profile.html?raw'),
   settings: () => import('./pages/settings.html?raw'),
   help: () => import('./pages/help.html?raw'),
@@ -273,7 +275,7 @@ const pageLoaders = {
 let pageRequest = 0;
 const viewId = name => name === 'home' ? 'dashboard-home' : `page-${name}`;
 const viewLoads = new Map();
-let frameReady = null, botFrameReady = null, watchFrameReady = null, archiveFrameReady = null, ratingView = null, profileView = null, profileReturnPage = 'rating';
+let frameReady = null, botFrameReady = null, watchFrameReady = null, archiveFrameReady = null, puzzlesFrameReady = null, ratingView = null, profileView = null, profileReturnPage = 'rating';
 let onlineStop = null, heartbeatStop = null, onlineUser = null, onlineCount = null, onlineNames = null, onlineEpoch = 0, onlineUsername = null;
 function sendOnline() { $('member-game-frame')?.contentWindow?.postMessage({ type: 'shahmat-online', count: onlineCount }, window.location.origin); }
 async function startOnline(id, username = null) {
@@ -304,8 +306,8 @@ async function loadView(name) {
         for (const id of ['member-game-frame','bot-game-frame']) $(id)?.contentWindow?.postMessage({type:'shahmat-profile-updated',username:updated.username,avatar:media.avatar}, window.location.origin);
       } });
     }
-    if (name === 'game' || name === 'bot' || name === 'watch' || name === 'archive') {
-      const frame = $(({game:'member-game-frame',bot:'bot-game-frame',watch:'watch-frame',archive:'archive-frame'})[name]);
+    if (name === 'game' || name === 'bot' || name === 'watch' || name === 'archive' || name === 'puzzles') {
+      const frame = $(({game:'member-game-frame',bot:'bot-game-frame',watch:'watch-frame',archive:'archive-frame',puzzles:'puzzles-frame'})[name]);
       const ready = new Promise((resolve, reject) => {
         const timeout = setTimeout(() => reject(new Error('Game load timed out')), 15000);
         frame.addEventListener('load', () => { clearTimeout(timeout); resolve(); }, { once: true });
@@ -313,7 +315,7 @@ async function loadView(name) {
       });
       // Prevent an unhandled rejection if a background load fails before navigation.
       ready.catch(() => {});
-      if (name === 'game') frameReady = ready; else if(name === 'bot') botFrameReady = ready; else if(name === 'watch') watchFrameReady = ready; else archiveFrameReady = ready;
+      if (name === 'game') frameReady = ready; else if(name === 'bot') botFrameReady = ready; else if(name === 'watch') watchFrameReady = ready; else if(name === 'archive') archiveFrameReady = ready; else puzzlesFrameReady = ready;
     }
   })();
   viewLoads.set(name, pending);
@@ -362,13 +364,14 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
     if (link.dataset.page === name) link.setAttribute('aria-current','page'); else link.removeAttribute('aria-current');
   });
   closeAccountMenu();
-  document.title = ({ home: 'Главная', game: 'Играть', bot: 'Бот', rating: 'Рейтинг', watch: 'Наблюдать', archive: 'Архив', profile: 'Профиль', settings: 'Настройки', help: 'Помощь' })[name] + ' — shahmat.xyz';
+  document.title = ({ home: 'Главная', game: 'Играть', bot: 'Бот', rating: 'Рейтинг', watch: 'Наблюдать', archive: 'Архив', puzzles: 'Пазлы', profile: 'Профиль', settings: 'Настройки', help: 'Помощь' })[name] + ' — shahmat.xyz';
   try {
     await loadView(name);
     if (name === 'game' && frameReady) await frameReady;
     if (name === 'bot' && botFrameReady) await botFrameReady;
     if (name === 'watch' && watchFrameReady) await watchFrameReady;
     if (name === 'archive' && archiveFrameReady) await archiveFrameReady;
+    if (name === 'puzzles' && puzzlesFrameReady) await puzzlesFrameReady;
     if (request !== pageRequest) return;
     $('page-load-error')?.remove();
     $('page-loading')?.remove();
@@ -376,6 +379,7 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
     $('bot-game-frame')?.contentWindow?.postMessage({ type: name === 'bot' ? 'shahmat-bot-shown' : 'shahmat-bot-hidden' }, window.location.origin);
     $('watch-frame')?.contentWindow?.postMessage({type:name === 'watch'?'shahmat-watch-shown':'shahmat-watch-hidden'},window.location.origin);
     $('archive-frame')?.contentWindow?.postMessage({type:name === 'archive'?'shahmat-archive-shown':'shahmat-archive-hidden'},window.location.origin);
+    $('puzzles-frame')?.contentWindow?.postMessage({type:name === 'puzzles'?'shahmat-puzzles-shown':'shahmat-puzzles-hidden'},window.location.origin);
     const profileWasHidden = $('page-profile')?.hidden;
     document.querySelectorAll('#dashboard-screen [data-view]').forEach(view => {
       const active = view.dataset.view === name;
@@ -408,7 +412,7 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
       const heading = $('page-' + name + '-title');
       if (heading) { heading.setAttribute('tabindex', '-1'); heading.focus({ preventScroll: true }); }
     }
-    document.title = ({ home: 'Главная', game: 'Играть', bot: 'Бот', rating: 'Рейтинг', watch: 'Наблюдать', archive: 'Архив', profile: 'Профиль', settings: 'Настройки', help: 'Помощь' })[name] + ' — shahmat.xyz';
+    document.title = ({ home: 'Главная', game: 'Играть', bot: 'Бот', rating: 'Рейтинг', watch: 'Наблюдать', archive: 'Архив', puzzles: 'Пазлы', profile: 'Профиль', settings: 'Настройки', help: 'Помощь' })[name] + ' — shahmat.xyz';
   } catch {
     if (request !== pageRequest) return;
     document.querySelectorAll('#dashboard-screen [data-view]').forEach(view => { view.hidden = true; });
@@ -417,12 +421,13 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
     if (name === 'bot') { $('page-bot')?.remove(); botFrameReady = null; }
     if (name === 'watch') { $('page-watch')?.remove(); watchFrameReady = null; }
     if (name === 'archive') { $('page-archive')?.remove(); archiveFrameReady = null; }
+    if (name === 'puzzles') { $('page-puzzles')?.remove(); puzzlesFrameReady = null; }
     $('page-content').insertAdjacentHTML('beforeend', '<section class="empty-page" id="page-load-error" role="alert"><h2>Страница не загрузилась.</h2><p>Проверь соединение и обнови страницу.</p></section>');
   }
 }
 // The game remains a separate page; send appearance only to our own frame.
 function syncGameAppearance() {
-  const frames = [$('member-game-frame'), $('bot-game-frame'), $('watch-frame'), $('archive-frame')].filter(frame => frame?.contentWindow);
+  const frames = [$('member-game-frame'), $('bot-game-frame'), $('watch-frame'), $('archive-frame'), $('puzzles-frame')].filter(frame => frame?.contentWindow);
   if (!frames.length) return;
   const style = getComputedStyle(landing);
   const names = ['--page-background', '--foreground', '--surface', '--surface-raised', '--line', '--button-background', '--button-text', '--accent', '--board-light', '--board-dark', '--clock-white', '--clock-black'];
@@ -436,7 +441,7 @@ function syncGameAppearance() {
   }
 }
 new MutationObserver(syncGameAppearance).observe(landing, { attributes: true, attributeFilter: ['data-palette', 'data-palette-theme', 'class'] });
-$('page-content').addEventListener('load', event => { if (event.target.id === 'member-game-frame' || event.target.id === 'bot-game-frame' || event.target.id === 'watch-frame' || event.target.id === 'archive-frame') { syncGameAppearance(); sendOnline(); applyRankUnit(rankUnit); } }, true);
+$('page-content').addEventListener('load', event => { if (event.target.id === 'member-game-frame' || event.target.id === 'bot-game-frame' || event.target.id === 'watch-frame' || event.target.id === 'archive-frame' || event.target.id === 'puzzles-frame') { syncGameAppearance(); sendOnline(); applyRankUnit(rankUnit); } }, true);
 $('dashboard-screen').addEventListener('click', event => {
   const link = event.target.closest('[data-page]'); if (!link || !$('dashboard-screen').contains(link)) return;
   if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
@@ -454,9 +459,9 @@ document.addEventListener('click', event => {
   if (accountToggle.getAttribute('aria-expanded') === 'true' && !$('sidebar-account').contains(event.target)) closeAccountMenu();
 });
 document.addEventListener('keydown', event => {
-  if (!['game','bot','watch','archive'].includes(currentPage()) || $('dashboard-screen').hidden || event.defaultPrevented || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey || event.target.closest?.('input, textarea, select, [contenteditable]:not([contenteditable=false]), [role=textbox]') || document.querySelector('dialog[open]')) return;
+  if (!['game','bot','watch','archive','puzzles'].includes(currentPage()) || $('dashboard-screen').hidden || event.defaultPrevented || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey || event.target.closest?.('input, textarea, select, [contenteditable]:not([contenteditable=false]), [role=textbox]') || document.querySelector('dialog[open]')) return;
   const key=({KeyA:'a',KeyD:'d',KeyW:'w',KeyS:'s'})[event.code]||event.key;
-  if (['ArrowLeft','ArrowRight','a','d'].includes(key) || ['ArrowUp','ArrowDown','w','s'].includes(key) || (key==='Enter' && currentPage()==='bot' && !event.target.closest?.('button,a'))) { event.preventDefault(); $(({game:'member-game-frame',bot:'bot-game-frame',watch:'watch-frame',archive:'archive-frame'})[currentPage()])?.contentWindow?.postMessage({type:'shahmat-history-key',key,code:event.code},window.location.origin); }
+  if (['ArrowLeft','ArrowRight','a','d'].includes(key) || ['ArrowUp','ArrowDown','w','s'].includes(key) || (key==='Enter' && currentPage()==='bot' && !event.target.closest?.('button,a'))) { event.preventDefault(); $(({game:'member-game-frame',bot:'bot-game-frame',watch:'watch-frame',archive:'archive-frame',puzzles:'puzzles-frame'})[currentPage()])?.contentWindow?.postMessage({type:'shahmat-history-key',key,code:event.code},window.location.origin); }
 });
 // Forward held physical Q/E keys when the shell, rather than the frame, has focus.
 for (const type of ['keydown','keyup']) document.addEventListener(type,event=>{
@@ -897,7 +902,7 @@ document.querySelectorAll('.signout').forEach(button => button.addEventListener(
     void startOnline(guestPresenceId(window));
     dashboardPreloadEnabled = false; pageRequest++;
     // Discard account-specific views on logout.
-    $('page-game')?.remove(); frameReady = null; $('page-bot')?.remove(); botFrameReady = null; $('page-watch')?.remove(); watchFrameReady = null; $('page-archive')?.remove(); archiveFrameReady = null;
+    $('page-game')?.remove(); frameReady = null; $('page-bot')?.remove(); botFrameReady = null; $('page-watch')?.remove(); watchFrameReady = null; $('page-archive')?.remove(); archiveFrameReady = null; $('page-puzzles')?.remove(); puzzlesFrameReady = null;
     ratingView?.destroy(); $('page-rating')?.remove(); ratingView = null;
     profileView?.destroy(); $('page-profile')?.remove(); profileView = null;
     profile = null; applyPalette('monochrome'); applyTheme(null); applyRankUnit('yar'); $('auth-form').reset(); setMode('login');
