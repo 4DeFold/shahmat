@@ -1,0 +1,66 @@
+/* Motion for the independent game documents (/play, game, bot, watch,
+   archive and puzzles frames). Only existing elements are animated. */
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes m-rail-in { from { opacity: 0; translate: 14px 0; filter: blur(4px); } }
+
+  /* Players and captured material. */
+  :is(html,#m) .player-row .avatar img, :is(html,#m) .player-row .avatar { transition: scale .45s var(--m-spring), rotate .45s var(--m-spring); }
+  @media (hover: hover) { .player-row:hover .avatar { scale: 1.08; rotate: -4deg; } }
+  .offline-choice:not([hidden]) { animation: m-rail-in .5s var(--m-ease) backwards; }
+
+  /* Mode options: stagger whenever the picker opens. */
+  .mode-picker:not(.is-collapsed) .mode-option { animation: m-option-in .5s var(--m-ease) backwards; }
+  .mode-picker:not(.is-collapsed) .mode-option:nth-child(2) { animation-delay: 35ms; }
+  .mode-picker:not(.is-collapsed) .mode-option:nth-child(3) { animation-delay: 70ms; }
+  .mode-picker:not(.is-collapsed) .mode-option:nth-child(4) { animation-delay: 105ms; }
+  .mode-picker:not(.is-collapsed) .mode-option:nth-child(n+5) { animation-delay: 140ms; }
+  @keyframes m-option-in { from { opacity: 0; translate: 0 8px; } }
+
+  /* Move notation: the latest move glints (React Bits Shiny Text). */
+  #move-list .move-enter { background-image: linear-gradient(100deg, transparent 30%, color-mix(in srgb, var(--accent, currentColor) 35%, transparent) 50%, transparent 70%); background-size: 250% 100%; background-repeat: no-repeat; animation-name: m-move-glint; animation-duration: .9s; animation-timing-function: ease-out; }
+  @keyframes m-move-glint { from { background-position: 130% 0; opacity: .2; translate: 0 4px; } 40% { opacity: 1; translate: 0 0; } to { background-position: -40% 0; } }
+
+  /* Resign / confirm dialog buttons. */
+  :is(html,#m) .dialog-actions button { transition: translate .35s var(--m-ease), background-color .2s ease, color .2s ease, border-color .2s ease; }
+  @media (hover: hover) { .dialog-actions button:hover { translate: 0 -2px; } }
+  dialog[open] .dialog-actions button { animation: m-pop-in .45s var(--m-spring) .12s backwards; }
+  dialog[open] .dialog-actions button + button { animation-delay: .18s; }
+
+  /* Bot showcase. */
+  :is(html,#m) .bot-play > span:first-child { transition: letter-spacing .4s var(--m-ease); }
+  @media (hover: hover) { .bot-play:hover > span:first-child { letter-spacing: .02em; } }
+
+  /* Puzzles. */
+  :is(html,#m) .puzzle-nav button > span { display: inline-block; transition: rotate .5s var(--m-spring), scale .5s var(--m-spring); }
+  @media (hover: hover) { .puzzle-nav button:hover > span { rotate: -12deg; scale: 1.15; } }
+  .puzzle-nav button[aria-current] > span { animation: m-nav-icon .6s var(--m-spring); }
+  @keyframes m-nav-icon { from { scale: .5; rotate: -25deg; } }
+  .puzzle-themes-grid, .puzzle-history-grid, .archive-grid { perspective: 1100px; }
+  .puzzle-themes-grid > .puzzle-theme-card { animation: m-rise-blur .6s var(--m-ease) backwards; animation-delay: calc(min(var(--m-i, 0), 14) * 28ms); }
+  @keyframes m-rise-blur { from { opacity: 0; translate: 0 14px; filter: blur(5px); } }
+  :is(html,#m) .puzzle-theme-number { display: inline-block; transition: translate .4s var(--m-ease), letter-spacing .4s var(--m-ease); }
+  @media (hover: hover) { .puzzle-theme-card:hover .puzzle-theme-number { letter-spacing: .12em; } }
+  :is(html,#m) .puzzle-tools button > span, :is(html,#m) .puzzle-move-controls button { transition: rotate .45s var(--m-spring), translate .3s var(--m-ease), background-color .22s ease, color .22s ease; }
+  @media (hover: hover) { #puzzle-hint:not(:disabled):hover > span { rotate: -14deg; } }
+  .puzzle-rating-change:not(:empty) { display: inline-block; animation: m-pop-in .55s var(--m-spring); }
+  :is(html,#m) .puzzle-side-to-move img { transition: rotate .5s var(--m-spring), scale .5s var(--m-spring); }
+  .puzzle-status-card[data-state='success'] .puzzle-side-to-move img { animation: m-king-win .8s var(--m-spring); }
+  @keyframes m-king-win { 0% { scale: 1; rotate: 0deg; } 35% { scale: 1.25; rotate: -12deg; } 100% { scale: 1; rotate: 0deg; } }
+
+  /* Watch and archive. */
+  :is(html,#m) .watch-tabs button, :is(html,#m) .watch-all { transition: background-color .22s ease, color .22s ease, border-color .22s ease, translate .3s var(--m-ease); }
+  :is(html,#m) .watch-mini, :is(html,#m) .archive-mini { transition: transform .4s var(--m-ease), translate .4s var(--m-ease), scale .4s var(--m-spring), box-shadow .4s ease, border-color .3s ease; }
+  :is(html,#m) .archive-stats-grid > div { transition: translate .35s var(--m-ease), transform .35s var(--m-ease), border-color .3s ease, background-color .3s ease; }
+  @media (hover: hover) { .archive-stats-grid > div:hover { translate: 0 -3px; } }
+  .archive-stats-grid > div { animation: m-rise-blur .55s var(--m-ease) backwards; }
+  .archive-stats-grid > div:nth-child(2) { animation-delay: 40ms; } .archive-stats-grid > div:nth-child(3) { animation-delay: 80ms; }
+  .archive-stats-grid > div:nth-child(4) { animation-delay: 120ms; } .archive-stats-grid > div:nth-child(5) { animation-delay: 160ms; }
+  .archive-stats-grid > div:nth-child(n+6) { animation-delay: 200ms; }
+  .archive-modes button { animation: m-rail-in .5s var(--m-ease) backwards; }
+  .archive-modes button:nth-child(2) { animation-delay: 50ms; } .archive-modes button:nth-child(3) { animation-delay: 90ms; }
+  .archive-modes button:nth-child(4) { animation-delay: 130ms; } .archive-modes button:nth-child(n+5) { animation-delay: 170ms; }
+
+  /* Guest demo (/play). */
+  :is(html,#m) .demo-page .new-game { transition: transform .25s ease, translate .4s var(--m-ease), background-color .3s ease; }
+}
