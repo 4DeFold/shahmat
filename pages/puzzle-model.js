@@ -33,3 +33,12 @@ export function createPuzzleAttempt(puzzle){
   fail(){failed=true},
  };
 }
+// Only trust a source game's score when it actually reaches this puzzle's FEN.
+// Never include moves after the starting position (which would spoil the puzzle).
+export function extractGamePrefix(pgn, fen, initialPly){
+ const game=new Chess();game.loadPgn(pgn);const moves=game.history({verbose:true});
+ const key=s=>s.split(' ').slice(0,4).join(' '),target=key(fen);
+ if(!Number.isInteger(initialPly)||initialPly<0||initialPly>moves.length)return null;
+ const position=initialPly?moves[initialPly-1].after:new Chess().fen();
+ return key(position)===target?moves.slice(0,initialPly):null;
+}

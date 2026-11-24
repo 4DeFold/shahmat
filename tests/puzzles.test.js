@@ -1,5 +1,5 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';import {Chess} from 'chess.js';
-import {THEMES,parsePuzzles,blankProgress,loadProgress,recordResult,puzzleStats,choosePuzzle,createPuzzleAttempt} from '../pages/puzzle-model.js';
+import {THEMES,parsePuzzles,blankProgress,loadProgress,recordResult,puzzleStats,choosePuzzle,createPuzzleAttempt,extractGamePrefix} from '../pages/puzzle-model.js';
 const data=JSON.parse(readFileSync('public/puzzles/tactics.json')),puzzles=parsePuzzles(data);
 test('1000 distinct licensed puzzles, eight well-stocked themes and legal full lines',()=>{
  assert.equal(data.license.includes('CC0'),true);assert.equal(puzzles.length,1000);assert.equal(new Set(puzzles.map(x=>x.id)).size,1000);assert.equal(THEMES.length,8);
@@ -23,4 +23,9 @@ test('rating records once, stays isolated, filters and chooses unseen themed puz
 test('progress restores the active puzzle state without changing earlier saved records',()=>{
  const p=puzzles[0],progress=blankProgress();progress.current={id:p.id,theme:'mix',cursor:2,failed:true};const loaded=loadProgress({getItem:()=>JSON.stringify(progress)},'alice');assert.deepEqual(loaded.current,progress.current);assert.equal(loadProgress({getItem:()=>'{broken'},'alice').current,undefined);
  const a=createPuzzleAttempt(p);const before=a.chess.fen();const wrong=a.chess.moves({verbose:true}).find(m=>m.from+m.to+(m.promotion||'')!==a.expected);const result=a.play(wrong.from+wrong.to+(wrong.promotion||''));assert.equal(result.status,'wrong');assert.ok(result.move.after);assert.equal(a.chess.fen(),before);
+});
+
+test('source game history is verified and excludes the puzzle move',()=>{
+ const pgn='e4 Nc6 d4 e5 d5 Nce7 Bg5 Nf6 Bxf6 gxf6 Nc3 Ng6 g3 Bc5 Qe2 O-O O-O-O a5 f4 exf4 gxf4 Nxf4 Qg4+ Ng6 Bd3 d6 Qg3 Kh8 e5 fxe5 Ne4 Bb6 h4 f5 h5 fxe4 hxg6 exd3 g7+ Kg8 gxf8=Q+ Kxf8 Rxh7 Qf6 Rxd3 Bf5 Rf3 Be3+ Kd1 Bf4 Rxf4';
+ const p=puzzles.find(p=>p.id==='ISYhO'),prefix=extractGamePrefix(pgn,p.fen,50);assert.equal(prefix.length,50);assert.equal(prefix.at(-1).after.split(' ').slice(0,4).join(' '),p.fen.split(' ').slice(0,4).join(' '));assert.notEqual(prefix.at(-1).san,'Rxf4');assert.equal(extractGamePrefix(pgn,p.fen,51),null);assert.equal(extractGamePrefix('e4 e5',p.fen,2),null);
 });
