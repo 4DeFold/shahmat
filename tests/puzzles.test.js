@@ -19,3 +19,8 @@ test('rating records once, stays isolated, filters and chooses unseen themed puz
  const store={getItem:k=>k==='alice'?JSON.stringify(progress):null};assert.equal(loadProgress(store,'alice').rating,rating);assert.equal(loadProgress(store,'bob').rating,1500);
  const theme=THEMES[0][0],choice=choosePuzzle(puzzles,theme,progress,()=>0);assert.ok(choice.themes.includes(theme));assert.notEqual(choice.id,p.id);
 });
+
+test('progress restores the active puzzle state without changing earlier saved records',()=>{
+ const p=puzzles[0],progress=blankProgress();progress.current={id:p.id,theme:'mix',cursor:2,failed:true};const loaded=loadProgress({getItem:()=>JSON.stringify(progress)},'alice');assert.deepEqual(loaded.current,progress.current);assert.equal(loadProgress({getItem:()=>'{broken'},'alice').current,undefined);
+ const a=createPuzzleAttempt(p);const before=a.chess.fen();const wrong=a.chess.moves({verbose:true}).find(m=>m.from+m.to+(m.promotion||'')!==a.expected);const result=a.play(wrong.from+wrong.to+(wrong.promotion||''));assert.equal(result.status,'wrong');assert.ok(result.move.after);assert.equal(a.chess.fen(),before);
+});

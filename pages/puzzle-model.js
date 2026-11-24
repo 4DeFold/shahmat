@@ -11,7 +11,7 @@ export function choosePuzzle(puzzles,theme,progress,random=Math.random){
  const ordered=[...candidates].sort((a,b)=>Math.abs(a.rating-rating)-Math.abs(b.rating-rating));const near=ordered.slice(0,Math.min(30,ordered.length));return near[Math.min(near.length-1,Math.floor(random()*near.length))];
 }
 export function blankProgress(){return {version:1,rating:1500,history:[]};}
-export function loadProgress(storage,key){try{const p=JSON.parse(storage.getItem(key));if(p?.version===1&&Number.isFinite(p.rating)&&Array.isArray(p.history))return {version:1,rating:p.rating,history:p.history.filter(x=>x&&typeof x.id==='string'&&typeof x.success==='boolean'&&Number.isFinite(x.at)&&Array.isArray(x.themes))};}catch{}return blankProgress();}
+export function loadProgress(storage,key){try{const p=JSON.parse(storage.getItem(key));if(p?.version===1&&Number.isFinite(p.rating)&&Array.isArray(p.history))return {version:1,rating:p.rating,history:p.history.filter(x=>x&&typeof x.id==='string'&&typeof x.success==='boolean'&&Number.isFinite(x.at)&&Array.isArray(x.themes)),current:p.current&&typeof p.current.id==='string'&&typeof p.current.theme==='string'&&Number.isInteger(p.current.cursor)&&typeof p.current.failed==='boolean'?p.current:null};}catch{}return blankProgress();}
 export function recordResult(progress,puzzle,success,now=Date.now()){
  // A replay never changes rating or adds another attempt.
  if(progress.history.some(row=>row.id===puzzle.id))return null;
@@ -28,7 +28,7 @@ export function createPuzzleAttempt(puzzle){
  const previous=apply(puzzle.moves[0]);let cursor=1,failed=false,finished=false;
  return {chess,previous,get cursor(){return cursor},get failed(){return failed},get finished(){return finished},get expected(){return puzzle.moves[cursor]},
   play(uci){if(finished)return {status:'finished'};let move;try{move=chess.move({from:uci.slice(0,2),to:uci.slice(2,4),promotion:uci[4]})}catch{return {status:'illegal'}}
-   if(uci!==puzzle.moves[cursor]){chess.undo();failed=true;return {status:'wrong'}}cursor++;if(cursor>=puzzle.moves.length){finished=true;return {status:'solved',move,success:!failed}}return {status:'correct',move};},
+   if(uci!==puzzle.moves[cursor]){chess.undo();failed=true;return {status:'wrong',move}}cursor++;if(cursor>=puzzle.moves.length){finished=true;return {status:'solved',move,success:!failed}}return {status:'correct',move};},
   reply(){if(finished||cursor>=puzzle.moves.length)return null;const move=apply(puzzle.moves[cursor++]);if(cursor>=puzzle.moves.length)finished=true;return move;},
   fail(){failed=true},
  };
