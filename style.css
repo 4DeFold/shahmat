@@ -1153,3 +1153,6 @@ body.startup-ready #landing-screen:not([hidden]) .hero-reveal--tail { animation-
 .landing:has(.dashboard:not([hidden]) #page-puzzles:not([hidden])) {padding:0 0 0 187px;height:100dvh;min-height:0}
 .landing:has(.dashboard:not([hidden]) #page-puzzles:not([hidden])) .dashboard,.landing:has(.dashboard:not([hidden]) #page-puzzles:not([hidden])) #page-content,#page-puzzles:not([hidden]),#page-puzzles:not([hidden]) iframe {width:100%;height:100%;min-height:0}
 @media(max-width:700px),(max-height:500px) and (pointer:coarse){.landing:has(.dashboard:not([hidden]) #page-puzzles:not([hidden])){padding:68px 0 0}}
+
+#puzzles-frame { display:block; border:0; width:100%; height:100%; background:var(--page-background); }
+#page-puzzles:focus {outline:none}

@@ -41,6 +41,7 @@ function applyRankUnit(value) {
   if (swap) swap.setAttribute('aria-label', rankUnit === 'yar' ? 'Показаны Яры. Переключить на Эло' : 'Показано Эло. Переключить на Яры');
   ratingView?.setUnit(rankUnit);
   $('member-game-frame')?.contentWindow?.postMessage({ type:'shahmat-rank-unit', value:rankUnit }, window.location.origin);
+  $('puzzles-frame')?.contentWindow?.postMessage({ type:'shahmat-rank-unit', value:rankUnit }, window.location.origin);
 }
 const paletteNames = { monochrome:'Монохром', gray:'Графит', forest:'Лес', atelier:'Шахматный кабинет', wood:'Тёплое дерево', earth:'Сосновый бор', ocean:'Морская глубина', amber:'Янтарь', lavender:'Лаванда', sand:'Песчаный' };
 function updateProfileAppearance() {
@@ -378,6 +379,7 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
     $('bot-game-frame')?.contentWindow?.postMessage({ type: name === 'bot' ? 'shahmat-bot-shown' : 'shahmat-bot-hidden' }, window.location.origin);
     $('watch-frame')?.contentWindow?.postMessage({type:name === 'watch'?'shahmat-watch-shown':'shahmat-watch-hidden'},window.location.origin);
     $('archive-frame')?.contentWindow?.postMessage({type:name === 'archive'?'shahmat-archive-shown':'shahmat-archive-hidden'},window.location.origin);
+    $('puzzles-frame')?.contentWindow?.postMessage({type:name === 'puzzles'?'shahmat-puzzles-shown':'shahmat-puzzles-hidden'},window.location.origin);
     const profileWasHidden = $('page-profile')?.hidden;
     document.querySelectorAll('#dashboard-screen [data-view]').forEach(view => {
       const active = view.dataset.view === name;

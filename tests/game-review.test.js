@@ -82,3 +82,11 @@ test('game accuracy penalizes blunders using volatility and harmonic mean',()=>{
  assert.ok(summary.w.accuracy<naive);assert.equal(summary.b.accuracy,100);assert.ok(moveAccuracy(100)===0);
  const partial=summarizeReview(moves,[null,...positions.slice(1)]);assert.ok(Number.isFinite(partial.w.accuracy));assert.equal(summarizeReview([],[]).w.accuracy,null);
 });
+
+test('review shows verified move counts while analysis is still running',async()=>{
+ const dom=new JSDOM('<div id="frame"></div><div id="rail"><div class="moves"></div></div>'),d=dom.window.document;
+ let release;const gate=new Promise(resolve=>release=resolve);let calls=0;
+ const engine=()=>({evaluate:async()=>{calls++;if(calls===4)await gate;return {win:50,best:'e2e4'}},destroy(){}});
+ const review=createGameReview({document:d,frame:d.querySelector('#frame'),host:d.querySelector('#rail'),createEngine:engine});review.start({moves:['e4','e5','Nf3']});
+ await new Promise(resolve=>setTimeout(resolve,80));assert.match(d.querySelector('.review-title').textContent,/Анализ 3\/4/);assert.equal(d.querySelector('.review-best b').textContent,'1');assert.equal(d.querySelector('.review-accuracy').textContent,'—');release();await new Promise(resolve=>setTimeout(resolve,80));assert.equal(d.querySelector('.review-title').textContent,'Анализ партии');review.destroy();dom.window.close();
+});
