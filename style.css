@@ -571,8 +571,8 @@ textarea { resize: vertical; min-height: 92px; }
   transition: grid-template-rows .3s cubic-bezier(.22, 1, .36, 1), opacity .22s ease, background-color 1.5s ease, border-color 1.5s ease;
 }
 .landing.palette-active .app-sidebar .account-menu.is-open { opacity: 1; grid-template-rows: 1fr; pointer-events: auto; }
-.page-enter { animation: view-entrance .3s cubic-bezier(.22, 1, .36, 1) both; }
-@keyframes view-entrance { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: translateY(0); } }
+.page-enter { animation: view-entrance .45s cubic-bezier(.22, 1, .36, 1) both; }
+@keyframes view-entrance { from { opacity: 0; transform: translateY(12px); filter: blur(5px); } to { opacity: 1; transform: translateY(0); filter: none; } }
 @media (max-width: 700px) {
   .sidebar-brand { margin: 0 0 32px; }
   .sidebar-chevron { display: none; }

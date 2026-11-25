@@ -171,10 +171,11 @@ function showLevel() {
 }
 function switchLevel(next) {
   if(phase!=='choose' || next<0 || next>=BOT_LEVELS.length || next===level) return;
-  level=next; showLevel();
+  const direction=next>level?1:-1; level=next; showLevel();
   if(motion.matches) { carouselPosition=level; carouselVelocity=0; positionOrbit(); return; }
   const title=$('bot-name'); title.getAnimations().forEach(animation=>animation.cancel());
-  title.animate([{opacity:.4},{opacity:1}],{duration:280,easing:'ease-out'});
+  title.animate([{opacity:0,translate:`${direction*22}px 0`,filter:'blur(6px)'},{opacity:1,translate:'0 0',filter:'blur(0)'}],{duration:420,easing:'cubic-bezier(.22,1,.36,1)'});
+  $(direction>0?'bot-next':'bot-prev').animate([{translate:'0 0'},{translate:`${direction*8}px 0`},{translate:'0 0'}],{duration:360,easing:'cubic-bezier(.34,1.56,.64,1)'});
   orbitSpeed=Math.min(7,Math.max(orbitSpeed,2.8)+.35); startOrbit();
 }
 $('bot-prev').addEventListener('click',()=>switchLevel(level-1)); $('bot-next').addEventListener('click',()=>switchLevel(level+1));
