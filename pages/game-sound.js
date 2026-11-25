@@ -9,7 +9,10 @@ export function createGameSound(win) {
     }
   }
   function play(move={}) {
-    if(destroyed)return;prime();
+    if(destroyed)return;
+    // Visual move feedback (motion/core.js) listens for the same moment.
+    try {win.dispatchEvent?.(new win.CustomEvent('shahmat-move',{detail:{to:move?.to,captured:move?.captured,san:move?.san}}));} catch {/* Motion is optional. */}
+    prime();
     const base=cache[move?.captured?'capture':'move'];
     if(!base)return;
     try {
