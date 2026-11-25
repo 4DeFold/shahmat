@@ -119,8 +119,8 @@
     #board:not(.waiting) .square:hover { filter: brightness(1.07); }
     #watch-app #board .square:hover { filter: none; }
     :is(html,#m) .board .piece { transition: scale .32s var(--m-spring), filter .3s ease; }
-    .board:not(.black):not(.waiting) .square:hover > .piece[src*='/w'],
-    .board.black:not(.waiting) .square:hover > .piece[src*='/b'] { scale: 1.07; filter: drop-shadow(0 5px 4px #0003); }
+    .board:not(.black):not(.waiting) .square:hover > :is(.piece[data-board-color='w'], .piece[src*='/w']),
+    .board.black:not(.waiting) .square:hover > :is(.piece[data-board-color='b'], .piece[src*='/b']) { scale: 1.07; filter: drop-shadow(0 5px 4px #0003); }
     #watch-app .board .square:hover > .piece { scale: 1; filter: none; }
   }
   .board .square.selected > .piece { scale: 1.1; filter: drop-shadow(0 8px 6px #0004); animation: m-piece-pick .42s var(--m-spring); }
