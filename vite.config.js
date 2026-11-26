@@ -11,6 +11,7 @@ const gameRoute = {
 function rewriteGame(req, _res, next) {
   const path = req.url?.split('?')[0];
   if (path === '/play') req.url = req.url.replace(path, '/pages/play.html');
+  if (path === '/about') req.url = req.url.replace(path, '/pages/about.html');
   if (path === '/game') req.url = req.url.replace(path, '/index.html');
   next();
 }
@@ -35,7 +36,7 @@ function serveStockfish(req, res, next) {
 }
 export default defineConfig({
   plugins: [gameRoute, stockfishAssets],
-  build: { rollupOptions: { input: { main: resolve('index.html'), demo: resolve('pages/play.html'), game: resolve('pages/game.html'), bot: resolve('pages/bot-game.html'), watch: resolve('pages/watch.html'), archive: resolve('pages/archive.html'), puzzles: resolve('pages/puzzles.html') } } },
+  build: { rollupOptions: { input: { main: resolve('index.html'), demo: resolve('pages/play.html'), game: resolve('pages/game.html'), bot: resolve('pages/bot-game.html'), watch: resolve('pages/watch.html'), archive: resolve('pages/archive.html'), puzzles: resolve('pages/puzzles.html'), about: resolve('pages/about.html') } } },
   server: { host: '0.0.0.0', allowedHosts: ['.e2b.app'] },
   preview: { host: '0.0.0.0', allowedHosts: ['.e2b.app'] },
 });
