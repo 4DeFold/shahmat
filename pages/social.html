@@ -1,13 +1,14 @@
 <section class="social-page" id="page-social" data-view="clans" hidden aria-labelledby="page-social-title">
- <header class="social-heading"><h2 id="page-social-title" tabindex="-1">Кланы<span>.</span></h2><div class="social-heading-actions"><button type="button" class="social-primary" id="social-my-clan" hidden>Мой клан ↗</button><button type="button" class="social-primary" id="social-create" hidden>Создать клан ↗</button></div></header>
+ <header class="social-heading"><h2 id="page-social-title" tabindex="-1">Кланы<span>.</span></h2><div class="social-heading-actions"><button type="button" class="social-primary social-add" id="social-add-friend" hidden aria-label="Добавить друга" aria-expanded="false" aria-controls="social-search">+</button><button type="button" class="social-primary" id="social-all-clans" hidden>Все кланы ↗</button><button type="button" class="social-primary" id="social-my-clan" hidden>Мой клан ↗</button><button type="button" class="social-primary" id="social-create" hidden>Создать клан ↗</button></div></header>
  <p class="social-status" role="status" aria-live="polite"></p>
  <section class="social-friends" aria-label="Друзья" hidden>
-  <form class="social-search" id="social-search" role="search"><label class="social-search-label" for="social-player-search">Поиск игрока</label><div class="social-search-control"><input id="social-player-search" placeholder="Ник игрока" maxlength="24" autocomplete="off"><button type="submit">Найти <span aria-hidden="true">↗</span></button></div></form>
+  <form class="social-search" id="social-search" role="search" hidden><label class="social-search-label" for="social-player-search">Поиск игрока</label><div class="social-search-control"><input id="social-player-search" placeholder="Ник игрока" maxlength="24" autocomplete="off"><button type="submit">Найти <span aria-hidden="true">↗</span></button></div></form>
   <div id="social-results" hidden></div><div id="social-friend-list"></div>
  </section>
  <section class="social-clans" aria-label="Кланы" hidden>
-  <label class="social-search-label" for="social-clan-search">Поиск клана</label><div class="social-search-control social-clan-search"><input id="social-clan-search" placeholder="Название клана" maxlength="40" autocomplete="off"></div>
-  <div id="social-clan-list"></div>
+  <section id="social-own-clan" hidden><h3 id="social-own-title" class="social-own-title"></h3><div id="social-own-content"></div></section>
+  <div id="social-clan-directory"><label class="social-search-label" for="social-clan-search">Поиск клана</label><div class="social-search-control social-clan-search"><input id="social-clan-search" placeholder="Название клана" maxlength="40" autocomplete="off"></div>
+  <div id="social-clan-list"></div></div>
  </section>
  <dialog id="social-dialog" class="social-dialog" aria-labelledby="social-dialog-title"><div class="social-dialog-head"><h3 id="social-dialog-title">Клан</h3><button type="button" id="social-close" aria-label="Закрыть">×</button></div><p id="social-dialog-status" class="social-status" role="status" aria-live="polite"></p><div id="social-dialog-content"></div></dialog>
 </section>

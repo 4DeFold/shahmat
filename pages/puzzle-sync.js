@@ -14,7 +14,7 @@ export function mergeProgress(remote, local, preferLocalCurrent = true) {
     const old=entries.get(row.id);
     if (!old || row.at < old.at) entries.set(row.id,row);
   }
-  const ordered=[...entries.values()].sort((x,y)=>x.at-y.at || x.id.localeCompare(y.id));
+  const ordered=[...entries.values()].sort((x,y)=>x.at-y.at || (x.id < y.id ? -1 : x.id > y.id ? 1 : 0));
   const same=ordered.length===a.history.length && ordered.every(row=>a.history.some(item=>item.id===row.id && item.at===row.at && item.success===row.success));
   let merged;
   if (same) merged=copy(a);
@@ -69,7 +69,7 @@ export function createPuzzleSync({client,userId,storage,key,getProgress,applyPro
         const snapshot=copy(getProgress()), epoch=generation, reply=await write(snapshot);if(stopped)return;
         revision=Number(reply.revision);
         if(reply.accepted){
-          if(epoch===generation){dirty=false;remember(snapshot)}
+          if(epoch===generation){dirty=false;const saved=validProgress(reply.progress);if(saved && canApply())apply(saved);else {remember(snapshot);if(saved && JSON.stringify(saved)!==JSON.stringify(snapshot))revision=-1}}
         } else {
           const remote=validProgress(reply.progress);
           if(remote && canApply()){const merged=mergeProgress(remote,getProgress(),true);apply(merged);}

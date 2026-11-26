@@ -180,10 +180,16 @@ function switchLevel(next) {
 }
 $('bot-prev').addEventListener('click',()=>switchLevel(level-1)); $('bot-next').addEventListener('click',()=>switchLevel(level+1));
 const review=createGameReview({document,frame:$('target-board'),host:$('moves').parentElement,onSelect:showHistory});let reviewKey=null;
+let activityPending=false;
+async function reportBotActivity(){
+ if(destroyed||!pageVisible||document.hidden||phase!=='playing'||!userId||!game||game.status!=='active'||activityPending)return;
+ activityPending=true;try{await supabase.rpc('social_bot_heartbeat',{p_game:game.id}).abortSignal(AbortSignal.timeout(4000));}catch{}finally{activityPending=false;}
+}
+const activityTimer=setInterval(reportBotActivity,12000);
 function setPhase(value) {
   if(value==='finished' && game && reviewKey!==game.id){reviewKey=game.id;engine?.destroy();engine=null;review.setVisible(pageVisible&&!document.hidden);review.start({moves:chess.history(),flip:playerColor()==='b',names:()=>playerColor()==='w'?{w:'Вы',b:$('game-bot-name').textContent}:{b:'Вы',w:$('game-bot-name').textContent}});}
   else if(value!=='finished' && reviewKey){review.clear();reviewKey=null;}
-  phase=value; shell.dataset.phase=value; $('return-button').textContent=value==='finished' && game?.status && game.status!=='draw' && !playerWon() ? 'Завершить' : 'К выбору бота'; const inGame=value==='playing'||value==='finished';
+  phase=value; if(value==='playing')void reportBotActivity(); shell.dataset.phase=value; $('return-button').textContent=value==='finished' && game?.status && game.status!=='draw' && !playerWon() ? 'Завершить' : 'К выбору бота'; const inGame=value==='playing'||value==='finished';
   showcase.inert=inGame||value==='launching'||value==='returning'; showcase.setAttribute('aria-hidden',String(inGame||value==='launching'||value==='returning'));
   $('bot-board-wrap').inert=!inGame; $('bot-board-wrap').setAttribute('aria-hidden',String(!inGame));
   for(const id of ['bot-actions','moves']) { $(id).inert=!inGame; $(id).setAttribute('aria-hidden',String(!inGame)); }
@@ -399,9 +405,9 @@ async function restore(id) {
 }
 showLevel(); draw(); startOrbit(); if(pageVisible) animateEntry(); $('bot-play').disabled=true;
 function setPlayerAvatar(value) { const img=$('bot-player-avatar-image'), custom=typeof value==='string'&&/^data:image\/(?:png|jpeg);base64,/.test(value); img.src=custom?value:piece(playerColor(),'n'); img.classList.toggle('custom-profile-avatar',custom); }
-startSessionMonitor({auth:supabase.auth,cachedId:cachedUserId(localStorageOrNull(window)),open:async id=>{ void Promise.all([supabase.from('profile_media').select('avatar').eq('user_id',id).maybeSingle(),supabase.from('profile_rewards').select('avatar_unlocked').eq('user_id',id).maybeSingle()]).then(([media,reward])=>{if(!destroyed&&userId===id)setPlayerAvatar(!reward.error&&reward.data?.avatar_unlocked?media.data?.avatar:null);}).catch(()=>{}); await restore(id); if(!destroyed) $('bot-play').disabled=false; },logout:()=>{ destroyed=true; ++generation; stopOrbit(); engine?.destroy(); store?.destroy(); clearInterval(timer); sound.destroy(); if(window.parent===window) location.replace('/'); },accountChanged:()=>location.reload()});
+startSessionMonitor({auth:supabase.auth,cachedId:cachedUserId(localStorageOrNull(window)),open:async id=>{ void Promise.all([supabase.from('profile_media').select('avatar').eq('user_id',id).maybeSingle(),supabase.from('profile_rewards').select('avatar_unlocked').eq('user_id',id).maybeSingle()]).then(([media,reward])=>{if(!destroyed&&userId===id)setPlayerAvatar(!reward.error&&reward.data?.avatar_unlocked?media.data?.avatar:null);}).catch(()=>{}); await restore(id); if(!destroyed) $('bot-play').disabled=false; },logout:()=>{ destroyed=true; ++generation; stopOrbit(); engine?.destroy(); store?.destroy(); clearInterval(timer); clearInterval(activityTimer); sound.destroy(); if(window.parent===window) location.replace('/'); },accountChanged:()=>location.reload()});
 window.addEventListener('online',()=>store?.flush());
-document.addEventListener('visibilitychange',()=>review.setVisible(pageVisible&&!document.hidden));
+document.addEventListener('visibilitychange',()=>{review.setVisible(pageVisible&&!document.hidden);if(!document.hidden)void reportBotActivity()});
 window.addEventListener('pagehide',event=>{if(!event.persisted)review.destroy()});
 // If Play is pressed during the entrance, continue from the current opacity
 // rather than letting a still-running entrance override the launch fade.
@@ -438,7 +444,7 @@ window.addEventListener('message',event=>{
   if(event.data?.type==='shahmat-history-key' && typeof event.data.key==='string') { handleNavigation(event.data.key,event.data.code); return; }
   if(event.data?.type==='shahmat-profile-updated') { setPlayerAvatar(event.data.avatar); return; }
   if(event.data?.type==='shahmat-bot-hidden') { pageVisible=false;review.setVisible(false);setThreat('KeyQ',false);setThreat('KeyE',false); stopOrbit(); return; }
-  if(event.data?.type==='shahmat-bot-shown') { const wasHidden=!pageVisible; pageVisible=true;review.setVisible(!document.hidden); startOrbit(); if(wasHidden) animateEntry(); return; }
+  if(event.data?.type==='shahmat-bot-shown') { const wasHidden=!pageVisible; pageVisible=true;review.setVisible(!document.hidden); startOrbit(); if(wasHidden) animateEntry(); void reportBotActivity(); return; }
   if(event.data?.type!=='shahmat-appearance') return;
   const targets={'--page-background':'--bg','--foreground':'--ink','--surface':'--surface','--surface-raised':'--surface-alt','--line':'--line','--button-background':'--control','--button-text':'--control-ink','--accent':'--accent','--board-light':'--board-light','--board-dark':'--board-dark'};
   for(const [name,target] of Object.entries(targets)) { const value=event.data.colors?.[name]; if(typeof value==='string' && value) document.documentElement.style.setProperty(target,value); }

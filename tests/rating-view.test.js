@@ -125,3 +125,11 @@ test('puzzle category uses separate leaderboard and personal position endpoints'
  const client={rpc:async (fn,args)=>{calls.push([fn,args]);if(fn==='puzzle_leaderboard')return {data:[{username:'Puzzle',yar:1735,elo:1735,ranked:true}]};if(fn==='puzzle_my_position')return {data:[{username:'Puzzle',yar:1735,elo:1735,ranked:true,place:1}]};return {data:[]}}};
  const view=createRatingView(root,client,{showSelf:true});await view.refresh();root.querySelector('[data-rating-mode=puzzle]').click();await tick();assert.equal(root.querySelector('.rating-player').textContent,'Puzzle');assert.equal(root.querySelector('.rating-self-place').textContent,'1');assert.equal(root.querySelector('.rating-score').textContent.replace(/\s/g,''),'1735');assert.ok(calls.some(([fn])=>fn==='puzzle_leaderboard'));assert.ok(calls.some(([fn])=>fn==='puzzle_my_position'));view.destroy();dom.window.close();
 });
+
+test('clan ranking shows averaged ЯР without player profile actions',async()=>{
+ const dom=new JSDOM(html,{pretendToBeVisual:true});const root=dom.window.document.querySelector('#page-rating');const calls=[];
+ const client={async rpc(name,args){calls.push(name);if(name==='social_clans_snapshot')return {data:{clans:[{name:'<Knights>',members:5,rating:1234}]}};if(name==='rank_leaderboard')return {data:[]};if(name==='rank_my_position')return {data:[]};return {data:[]}}};
+ const view=createRatingView(root,client,{showSelf:true});await view.refresh();root.querySelector('[data-rating-mode=clans]').click();await new Promise(r=>setTimeout(r,0));
+ assert.equal(root.querySelector('.rating-player').textContent,'<Knights>');assert.equal(root.querySelector('.rating-score').textContent.replace(/\s/g,''),'1234');assert.equal(root.querySelector('.rating-profile-trigger'),null);assert.equal(root.querySelector('.rating-self').hidden,true);assert.ok(calls.includes('social_clans_snapshot'));
+ view.destroy();dom.window.close();
+});
