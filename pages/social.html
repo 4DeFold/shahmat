@@ -1,16 +1,13 @@
-<section class="social-page" id="page-social" data-view="social" hidden aria-labelledby="page-social-title">
- <header class="rating-heading"><div><p class="social-eyebrow">ШАХМАТЫ ОБЪЕДИНЯЮТ</p><h2 id="page-social-title">Сообщество<span>.</span></h2><p class="social-intro">Находи друзей и играй в одной команде.</p></div></header>
- <div class="social-tabs rating-filters" role="group" aria-label="Раздел сообщества"><span class="social-indicator" aria-hidden="true"></span><button class="rating-filter" type="button" data-social-tab="friends" aria-pressed="true">Друзья</button><button class="rating-filter" type="button" data-social-tab="clans" aria-pressed="false">Кланы</button></div>
+<section class="social-page" id="page-social" data-view="clans" hidden aria-labelledby="page-social-title">
+ <header class="social-heading"><h2 id="page-social-title" tabindex="-1">Кланы<span>.</span></h2><div class="social-heading-actions"><button type="button" class="social-primary" id="social-my-clan" hidden>Мой клан ↗</button><button type="button" class="social-primary" id="social-create" hidden>Создать клан ↗</button></div></header>
  <p class="social-status" role="status" aria-live="polite"></p>
- <div class="social-layout">
-  <div class="social-main">
-   <section class="social-friends" aria-label="Друзья">
-    <form class="social-search" id="social-search"><label for="social-player-search">Найти игрока</label><div><input id="social-player-search" placeholder="Ник игрока" maxlength="24" autocomplete="off"><button type="submit">Найти <span aria-hidden="true">↗</span></button></div><small>Введи хотя бы две буквы ника.</small></form>
-    <div id="social-results" hidden></div><div id="social-friend-list"></div>
-   </section>
-   <section class="social-clans" aria-label="Кланы" hidden><div class="social-section-head"><div><h3>Кланы</h3><p>Средний общий ЯР игроков с рейтингом.</p></div><div class="social-actions"><button type="button" class="social-primary" id="social-my-clan" hidden>Мой клан ↗</button><button type="button" class="social-primary" id="social-create">Создать клан <span aria-hidden="true">↗</span></button></div></div><label class="social-clan-filter">Поиск клана<input id="social-clan-search" placeholder="Название клана" maxlength="40" autocomplete="off"></label><div id="social-clan-list"></div></section>
-  </div>
-  <aside class="social-aside" id="social-aside"><div class="social-aside-illustration" aria-hidden="true"><img src="/pieces/cburnett/wN.svg" alt=""><img src="/pieces/cburnett/bN.svg" alt=""></div><p class="social-eyebrow">ВМЕСТЕ СИЛЬНЕЕ</p><h3>Каждый ход — часть истории.</h3><p>Приглашай друзей, вступай в клан и развивайся вместе с другими игроками.</p></aside>
- </div>
+ <section class="social-friends" aria-label="Друзья" hidden>
+  <form class="social-search" id="social-search" role="search"><label class="social-search-label" for="social-player-search">Поиск игрока</label><div class="social-search-control"><input id="social-player-search" placeholder="Ник игрока" maxlength="24" autocomplete="off"><button type="submit">Найти <span aria-hidden="true">↗</span></button></div></form>
+  <div id="social-results" hidden></div><div id="social-friend-list"></div>
+ </section>
+ <section class="social-clans" aria-label="Кланы" hidden>
+  <label class="social-search-label" for="social-clan-search">Поиск клана</label><div class="social-search-control social-clan-search"><input id="social-clan-search" placeholder="Название клана" maxlength="40" autocomplete="off"></div>
+  <div id="social-clan-list"></div>
+ </section>
  <dialog id="social-dialog" class="social-dialog" aria-labelledby="social-dialog-title"><div class="social-dialog-head"><h3 id="social-dialog-title">Клан</h3><button type="button" id="social-close" aria-label="Закрыть">×</button></div><p id="social-dialog-status" class="social-status" role="status" aria-live="polite"></p><div id="social-dialog-content"></div></dialog>
 </section>

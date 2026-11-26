@@ -40,6 +40,14 @@
       "destination": "/index.html"
     },
     {
+      "source": "/friends",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/clans",
+      "destination": "/index.html"
+    },
+    {
       "source": "/social",
       "destination": "/index.html"
     },
