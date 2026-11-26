@@ -40,6 +40,10 @@
       "destination": "/index.html"
     },
     {
+      "source": "/social",
+      "destination": "/index.html"
+    },
+    {
       "source": "/profile",
       "destination": "/index.html"
     },

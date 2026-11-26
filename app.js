@@ -3,6 +3,7 @@ installLoadingIndicators(document);
 import {installPieceTheme,setPieceSet,selectedPieceSet,validPieceSet,renderLargePiecePreview} from './pages/piece-theme.js';
 installPieceTheme();
 import './pages/profile-card.css';
+import './pages/social.css';
 import { createRatingView } from './pages/rating.js';
 import { startOnlinePresence, guestPresenceId } from './pages/online-presence.js';
 import { startMatchHeartbeat } from './pages/match-heartbeat.js';
@@ -195,7 +196,7 @@ let navigating = false;
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const accountMenu = $('account-menu');
 const accountToggle = $('account-toggle');
-const pages = new Set(['home', 'game', 'bot', 'rating', 'watch', 'archive', 'puzzles', 'profile', 'settings', 'help']);
+const pages = new Set(['home', 'game', 'bot', 'rating', 'watch', 'archive', 'puzzles', 'social', 'profile', 'settings', 'help']);
 const sidebar = $('app-sidebar');
 const mobileMenuToggle = $('mobile-menu-toggle');
 let sidebarOpen = false;
@@ -268,6 +269,7 @@ const pageLoaders = {
   watch: () => import('./pages/watch-view.html?raw'),
   archive: () => import('./pages/archive-view.html?raw'),
   puzzles: () => import('./pages/puzzles-view.html?raw'),
+  social: () => import('./pages/social.html?raw'),
   profile: () => import('./pages/profile.html?raw'),
   settings: () => import('./pages/settings.html?raw'),
   help: () => import('./pages/help.html?raw'),
@@ -275,7 +277,7 @@ const pageLoaders = {
 let pageRequest = 0;
 const viewId = name => name === 'home' ? 'dashboard-home' : `page-${name}`;
 const viewLoads = new Map();
-let frameReady = null, botFrameReady = null, watchFrameReady = null, archiveFrameReady = null, puzzlesFrameReady = null, ratingView = null, profileView = null, profileReturnPage = 'rating';
+let frameReady = null, botFrameReady = null, watchFrameReady = null, archiveFrameReady = null, puzzlesFrameReady = null, ratingView = null, socialView = null, profileView = null, profileReturnPage = 'rating';
 let onlineStop = null, heartbeatStop = null, onlineUser = null, onlineCount = null, onlineNames = null, onlineEpoch = 0, onlineUsername = null;
 function sendOnline() { $('member-game-frame')?.contentWindow?.postMessage({ type: 'shahmat-online', count: onlineCount }, window.location.origin); }
 async function startOnline(id, username = null) {
@@ -293,11 +295,12 @@ async function loadView(name) {
   if ($(viewId(name))) return;
   if (viewLoads.has(name)) return viewLoads.get(name);
   const pending = (async () => {
-    const { default: html } = await pageLoaders[name]();
+    const [{ default: html }, socialModule] = await Promise.all([pageLoaders[name](), name === 'social' ? import('./pages/social.js') : Promise.resolve(null)]);
     if (!dashboardPreloadEnabled || $('dashboard-screen').hidden || $(viewId(name))) return;
     $('page-content').insertAdjacentHTML('beforeend', html);
     if (name === 'home') void import('./pages/home-particles.js').then(({createHomeParticles}) => { const home=$('dashboard-home'); if(home&&!home.dataset.particlesReady) { home.dataset.particlesReady='true'; createHomeParticles(home); } }).catch(()=>{});
     if (name === 'rating') { ratingView = createRatingView($('page-rating'), supabase, { showSelf:true, onOpenProfile:openOtherProfile }); ratingView.setUnit(rankUnit); ratingView.setOnlineNames(onlineNames); }
+    if (name === 'social') socialView=socialModule.createSocialView($('page-social'),supabase,{onOpenProfile:openOtherProfile});
     if (name === 'settings') { applyPalette(selectedPalette); applyRankUnit(rankUnit); window.dispatchEvent(new Event('shahmat-piece-set')); }
     if (name === 'profile') {
       updateProfileAppearance();
@@ -360,7 +363,7 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
   $('page-load-error')?.remove();
   if (!targetAlreadyVisible) {
     document.querySelectorAll('#dashboard-screen [data-view]').forEach(view => { view.hidden = true; });
-    hideProfileData(); ratingView?.hide();
+    hideProfileData(); ratingView?.hide(); socialView?.hide();
     for (const [id,type] of [['member-game-frame','game'],['bot-game-frame','bot'],['watch-frame','watch'],['archive-frame','archive']])
       $(id)?.contentWindow?.postMessage({type:`shahmat-${type}-hidden`},window.location.origin);
     if (!$('page-loading')) $('page-content').insertAdjacentHTML('beforeend', '<section class="empty-page page-loading" id="page-loading" role="status" aria-live="polite" aria-label="Загрузка"><span class="particle-loading" data-loading="page" hidden aria-hidden="true"><canvas></canvas></span></section>');
@@ -369,7 +372,7 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
     if (link.dataset.page === name) link.setAttribute('aria-current','page'); else link.removeAttribute('aria-current');
   });
   closeAccountMenu();
-  document.title = ({ home: 'Главная', game: 'Играть', bot: 'Бот', rating: 'Рейтинг', watch: 'Наблюдать', archive: 'Архив', puzzles: 'Пазлы', profile: 'Профиль', settings: 'Настройки', help: 'Помощь' })[name] + ' — shahmat.xyz';
+  document.title = ({ home: 'Главная', game: 'Играть', bot: 'Бот', rating: 'Рейтинг', watch: 'Наблюдать', archive: 'Архив', puzzles: 'Пазлы', social: 'Сообщество', profile: 'Профиль', settings: 'Настройки', help: 'Помощь' })[name] + ' — shahmat.xyz';
   try {
     await loadView(name);
     if (name === 'game' && frameReady) await frameReady;
@@ -406,6 +409,7 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
     if (name === 'profile' && profileWasHidden) { delete $('page-profile').dataset.profileOther; const requested=new URLSearchParams(window.location.search).get('player'); if(requested) {history.replaceState(null,'',window.location.pathname); showProfileData(()=>profileView?.showOther(requested));} else { updateProfileAppearance(); showProfileData(()=>profileView?.show(profile, appearanceUserId)); } }
     else if (name !== 'profile') hideProfileData();
     if (name === 'rating') ratingView?.show(); else ratingView?.hide();
+    if (name === 'social') socialView?.show(); else socialView?.hide();
     if (name !== 'settings') { clearTimeout(rankInfoTimer); rankInfoPinned = false; showRankInfo(false); }
     document.querySelectorAll('#dashboard-screen [data-page]').forEach(link => {
       if (link.dataset.page === name) link.setAttribute('aria-current', 'page');
@@ -417,7 +421,7 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
       const heading = $('page-' + name + '-title');
       if (heading) { heading.setAttribute('tabindex', '-1'); heading.focus({ preventScroll: true }); }
     }
-    document.title = ({ home: 'Главная', game: 'Играть', bot: 'Бот', rating: 'Рейтинг', watch: 'Наблюдать', archive: 'Архив', puzzles: 'Пазлы', profile: 'Профиль', settings: 'Настройки', help: 'Помощь' })[name] + ' — shahmat.xyz';
+    document.title = ({ home: 'Главная', game: 'Играть', bot: 'Бот', rating: 'Рейтинг', watch: 'Наблюдать', archive: 'Архив', puzzles: 'Пазлы', social: 'Сообщество', profile: 'Профиль', settings: 'Настройки', help: 'Помощь' })[name] + ' — shahmat.xyz';
   } catch {
     if (request !== pageRequest) return;
     document.querySelectorAll('#dashboard-screen [data-view]').forEach(view => { view.hidden = true; });
@@ -910,6 +914,7 @@ document.querySelectorAll('.signout').forEach(button => button.addEventListener(
     // Discard account-specific views on logout.
     $('page-game')?.remove(); frameReady = null; $('page-bot')?.remove(); botFrameReady = null; $('page-watch')?.remove(); watchFrameReady = null; $('page-archive')?.remove(); archiveFrameReady = null; $('page-puzzles')?.remove(); puzzlesFrameReady = null;
     ratingView?.destroy(); $('page-rating')?.remove(); ratingView = null;
+    socialView?.destroy(); $('page-social')?.remove(); socialView = null;
     profileView?.destroy(); $('page-profile')?.remove(); profileView = null;
     profile = null; applyPalette('monochrome'); applyTheme(null); applyRankUnit('yar'); $('auth-form').reset(); setMode('login');
     window.history.replaceState(null, '', '/');
