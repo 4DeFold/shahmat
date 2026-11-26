@@ -81,6 +81,8 @@ try {
    assert.ok(backToCard.ghost&&backToCard.aria==='true');assert.match(backToCard.frames.at(-1).transform,/translate/);assert.ok(backToCard.target.length>=3);
   }else assert.equal(await page.locator('.lobby-board-ghost').count(),0);
   await page.setViewportSize({width:390,height:844});
+  // Let the incoming scaled back-button animation settle before measuring its hit area.
+  await page.waitForFunction(()=>document.querySelector('#lobby-back')?.getBoundingClientRect().height>=44);
   const backSize=await page.locator('#lobby-back').boundingBox();assert.ok(backSize.height>=44,JSON.stringify(backSize));
   await page.close();
  }
