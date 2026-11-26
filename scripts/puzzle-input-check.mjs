@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';import {chromium,firefox,webkit} from 'playwright';
+const browser=await ({chromium,firefox,webkit})[process.env.BROWSER||'chromium'].launch({headless:true,...(process.env.CHROMIUM_PATH&&(!process.env.BROWSER||process.env.BROWSER==='chromium')?{executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox']}: {})});
+const base=process.env.RESPONSIVE_BASE_URL||'http://127.0.0.1:4271';
+try {
+ const page=await browser.newPage({viewport:{width:1440,height:900}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.addInitScript(()=>{localStorage.setItem('shahmat.puzzles.guest',JSON.stringify({version:1,rating:1500,history:[],current:{id:'0qkVG',theme:'mix',cursor:1,failed:false}}));window.boardClicks=[];document.addEventListener('click',e=>{const cell=e.target.closest?.('#board .square');if(cell)window.boardClicks.push(cell.dataset.square)},true)});
+ const pgn='e4 c5 c3 g6 d4 cxd4 cxd4 Bg7 Nf3 d6 Be2 Nd7 O-O Ngf6 Nc3 e6 Bg5 h6 Bh4 g5 Bg3 Qe7 Qb3 Nh5 e5 Nxg3 fxg3 dxe5 Nxe5 Nxe5 dxe5 Bxe5';
+ await page.route('https://lichess.org/api/puzzle/**',route=>route.fulfill({json:{game:{pgn},puzzle:{id:'0qkVG',initialPly:31}},headers:{'access-control-allow-origin':'*'}}));
+ await page.goto(base+'/pages/puzzles.html');await page.locator('#puzzle-move-list .puzzle-move').nth(31).waitFor();
+ const square=name=>page.locator(`#board [data-square=${name}]`);
+ await square('b3').click();await square('a4').click();await page.locator('#puzzle-status').getByText('Ошибка').waitFor();await page.waitForTimeout(1200);
+ await square('b3').click();await square('b5').click();await page.waitForFunction(()=>JSON.parse(localStorage.getItem('shahmat.puzzles.guest')).current.cursor>=3,null,{timeout:5000}).catch(async e=>{console.error('Clicks:',await page.evaluate(()=>window.boardClicks),'Selected:',await page.locator('#board .selected').evaluateAll(els=>els.map(el=>el.dataset.square)),'Status:',await page.locator('#puzzle-status').textContent());throw e});
+ await page.waitForTimeout(700);await square('b5').click();await square('e5').click();await page.locator('#puzzle-next:not([hidden])').waitFor({timeout:5000});assert.deepEqual(errors,[]);await page.close();console.log('✓ retrying with the same piece after a wrong move and loaded game history');
+}finally{await browser.close()}
