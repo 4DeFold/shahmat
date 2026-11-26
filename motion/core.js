@@ -214,7 +214,7 @@ function textChanged(el) {
   if (el.id === 'puzzle-status' && /^ошибка/i.test(text)) restart(el.closest('.puzzle-status-card') || el, 'm-shake');
 }
 // React Bits Count Up for statistics.
-const COUNT = '.archive-stats-grid dd, #puzzle-rating';
+const COUNT = '.archive-stats-grid dd';
 const counting = new WeakMap();
 function countChanged(el) {
   const text = el.textContent, state = counting.get(el) || {};

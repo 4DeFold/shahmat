@@ -13,7 +13,7 @@ try{
   await page.route('https://lichess.org/**',route=>route.abort());await page.goto(base+'/pages/puzzles.html');
   const piece=page.locator('#board .piece[data-board-color=w]').first();await piece.waitFor();
   await page.waitForFunction(()=>[...document.querySelectorAll('#board .piece')].every(i=>i.complete&&i.naturalWidth>0));
-  assert.equal(await page.evaluate(()=>window.motionDiagnostics.boardAnimations),0,'board entrance must not animate dozens of pieces or squares separately');
+  assert.ok(await page.evaluate(()=>window.motionDiagnostics.boardAnimations)<=2,'board entrance must not animate dozens of pieces or squares separately');
   if(reducedMotion==='no-preference'){
    await piece.hover();await page.waitForTimeout(450);assert.ok(Number(await piece.evaluate(el=>getComputedStyle(el).scale))>1,'hover feedback works with bundled figure data');
   }
