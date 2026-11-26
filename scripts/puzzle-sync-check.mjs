@@ -33,7 +33,7 @@ try{
  await a.page.locator(`[data-square=${wrong.from}]`).click();await a.page.locator(`[data-square=${wrong.to}]`).click();await a.page.locator('#puzzle-status').getByText('Ошибка').waitFor();
  await b.page.waitForFunction(()=>document.querySelector('#puzzle-status').textContent==='Ошибка',{timeout:6000});assert.equal(await b.page.locator('#puzzle-rating').textContent(),String(remote.progress.rating));
  await a.page.waitForTimeout(1200);const frames=await a.page.evaluate(()=>window.ratingFrames);assert.ok(new Set(frames).size>2,JSON.stringify(frames));assert.equal(frames.at(-1),remote.progress.rating);
- const rows=await a.page.locator('.puzzle-move-row').count();assert.ok(rows>=1);assert.ok(await a.page.locator('.puzzle-move-number').first().textContent());
+ const rows=await a.page.locator('.history-row').count();assert.ok(rows>=1);assert.ok(await a.page.locator('.move-number').first().textContent());
  offline=true;await a.page.locator('[data-view=themes]').click();await a.page.locator('.puzzle-theme-card').nth(1).click();const offlineId=await a.page.locator('#board').getAttribute('data-puzzle-id');await a.page.locator('#puzzle-sync-status').getByText(/Не удалось/).waitFor();offline=false;
  await b.page.waitForFunction(id=>document.querySelector('#board').dataset.puzzleId===id,offlineId,{timeout:8000});assert.equal(remote.progress.current.id,offlineId);
  assert.deepEqual(a.errors,[]);assert.deepEqual(b.errors,[]);await a.context.close();await b.context.close();console.log('✓ two devices: current puzzle, results, offline recovery, animation, revision polling and reduced motion');

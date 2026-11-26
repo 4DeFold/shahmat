@@ -119,3 +119,9 @@ test('online dots follow presence changes and survive leaderboard rendering', as
   view.setOnlineNames(null); assert.equal(root.querySelector('.rating-online'),null);
   view.destroy(); dom.window.close();
 });
+
+test('puzzle category uses separate leaderboard and personal position endpoints',async()=>{
+ const dom=new JSDOM(html),root=dom.window.document.querySelector('section'),calls=[];
+ const client={rpc:async (fn,args)=>{calls.push([fn,args]);if(fn==='puzzle_leaderboard')return {data:[{username:'Puzzle',yar:1735,elo:1735,ranked:true}]};if(fn==='puzzle_my_position')return {data:[{username:'Puzzle',yar:1735,elo:1735,ranked:true,place:1}]};return {data:[]}}};
+ const view=createRatingView(root,client,{showSelf:true});await view.refresh();root.querySelector('[data-rating-mode=puzzle]').click();await tick();assert.equal(root.querySelector('.rating-player').textContent,'Puzzle');assert.equal(root.querySelector('.rating-self-place').textContent,'1');assert.equal(root.querySelector('.rating-score').textContent.replace(/\s/g,''),'1735');assert.ok(calls.some(([fn])=>fn==='puzzle_leaderboard'));assert.ok(calls.some(([fn])=>fn==='puzzle_my_position'));view.destroy();dom.window.close();
+});

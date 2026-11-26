@@ -1,0 +1,6 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';import {JSDOM} from 'jsdom';import {createProfileView} from '../pages/profile-view.js';
+test('profile loads puzzle score separately and does not change the overall score',async()=>{
+ const dom=new JSDOM(readFileSync('pages/profile.html','utf8'),{url:'https://example.test'});const root=dom.window.document.querySelector('#page-profile');dom.window.matchMedia=()=>({matches:true});let resolvePuzzle;
+ const client={rpc:(name)=>name==='profile_public'?Promise.resolve({data:{username:'Bob',ratings:{overall:1100},games:{},palette:'monochrome',theme:'light'}}):name==='profile_puzzle_rating'?new Promise(r=>resolvePuzzle=r):Promise.resolve({data:null})};
+ const view=createProfileView(root,client);await view.showOther('Bob');let rows=[...root.querySelectorAll('#profile-yar-details .profile-detail-row')],row=rows.find(row=>row.firstChild.textContent==='Пазл');assert.equal(row.querySelector('strong').textContent,'—');resolvePuzzle({data:1678});await new Promise(r=>setTimeout(r,0));assert.equal(row.querySelector('strong').textContent.replace(/\s/g,''),'1678');assert.equal(root.querySelector('#profile-yar').textContent.replace(/\s/g,''),'1100');view.destroy();dom.window.close();
+});
