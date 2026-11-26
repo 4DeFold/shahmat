@@ -4,7 +4,7 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { SplitText } from 'gsap/SplitText';
 import { ScrambleTextPlugin } from 'gsap/ScrambleTextPlugin';
 import { createDither } from './dither.js';
-import { buildOdometer, buildChart, createBoard, createFlicker, buildPieces, createPalettes, createPixelator } from './widgets.js';
+import { buildOdometer, createCountUp, buildChart, createBoard, createFlicker, buildPieces, createPalettes, createPixelator } from './widgets.js';
 
 gsap.registerPlugin(ScrollTrigger, SplitText, ScrambleTextPlugin);
 const $ = (s, r = document) => r.querySelector(s);
@@ -115,7 +115,17 @@ function headings() {
 }
 
 function numbers() {
-  for (const el of $$('[data-count]')) {
+  // "Цифры": React Bits CountUp; every number is sized to fit its own cell
+  const stats = $$('.stat__num[data-count]').map((el, i) => ({ el, c: createCountUp(el, { duration: 2, delay: i * .12 }) }));
+  const fit = () => stats.forEach(({ el, c }) => {
+    el.style.fontSize = ''; el.textContent = c.finalText;
+    const avail = el.parentElement.clientWidth * 0.9, w = el.getBoundingClientRect().width;
+    if (w > avail) el.style.fontSize = parseFloat(getComputedStyle(el).fontSize) * avail / w + 'px';
+    if (!el.dataset.done && !reduced) c.set(0);
+  });
+  fit(); addEventListener('resize', () => { fit(); stats.forEach(({ el, c }) => { if (el.dataset.done) c.set(Number(el.dataset.count)); }); });
+  if (!reduced) ScrollTrigger.create({ trigger: '[data-grid]', start: 'top 85%', once: true, onEnter: () => stats.forEach(({ el, c }) => { el.dataset.done = '1'; c.play(); }) });
+  for (const el of $$('.big[data-count]')) {
     const cols = buildOdometer(el);
     if (reduced) { cols.forEach(({ col, digit }) => gsap.set(col, { yPercent: -(10 + digit) * 5 })); continue; }
     gsap.set(cols.map(c => c.col), { yPercent: 0 });

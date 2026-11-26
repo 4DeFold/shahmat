@@ -134,7 +134,8 @@ section { position: relative; }
 .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); position: relative; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--ink); }
 .stat { position: relative; padding: 28px 24px 30px; border-left: 1px solid var(--hair); overflow: hidden; }
 .stat:first-child { border-left: 0; padding-left: 0; }
-.stat__num { font-family: var(--ui); font-weight: 300; font-size: clamp(56px, 7.4vw, 120px); line-height: 1; letter-spacing: -.05em; font-variant-numeric: tabular-nums; display: flex; height: 1em; overflow: hidden; }
+.stat__num { font-family: var(--ui); font-weight: 300; font-size: clamp(56px, 7.4vw, 120px); line-height: 1; letter-spacing: -.05em; font-variant-numeric: tabular-nums; white-space: nowrap; display: inline-block; }
+.stat__box { height: clamp(56px, 7.4vw, 120px); display: flex; align-items: flex-end; }
 .stat p { font-family: var(--ui); font-size: 13px; font-weight: 500; color: var(--mute); margin-top: 18px; letter-spacing: .02em; }
 .odo { display: inline-block; height: 1em; overflow: hidden; position: relative; }
 .odo__col { display: flex; flex-direction: column; will-change: transform; }

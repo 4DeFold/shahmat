@@ -17,6 +17,41 @@ export function buildOdometer(el) {
   return cols;
 }
 
+/* ---------- count up (React Bits <CountUp />, default "count" mode) ----------
+   from → to over `duration` with easeOut = cubic-bezier(.33, 1, .68, 1), the
+   text re-rendered every frame, thousands grouped with a separator. */
+function cubicBezier(x1, y1, x2, y2) {
+  const cx = 3 * x1, bx = 3 * (x2 - x1) - cx, ax = 1 - cx - bx;
+  const cy = 3 * y1, by = 3 * (y2 - y1) - cy, ay = 1 - cy - by;
+  const sx = t => ((ax * t + bx) * t + cx) * t, sy = t => ((ay * t + by) * t + cy) * t;
+  const dx = t => (3 * ax * t + 2 * bx) * t + cx;
+  return x => { let t = x; for (let i = 0; i < 8; i++) { const e = sx(t) - x; const d = dx(t); if (Math.abs(e) < 1e-6 || !d) break; t -= e / d; } return sy(Math.min(1, Math.max(0, t))); };
+}
+const easeOut = cubicBezier(0.33, 1, 0.68, 1);
+export function createCountUp(el, { from = 0, duration = 2, delay = 0, separator = ' ' } = {}) {
+  const to = Number(el.dataset.count);
+  const format = v => String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, separator);
+  const finalText = format(to);
+  el.setAttribute('aria-label', finalText);
+  el.style.fontVariantNumeric = 'tabular-nums';
+  let raf = 0;
+  return {
+    finalText,
+    set(v) { el.textContent = format(v); },
+    play() {
+      cancelAnimationFrame(raf);
+      const t0 = performance.now() + delay * 1000;
+      const step = now => {
+        const p = Math.min(1, Math.max(0, (now - t0) / (duration * 1000)));
+        el.textContent = format(from + (to - from) * easeOut(p));
+        if (p < 1) raf = requestAnimationFrame(step);
+      };
+      el.textContent = format(from);
+      raf = requestAnimationFrame(step);
+    },
+  };
+}
+
 /* ---------- commit chart ---------- */
 export const COMMITS = [['13.11', 23], ['14.11', 11], ['15.11', 8], ['16.11', 30], ['17.11', 23], ['18.11', 12], ['19.11', 15], ['20.11', 14], ['21.11', 24], ['22.11', 3], ['23.11', 15], ['24.11', 7], ['25.11', 3], ['26.11', 14]];
 const plural = (n, a, b, c) => { const m10 = n % 10, m100 = n % 100; return m10 === 1 && m100 !== 11 ? a : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? b : c; };

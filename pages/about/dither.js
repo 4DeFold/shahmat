@@ -31,7 +31,7 @@ void main(){
   float v = .5 + .9*n;
   // waves gather towards the lower right, leaving the copy area clean
   float wide = smoothstep(.42, 1.05, uv.x + (1.-uv.y)*.25);
-  float narrow = smoothstep(.5, 1., uv.y);
+  float narrow = smoothstep(.5, .78, uv.y) * (1. - smoothstep(.86, .93, uv.y));
   float mask = mix(wide, narrow, uNarrow);
   v = v * mask * uIntro * uFade;
   v -= .3;
