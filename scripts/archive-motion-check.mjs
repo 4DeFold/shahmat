@@ -34,16 +34,23 @@ try {
   await page.locator('#nav-archive').evaluate(el=>el.click());assert.equal(await frame.locator('#archive-detail').isVisible(),true,'active tab must not reset');
   await frame.locator('#history-first').click();
   assert.equal(await frame.locator('.move-number').first().textContent(),'1');
-  await frame.locator('#history-next').click();await frame.locator('#history-next').click();await frame.locator('#history-next').click();
+  // Inspect each animation in the same browser task as navigation. Under a busy CI
+  // runner a separate protocol round trip can arrive after the short flight ends.
+  const flights=await frame.locator('#history-next').evaluate(next=>{
+   const prev=document.querySelector('#history-prev');
+   const snapshot=()=>({count:document.querySelectorAll('.capture-flight').length,captured:document.querySelector('#archive-opponent-captured img')?.style.opacity,restored:document.querySelector('[data-square=d5] .piece')?.style.opacity});
+   next.click();next.click();next.click();const capture=snapshot();
+   prev.click();const rewind=snapshot();next.click();const forward=snapshot();prev.click();const rapidRewind=snapshot();
+   return {capture,rewind,forward,rapidRewind};
+  });
   if(motion==='no-preference') {
-   assert.equal(await frame.locator('.capture-flight').count(),1,'captured piece flies into strip');
-   assert.equal(await frame.locator('#archive-opponent-captured img').first().evaluate(el=>el.style.opacity),'0');
-   await frame.locator('#history-prev').click();
-   assert.equal(await frame.locator('.capture-flight').count(),1,'rewind launches reverse flight');
-   assert.equal(await frame.locator('[data-square=d5] .piece').evaluate(el=>el.style.opacity),'0','restored piece is hidden during reverse flight');
-   await frame.locator('#history-next').click();assert.equal(await frame.locator('.capture-flight').count(),1,'rapid forward cancels reverse flight');
-   await frame.locator('#history-prev').click();assert.equal(await frame.locator('.capture-flight').count(),1,'rapid rewind launches new reverse flight');
-  } else assert.equal(await frame.locator('.capture-flight').count(),0);
+   assert.equal(flights.capture.count,1,'captured piece flies into strip');
+   assert.equal(flights.capture.captured,'0');
+   assert.equal(flights.rewind.count,1,'rewind launches reverse flight');
+   assert.equal(flights.rewind.restored,'0','restored piece is hidden during reverse flight');
+   assert.equal(flights.forward.count,1,'rapid forward cancels reverse flight');
+   assert.equal(flights.rapidRewind.count,1,'rapid rewind launches new reverse flight');
+  } else assert.equal(flights.capture.count,0);
   await page.locator('#nav-archive').focus();
   for(const key of ['w','s','w','s','w','s']) await page.keyboard.press(key);
   await frame.locator('#history-last:disabled').waitFor();
