@@ -3,6 +3,7 @@ installLoadingIndicators(document);
 import {installPieceTheme,setPieceSet,selectedPieceSet,validPieceSet,renderLargePiecePreview} from './pages/piece-theme.js';
 installPieceTheme();
 import './pages/profile-card.css';
+import './pages/social.css';
 import { createRatingView } from './pages/rating.js';
 import { startOnlinePresence, guestPresenceId } from './pages/online-presence.js';
 import { startMatchHeartbeat } from './pages/match-heartbeat.js';
@@ -195,7 +196,7 @@ let navigating = false;
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const accountMenu = $('account-menu');
 const accountToggle = $('account-toggle');
-const pages = new Set(['home', 'game', 'bot', 'rating', 'watch', 'archive', 'puzzles', 'profile', 'settings', 'help']);
+const pages = new Set(['home', 'game', 'bot', 'rating', 'watch', 'archive', 'puzzles', 'friends', 'clans', 'profile', 'settings', 'help']);
 const sidebar = $('app-sidebar');
 const mobileMenuToggle = $('mobile-menu-toggle');
 let sidebarOpen = false;
@@ -268,14 +269,16 @@ const pageLoaders = {
   watch: () => import('./pages/watch-view.html?raw'),
   archive: () => import('./pages/archive-view.html?raw'),
   puzzles: () => import('./pages/puzzles-view.html?raw'),
+  social: () => import('./pages/social.html?raw'),
   profile: () => import('./pages/profile.html?raw'),
   settings: () => import('./pages/settings.html?raw'),
   help: () => import('./pages/help.html?raw'),
 };
 let pageRequest = 0;
-const viewId = name => name === 'home' ? 'dashboard-home' : `page-${name}`;
+const isSocialPage = name => name === 'friends' || name === 'clans';
+const viewId = name => name === 'home' ? 'dashboard-home' : isSocialPage(name) ? 'page-social' : `page-${name}`;
 const viewLoads = new Map();
-let frameReady = null, botFrameReady = null, watchFrameReady = null, archiveFrameReady = null, puzzlesFrameReady = null, ratingView = null, profileView = null, profileReturnPage = 'rating';
+let frameReady = null, botFrameReady = null, watchFrameReady = null, archiveFrameReady = null, puzzlesFrameReady = null, ratingView = null, socialView = null, profileView = null, profileReturnPage = 'rating';
 let onlineStop = null, heartbeatStop = null, onlineUser = null, onlineCount = null, onlineNames = null, onlineEpoch = 0, onlineUsername = null;
 function sendOnline() { $('member-game-frame')?.contentWindow?.postMessage({ type: 'shahmat-online', count: onlineCount }, window.location.origin); }
 async function startOnline(id, username = null) {
@@ -291,13 +294,15 @@ startOnline(guestPresenceId(window));
 let dashboardPreloadEnabled = false;
 async function loadView(name) {
   if ($(viewId(name))) return;
-  if (viewLoads.has(name)) return viewLoads.get(name);
+  const key = isSocialPage(name) ? 'social' : name;
+  if (viewLoads.has(key)) return viewLoads.get(key);
   const pending = (async () => {
-    const { default: html } = await pageLoaders[name]();
+    const [{ default: html }, socialModule] = await Promise.all([pageLoaders[key](), key === 'social' ? import('./pages/social.js') : Promise.resolve(null)]);
     if (!dashboardPreloadEnabled || $('dashboard-screen').hidden || $(viewId(name))) return;
     $('page-content').insertAdjacentHTML('beforeend', html);
     if (name === 'home') void import('./pages/home-particles.js').then(({createHomeParticles}) => { const home=$('dashboard-home'); if(home&&!home.dataset.particlesReady) { home.dataset.particlesReady='true'; createHomeParticles(home); } }).catch(()=>{});
     if (name === 'rating') { ratingView = createRatingView($('page-rating'), supabase, { showSelf:true, onOpenProfile:openOtherProfile }); ratingView.setUnit(rankUnit); ratingView.setOnlineNames(onlineNames); }
+    if (key === 'social') socialView=socialModule.createSocialView($('page-social'),supabase,{onOpenProfile:openOtherProfile});
     if (name === 'settings') { applyPalette(selectedPalette); applyRankUnit(rankUnit); window.dispatchEvent(new Event('shahmat-piece-set')); }
     if (name === 'profile') {
       updateProfileAppearance();
@@ -318,8 +323,8 @@ async function loadView(name) {
       if (name === 'game') frameReady = ready; else if(name === 'bot') botFrameReady = ready; else if(name === 'watch') watchFrameReady = ready; else if(name === 'archive') archiveFrameReady = ready; else puzzlesFrameReady = ready;
     }
   })();
-  viewLoads.set(name, pending);
-  try { await pending; } finally { viewLoads.delete(name); }
+  viewLoads.set(key, pending);
+  try { await pending; } finally { viewLoads.delete(key); }
 }
 let profileLoadSequence=0;
 function showProfileData(run) {
@@ -348,7 +353,7 @@ function preloadDashboard() {
 }
 function currentPage() {
   const name = window.location.pathname.replace(/^\/+|\/+$/g, '');
-  return pages.has(name) ? name : 'home';
+  return name === 'social' ? 'clans' : pages.has(name) ? name : 'home';
 }
 async function showPage(name, { updateHistory = false, focus = false } = {}) {
   if (!pages.has(name)) name = 'home';
@@ -356,11 +361,12 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
   if (updateHistory && currentPage() !== name) window.history.pushState(null, '', `/${name}`);
   // Switch the shell immediately, even if the view chunk or iframe is still loading.
   // Each request owns its placeholder; stale completions cannot replace a newer tab.
-  const targetAlreadyVisible = $(viewId(name)) && !$(viewId(name)).hidden;
+  const target = $(viewId(name));
+  const targetAlreadyVisible = target && !target.hidden && (!isSocialPage(name) || target.dataset.view === name);
   $('page-load-error')?.remove();
   if (!targetAlreadyVisible) {
     document.querySelectorAll('#dashboard-screen [data-view]').forEach(view => { view.hidden = true; });
-    hideProfileData(); ratingView?.hide();
+    hideProfileData(); ratingView?.hide(); socialView?.hide();
     for (const [id,type] of [['member-game-frame','game'],['bot-game-frame','bot'],['watch-frame','watch'],['archive-frame','archive']])
       $(id)?.contentWindow?.postMessage({type:`shahmat-${type}-hidden`},window.location.origin);
     if (!$('page-loading')) $('page-content').insertAdjacentHTML('beforeend', '<section class="empty-page page-loading" id="page-loading" role="status" aria-live="polite" aria-label="Загрузка"><span class="particle-loading" data-loading="page" hidden aria-hidden="true"><canvas></canvas></span></section>');
@@ -369,7 +375,7 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
     if (link.dataset.page === name) link.setAttribute('aria-current','page'); else link.removeAttribute('aria-current');
   });
   closeAccountMenu();
-  document.title = ({ home: 'Главная', game: 'Играть', bot: 'Бот', rating: 'Рейтинг', watch: 'Наблюдать', archive: 'Архив', puzzles: 'Пазлы', profile: 'Профиль', settings: 'Настройки', help: 'Помощь' })[name] + ' — shahmat.xyz';
+  document.title = ({ home: 'Главная', game: 'Играть', bot: 'Бот', rating: 'Рейтинг', watch: 'Наблюдать', archive: 'Архив', puzzles: 'Пазлы', friends: 'Друзья', clans: 'Кланы', profile: 'Профиль', settings: 'Настройки', help: 'Помощь' })[name] + ' — shahmat.xyz';
   try {
     await loadView(name);
     if (name === 'game' && frameReady) await frameReady;
@@ -385,6 +391,7 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
     $('watch-frame')?.contentWindow?.postMessage({type:name === 'watch'?'shahmat-watch-shown':'shahmat-watch-hidden'},window.location.origin);
     $('archive-frame')?.contentWindow?.postMessage({type:name === 'archive'?'shahmat-archive-shown':'shahmat-archive-hidden'},window.location.origin);
     $('puzzles-frame')?.contentWindow?.postMessage({type:name === 'puzzles'?'shahmat-puzzles-shown':'shahmat-puzzles-hidden'},window.location.origin);
+    if (isSocialPage(name)) $('page-social').dataset.view = name;
     const profileWasHidden = $('page-profile')?.hidden;
     document.querySelectorAll('#dashboard-screen [data-view]').forEach(view => {
       const active = view.dataset.view === name;
@@ -406,6 +413,7 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
     if (name === 'profile' && profileWasHidden) { delete $('page-profile').dataset.profileOther; const requested=new URLSearchParams(window.location.search).get('player'); if(requested) {history.replaceState(null,'',window.location.pathname); showProfileData(()=>profileView?.showOther(requested));} else { updateProfileAppearance(); showProfileData(()=>profileView?.show(profile, appearanceUserId)); } }
     else if (name !== 'profile') hideProfileData();
     if (name === 'rating') ratingView?.show(); else ratingView?.hide();
+    if (isSocialPage(name)) socialView?.show(name); else socialView?.hide();
     if (name !== 'settings') { clearTimeout(rankInfoTimer); rankInfoPinned = false; showRankInfo(false); }
     document.querySelectorAll('#dashboard-screen [data-page]').forEach(link => {
       if (link.dataset.page === name) link.setAttribute('aria-current', 'page');
@@ -414,10 +422,10 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
     closeAccountMenu();
     if (focus) {
       window.scrollTo(0, 0);
-      const heading = $('page-' + name + '-title');
+      const heading = $(isSocialPage(name) ? 'page-social-title' : 'page-' + name + '-title');
       if (heading) { heading.setAttribute('tabindex', '-1'); heading.focus({ preventScroll: true }); }
     }
-    document.title = ({ home: 'Главная', game: 'Играть', bot: 'Бот', rating: 'Рейтинг', watch: 'Наблюдать', archive: 'Архив', puzzles: 'Пазлы', profile: 'Профиль', settings: 'Настройки', help: 'Помощь' })[name] + ' — shahmat.xyz';
+    document.title = ({ home: 'Главная', game: 'Играть', bot: 'Бот', rating: 'Рейтинг', watch: 'Наблюдать', archive: 'Архив', puzzles: 'Пазлы', friends: 'Друзья', clans: 'Кланы', profile: 'Профиль', settings: 'Настройки', help: 'Помощь' })[name] + ' — shahmat.xyz';
   } catch {
     if (request !== pageRequest) return;
     document.querySelectorAll('#dashboard-screen [data-view]').forEach(view => { view.hidden = true; });
@@ -910,6 +918,7 @@ document.querySelectorAll('.signout').forEach(button => button.addEventListener(
     // Discard account-specific views on logout.
     $('page-game')?.remove(); frameReady = null; $('page-bot')?.remove(); botFrameReady = null; $('page-watch')?.remove(); watchFrameReady = null; $('page-archive')?.remove(); archiveFrameReady = null; $('page-puzzles')?.remove(); puzzlesFrameReady = null;
     ratingView?.destroy(); $('page-rating')?.remove(); ratingView = null;
+    socialView?.destroy(); $('page-social')?.remove(); socialView = null;
     profileView?.destroy(); $('page-profile')?.remove(); profileView = null;
     profile = null; applyPalette('monochrome'); applyTheme(null); applyRankUnit('yar'); $('auth-form').reset(); setMode('login');
     window.history.replaceState(null, '', '/');
@@ -920,6 +929,8 @@ document.querySelectorAll('.signout').forEach(button => button.addEventListener(
 
 // Keep the page covered until both the session and, when needed, the profile are known.
 async function initialize() {
+  // Preserve links to the former combined page.
+  if (window.location.pathname === '/social') history.replaceState(null, '', '/clans' + window.location.search + window.location.hash);
   // Registration is a real deep link; recovery callbacks still take precedence.
   if (window.location.pathname === '/login' && new URLSearchParams(window.location.search).get('mode') === 'signup') setMode('signup');
   // Preserve old bookmarked hash routes, but never touch Supabase callback fragments.

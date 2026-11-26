@@ -7,11 +7,22 @@ export function parsePuzzles(data){
 export function choosePuzzle(puzzles,theme,progress,random=Math.random){
  const pool=puzzles.filter(p=>theme==='mix'||p.themes.includes(theme));if(!pool.length)return null;
  const played=new Set(progress.history.map(x=>x.id)),unseen=pool.filter(p=>!played.has(p.id)),candidates=unseen.length?unseen:pool;
- const rating=Number.isFinite(progress.rating)?progress.rating:1500;
+ const rating=Number.isFinite(progress.rating)?progress.rating:1000;
  const ordered=[...candidates].sort((a,b)=>Math.abs(a.rating-rating)-Math.abs(b.rating-rating));const near=ordered.slice(0,Math.min(30,ordered.length));return near[Math.min(near.length-1,Math.floor(random()*near.length))];
 }
-export function blankProgress(){return {version:1,rating:1500,history:[]};}
-export function loadProgress(storage,key){try{const p=JSON.parse(storage.getItem(key));if(p?.version===1&&Number.isFinite(p.rating)&&Array.isArray(p.history))return {version:1,rating:p.rating,history:p.history.filter(x=>x&&typeof x.id==='string'&&typeof x.success==='boolean'&&Number.isFinite(x.at)&&Array.isArray(x.themes)),current:p.current&&typeof p.current.id==='string'&&typeof p.current.theme==='string'&&Number.isInteger(p.current.cursor)&&typeof p.current.failed==='boolean'?p.current:null};}catch{}return blankProgress();}
+export function blankProgress(){return {version:1,ratingBase:1000,rating:1000,history:[]};}
+// Old snapshots (including offline journals) retain their attempts and active
+// puzzle, but their rating must be replayed against the new starting value.
+export function normalizeProgress(p){
+ if(!p || p.version!==1 || !Number.isFinite(p.rating) || !Array.isArray(p.history))return null;
+ const history=p.history.filter(x=>x&&typeof x.id==='string'&&typeof x.success==='boolean'&&Number.isFinite(x.at)&&Array.isArray(x.themes));
+ const current=p.current&&typeof p.current.id==='string'&&typeof p.current.theme==='string'&&Number.isInteger(p.current.cursor)&&typeof p.current.failed==='boolean'?p.current:null;
+ if(p.ratingBase===1000)return {...p,history,current};
+ const result=blankProgress();
+ for(const row of [...history].sort((a,b)=>a.at-b.at || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))){const entry=recordResult(result,{id:row.id,rating:Number(row.rating)||1500,themes:row.themes},row.success,row.at);if(entry)Object.assign(entry,row,{delta:entry.delta});}
+ result.current=current;return result;
+}
+export function loadProgress(storage,key){try{return normalizeProgress(JSON.parse(storage.getItem(key)))||blankProgress()}catch{return blankProgress()}}
 export function recordResult(progress,puzzle,success,now=Date.now()){
  // A replay never changes rating or adds another attempt.
  if(progress.history.some(row=>row.id===puzzle.id))return null;

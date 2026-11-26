@@ -43,7 +43,7 @@ async function switchUser(id){
 }
 function saveCurrent(){if(replay||!puzzle||!attempt)return;const next={id:puzzle.id,theme,cursor:attempt.cursor,failed:attempt.failed};if(JSON.stringify(progress.current)===JSON.stringify(next))return;progress.current=next;save()}
 const nameFor=id=>THEMES.find(([k])=>k===id)?.[1]||'Микс';
-let ratingFrame=0,displayRating=1500,ratingTarget=1500;
+let ratingFrame=0,displayRating=1000,ratingTarget=1000;
 function scores(animate=false){
  const el=$('puzzle-rating'),target=progress.rating;
  if(target!==ratingTarget || (!animate && !ratingFrame)){

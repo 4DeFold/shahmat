@@ -20,7 +20,7 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
   const cache = new Map(), pending = new Map();
   const freshness = 15000;
   let mode = 'overall', sequence = 0, destroyed = false, indicatorFrame = null, onlineNames = null;
-  const scoreUnit=()=>mode==='puzzle'?'yar':unit;
+  const scoreUnit=()=>mode==='puzzle'||mode==='clans'?'yar':unit;
   const updateUnitLabel=()=>{const label=root.querySelector('.rating-unit');if(label)label.textContent=scoreUnit()==='elo'?'ЭЛО':'ЯР';};
   function updateOnlineIndicators() {
     for (const person of root.querySelectorAll('.rating-person')) {
@@ -128,6 +128,19 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
   motionPreference?.addEventListener?.('change', onMotionPreferenceChange);
 
   function render(data, animate = false) {
+    if(mode==='clans') {
+      avatarRequest++; displayed=data; list.replaceChildren();
+      for(const [i,clan] of data.entries()) {
+        const row=root.ownerDocument.createElement('li');row.className='rating-row';
+        const place=root.ownerDocument.createElement('span');place.className='rating-place';place.textContent=String(i+1);
+        const name=root.ownerDocument.createElement('span');name.className='rating-player';name.textContent=clan.name;
+        const score=root.ownerDocument.createElement('span');score.className='rating-score';score.textContent=clan.rating==null?'—':number.format(clan.rating);
+        row.append(place,name,score);list.append(row);
+      }
+      status.hidden=data.length>0;status.textContent=data.length?'':'Пока нет кланов';return;
+    }
+    // Clan rows have no profile identity and cannot be reused as player rows.
+    for(const row of [...list.children])if(!row.dataset.profileName)row.remove();
     const previous = new Map([...list.children].map(row => [row.dataset.profileName, row]));
     // Capture the current visual position, including an interrupted animation.
     const positions = new Map([...previous].map(([name,row]) => [name,row.getBoundingClientRect()]));
@@ -202,12 +215,13 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
       try {
         // Install the in-flight entry before a client can synchronously throw.
         await Promise.resolve();
-        const call = requestedMode==='puzzle' ? client.rpc('puzzle_leaderboard') : client.rpc('rank_leaderboard', { p_mode:requestedMode });
+        const call = requestedMode==='clans' ? client.rpc('social_clans_snapshot',{p_search:''}) : requestedMode==='puzzle' ? client.rpc('puzzle_leaderboard') : client.rpc('rank_leaderboard', { p_mode:requestedMode });
         const query = typeof call?.abortSignal === 'function' ? call.abortSignal(controller.signal) : call;
         const timeout = new Promise((_, reject) => {
           timer = win.setTimeout(() => { controller.abort(); reject(new Error('timeout')); }, 10000);
         });
-        const { data, error } = await Promise.race([query, timeout]);
+        const result = await Promise.race([query, timeout]);
+        const error=result.error,data=requestedMode==='clans'?result.data?.clans:result.data;
         if (error || !Array.isArray(data)) throw error || new Error('Invalid response');
         if (!destroyed) cache.set(requestedMode, { data, at:Date.now() });
         return data;
@@ -222,6 +236,7 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
 
   async function refreshSelf(requestedMode, request) {
     if (!showSelf || !self) return;
+    if(requestedMode==='clans'){self.hidden=true;return;}
     try {
       const { data, error } = await (requestedMode==='puzzle' ? client.rpc('puzzle_my_position') : client.rpc('rank_my_position', { p_mode:requestedMode }));
       if (destroyed || request !== sequence) return;
@@ -248,6 +263,7 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
   async function refresh({ force = false } = {}) {
     beginMotion();
     const request = ++sequence, requestedMode = mode;
+    const column=root.querySelector('.rating-columns span:nth-child(2)');if(column)column.textContent=mode==='clans'?'Клан':'Игрок';
     const cached = cache.get(requestedMode);
     void refreshSelf(requestedMode, request);
     retry.hidden = true;
@@ -270,7 +286,7 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
       } else {
         displayed = data; displayedMode = requestedMode;
         status.hidden = data.length > 0;
-        status.textContent = data.length ? '' : 'Пока нет игроков';
+        status.textContent = data.length ? '' : requestedMode==='clans'?'Пока нет кланов':'Пока нет игроков';
       }
     } catch {
       if (destroyed || request !== sequence) return;
