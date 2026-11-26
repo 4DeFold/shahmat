@@ -8,6 +8,10 @@
       "destination": "/index.html"
     },
     {
+      "source": "/about",
+      "destination": "/pages/about.html"
+    },
+    {
       "source": "/play",
       "destination": "/pages/play.html"
     },

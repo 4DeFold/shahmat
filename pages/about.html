@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="ru" class="is-loading">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#ffffff">
+    <title>shahmat.xyz — DeFold</title>
+    <meta name="description" content="shahmat.xyz — онлайн-шахматы для школьников Казахстана. Дизайн и разработка — DeFold.">
+    <meta property="og:title" content="shahmat.xyz — DeFold">
+    <meta property="og:image" content="/folio/home.webp">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="preload" href="/folio/defold.webp" as="image">
+    <link rel="stylesheet" href="/pages/about/about.css">
+    <script type="module" src="/pages/about/main.js"></script>
+  </head>
+  <body>
+    <div class="loader" aria-hidden="true">
+      <div class="loader__mark"><span class="blk">shah</span><span>mat</span></div>
+      <div class="loader__count"><span data-loader-count>000</span></div>
+    </div>
+
+    <div class="cursor" aria-hidden="true"><i></i><i></i><i></i><i></i><b></b></div>
+
+    <header class="nav" data-nav>
+      <a class="logo" href="/" data-cursor><span class="blk">shah</span>mat.xyz</a>
+      <nav class="nav__links" aria-label="Разделы">
+        <a href="#project" data-cursor><sup>01</sup>Проект</a>
+        <a href="#numbers" data-cursor><sup>02</sup>Цифры</a>
+        <a href="#product" data-cursor><sup>03</sup>Продукт</a>
+        <a href="#inside" data-cursor><sup>04</sup>Внутри</a>
+        <a href="#author" data-cursor><sup>05</sup>Автор</a>
+      </nav>
+      <a class="pill pill--sm" href="/" data-cursor data-magnet><span>Играть</span></a>
+      <span class="nav__progress" data-progress></span>
+    </header>
+
+    <main>
+      <!-- 00 · hero -->
+      <section class="hero" id="top">
+        <canvas class="hero__dither" data-dither aria-hidden="true"></canvas>
+        <div class="frame hero__inner">
+          <div class="hero__copy">
+            <p class="eyebrow" data-hero-in>Портфолио · 2026</p>
+            <h1 class="wordmark" aria-label="shahmat.xyz">
+              <span class="wordmark__blk" data-blk><span class="wordmark__chars" data-chars>shah</span></span><span class="wordmark__chars" data-chars>mat.xyz</span>
+            </h1>
+            <p class="hero__lead" data-hero-in>Онлайн-шахматы для школьников Казахстана.</p>
+            <div class="hero__actions" data-hero-in>
+              <a class="pill" href="/" data-cursor data-magnet><span>Открыть сайт</span></a>
+              <a class="ghost" href="https://github.com/4DeFold/shahmat" target="_blank" rel="noopener" data-cursor>GitHub <span aria-hidden="true">↗</span></a>
+            </div>
+          </div>
+        </div>
+        <canvas class="hero__lanyard" data-lanyard aria-label="Бейдж DeFold — его можно потянуть"></canvas>
+        <p class="hero__hint" data-hint><span aria-hidden="true">←</span> потяни бейдж</p>
+        <dl class="frame hero__meta" data-hero-meta>
+          <div><dt>Роль</dt><dd>Дизайн и код</dd></div>
+          <div><dt>Срок</dt><dd>14 дней</dd></div>
+          <div><dt>Стек</dt><dd>Vanilla JS</dd></div>
+          <div><dt>Статус</dt><dd><i class="live"></i>В продакшене</dd></div>
+        </dl>
+      </section>
+
+      <!-- 01 · manifesto -->
+      <section class="manifest" id="project">
+        <div class="frame manifest__inner">
+          <p class="eyebrow"><span class="idx">01</span>Проект</p>
+          <p class="manifest__text" data-reveal-words>Один разработчик. Четырнадцать дней. Шахматный клуб в браузере — онлайн, с ботом, пазлами и кланами.</p>
+        </div>
+      </section>
+
+      <!-- 02 · numbers -->
+      <section class="numbers" id="numbers">
+        <div class="frame">
+          <div class="section-head">
+            <p class="eyebrow"><span class="idx">02</span>Цифры</p>
+            <h2 class="h2" data-split>Сделано за две недели.</h2>
+          </div>
+          <div class="grid4" data-grid>
+            <div class="stat" data-spot><div class="stat__box"><span class="stat__num" data-count="202">202</span></div><p>коммитов</p></div>
+            <div class="stat" data-spot><div class="stat__box"><span class="stat__num" data-count="34">34</span></div><p>пулл-реквестов</p></div>
+            <div class="stat" data-spot><div class="stat__box"><span class="stat__num" data-count="17031">17 031</span></div><p>строк кода</p></div>
+            <div class="stat" data-spot><div class="stat__box"><span class="stat__num" data-count="14">14</span></div><p>дней</p></div>
+          </div>
+          <div class="chart" data-chart>
+            <div class="chart__head"><span>Коммиты по дням</span><span data-chart-value>13.11 — 26.11</span></div>
+            <div class="chart__bars" data-bars></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 03 · product -->
+      <section class="product" id="product">
+        <div class="frame">
+          <div class="section-head section-head--center">
+            <p class="eyebrow"><span class="idx">03</span>Продукт</p>
+            <h2 class="h2 h2--xl" data-split>Шахматы.</h2>
+          </div>
+        </div>
+        <div class="device-stage" data-device-stage>
+          <figure class="phone phone--l" data-phone="l"><img src="/folio/m-home.webp" alt="" loading="lazy" width="780" height="1688"></figure>
+          <div class="device" data-device>
+            <div class="device__bar"><span></span><span></span><span></span><em>shahmatt.vercel.app/home</em></div>
+            <img src="/folio/home.webp" alt="Главная shahmat.xyz" width="1800" height="1125" loading="lazy">
+          </div>
+          <figure class="phone phone--r" data-phone="r"><img src="/folio/m-bot.webp" alt="" loading="lazy" width="780" height="1688"></figure>
+        </div>
+
+        <div class="frame sticky-feats" data-feats>
+          <ol class="feats">
+            <li class="feat" data-feat="0"><span class="feat__i">01</span><h3>Бот</h3><p>Пять уровней и Stockfish 17.1.</p></li>
+            <li class="feat" data-feat="1"><span class="feat__i">02</span><h3>Пазлы</h3><p>Тысяча задач с Lichess.</p></li>
+            <li class="feat" data-feat="2"><span class="feat__i">03</span><h3>Профиль</h3><p>Карточка, рейтинг, история.</p></li>
+            <li class="feat" data-feat="3"><span class="feat__i">04</span><h3>Фигуры</h3><p>Десять наборов.</p></li>
+            <li class="feat" data-feat="4"><span class="feat__i">05</span><h3>Палитры</h3><p>Десять тем, светлых и тёмных.</p></li>
+          </ol>
+          <div class="screens" data-screens>
+            <div class="screens__frame">
+              <img src="/folio/bot.webp" alt="Игра с ботом" loading="lazy" width="1800" height="1125">
+              <img src="/folio/puzzles.webp" alt="Пазлы" loading="lazy" width="1800" height="1125">
+              <img src="/folio/profile.webp" alt="Профиль" loading="lazy" width="1800" height="1125">
+              <img src="/folio/settings.webp" alt="Наборы фигур" loading="lazy" width="1800" height="1125">
+              <img src="/folio/forest.webp" alt="Тёмная палитра «Лес»" loading="lazy" width="1800" height="1125">
+            </div>
+            <div class="screens__dots" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 04 · inside / bento -->
+      <section class="inside" id="inside">
+        <div class="frame">
+          <div class="section-head">
+            <p class="eyebrow"><span class="idx">04</span>Внутри</p>
+            <h2 class="h2" data-split>Всё живое.</h2>
+          </div>
+          <div class="bento" data-bento>
+            <article class="cell cell--board" data-spot data-beam>
+              <header><h3>Онлайн-партии</h3><span class="tag" data-board-move>1. e4</span></header>
+              <div class="mini-board" data-board aria-label="Оперная партия, Морфи — 1858"></div>
+              <footer>Морфи — герцог Брауншвейгский, 1858</footer>
+            </article>
+            <article class="cell cell--bot" data-spot data-beam>
+              <header><h3>Бот</h3><span class="tag">Elo</span></header>
+              <ul class="ladder" data-ladder>
+                <li style="--v:.30"><span>1</span><i></i><b>1320</b></li>
+                <li style="--v:.45"><span>2</span><i></i><b>1550</b></li>
+                <li style="--v:.60"><span>3</span><i></i><b>1800</b></li>
+                <li style="--v:.76"><span>4</span><i></i><b>2100</b></li>
+                <li style="--v:.90"><span>5</span><i></i><b>2450</b></li>
+                <li style="--v:1" class="ladder__max"><span>♚</span><i></i><b>Stockfish</b></li>
+              </ul>
+            </article>
+            <article class="cell cell--puzzles" data-spot data-beam>
+              <canvas class="flicker" data-flicker aria-hidden="true"></canvas>
+              <div class="cell__over"><div class="big" data-count="1000">1000</div><h3>пазлов</h3></div>
+            </article>
+            <article class="cell cell--clans" data-spot data-beam>
+              <header><h3>Кланы</h3><span class="tag">войны</span></header>
+              <div class="orbit" data-orbit aria-hidden="true">
+                <div class="orbit__ring orbit__ring--a"><img src="/pieces/cburnett/wN.svg" alt=""><img src="/pieces/cburnett/bB.svg" alt=""><img src="/pieces/cburnett/wR.svg" alt=""></div>
+                <div class="orbit__ring orbit__ring--b"><img src="/pieces/cburnett/bQ.svg" alt=""><img src="/pieces/cburnett/wP.svg" alt=""><img src="/pieces/cburnett/bN.svg" alt=""><img src="/pieces/cburnett/wB.svg" alt=""><img src="/pieces/cburnett/bR.svg" alt=""></div>
+                <div class="orbit__core"><span class="blk">shah</span></div>
+              </div>
+            </article>
+            <article class="cell cell--pieces" data-spot data-beam>
+              <header><h3>10 наборов фигур</h3></header>
+              <div class="marquee" data-pieces></div>
+            </article>
+            <article class="cell cell--palettes" data-spot data-beam data-palette-cell>
+              <header><h3>10 палитр</h3><span class="tag" data-palette-name>Монохром</span></header>
+              <div class="palettes" data-palettes></div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- stack marquee -->
+      <section class="stack" aria-label="Стек">
+        <div class="velo" data-velo="1"><div class="velo__track">Vite<i></i>Supabase<i></i>chess.js<i></i>Stockfish 17.1<i></i>Lenis<i></i>OGL<i></i>three.js<i></i>GSAP<i></i>Vercel<i></i></div></div>
+        <div class="velo velo--out" data-velo="-1"><div class="velo__track">Vanilla JS<i></i>WebGL<i></i>Realtime<i></i>WASM<i></i>PWA-ready<i></i>Postgres<i></i>Edge<i></i>CSS<i></i></div></div>
+      </section>
+
+      <!-- 05 · author -->
+      <section class="author" id="author" data-author>
+        <div class="frame author__inner">
+          <p class="eyebrow eyebrow--inv"><span class="idx">05</span>Автор</p>
+          <div class="author__grid">
+            <div class="author__pic" data-spot>
+              <canvas data-pixel aria-hidden="true"></canvas>
+              <img src="/folio/defold.webp" alt="Аватар DeFold" width="1024" height="1024" loading="lazy">
+            </div>
+            <div class="author__copy">
+              <h2 class="author__name" data-scramble="DeFold" data-cursor>DeFold</h2>
+              <p class="author__quote" data-split>«Interested of everything in this world.»</p>
+              <dl class="facts" data-facts>
+                <div><dt>GitHub</dt><dd>@4DeFold</dd></div>
+                <div><dt>На GitHub</dt><dd>с 27.02.2026</dd></div>
+                <div><dt>Репозитории</dt><dd>4</dd></div>
+                <div><dt>Роль</dt><dd>Дизайн, код, деплой</dd></div>
+              </dl>
+              <a class="pill pill--inv" href="https://github.com/4DeFold" target="_blank" rel="noopener" data-cursor data-magnet><span>GitHub ↗</span></a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- cta -->
+      <section class="cta">
+        <div class="frame cta__inner">
+          <h2 class="cta__title" data-split>Сыграем?</h2>
+          <a class="pill pill--xl" href="/" data-cursor data-magnet><span>Играть</span></a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <div class="frame foot__row">
+        <span>© 2026 DeFold</span>
+        <a href="/" data-cursor>shahmatt.vercel.app</a>
+        <a href="#top" data-cursor data-top>Наверх ↑</a>
+      </div>
+      <div class="foot__mark" data-foot-mark aria-hidden="true"><span class="blk">shah</span>mat.xyz</div>
+    </footer>
+  </body>
+</html>
