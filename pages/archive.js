@@ -1,3 +1,4 @@
+import {setBoardPiece} from './board-pieces.js';
 import '../smooth-scroll.js';
 import {createGameReview} from './game-review.js';
 import {installLoadingIndicators} from './loading-indicators.js';
@@ -36,7 +37,7 @@ async function loadStats(request){
 }
 const renderHistory=createMoveHistory({document,list:$('move-list'),count:$('move-count'),onSelect:showHistory});
 function replay(moves){const c=new Chess();for(const move of moves||[])c.move(move);return c;}
-function miniature(c,flip=false){const grid=document.createElement('span');grid.className='archive-mini';const last=c.history({verbose:true}).at(-1);for(let i=0;i<8;i++)for(let j=0;j<8;j++){const r=flip?i+1:8-i,f=flip?7-j:j,square='abcdefgh'[f]+r,p=c.get(square),el=document.createElement('span');el.className=`archive-mini-square ${(r+f)%2?'dark':'light'}`;if(last&&(last.from===square||last.to===square))el.classList.add('last');if(p?.type==='k'&&p.color===c.turn()&&c.isCheck())el.classList.add('check');if(p){const img=document.createElement('img');img.alt='';img.src=themedPieceSrc(p.color,p.type);el.append(img);}grid.append(el);}return grid;}
+function miniature(c,flip=false){const grid=document.createElement('span');grid.className='archive-mini';const last=c.history({verbose:true}).at(-1);for(let i=0;i<8;i++)for(let j=0;j<8;j++){const r=flip?i+1:8-i,f=flip?7-j:j,square='abcdefgh'[f]+r,p=c.get(square),el=document.createElement('span');el.className=`archive-mini-square ${(r+f)%2?'dark':'light'}`;if(last&&(last.from===square||last.to===square))el.classList.add('last');if(p?.type==='k'&&p.color===c.turn()&&c.isCheck())el.classList.add('check');if(p){const img=document.createElement('img');img.alt='';setBoardPiece(img,p.color,p.type);el.append(img);}grid.append(el);}return grid;}
 function resultOf(row,c){const status=row.mode==='bot'||mode==='bot'?row.status||row.result:row.result;const us=row.my_color||row.player_color||'w';if(c.isStalemate()||row.reason==='stalemate')return ['Пат','draw'];if(c.isCheckmate()||row.reason==='checkmate'){const winner=status==='white_win'?'w':status==='black_win'?'b':c.turn()==='w'?'b':'w';return ['Мат',winner===us?'win':'loss'];}if(status==='draw')return ['Ничья','draw'];if(status==='white_win'||status==='black_win')return [status===(us==='w'?'white_win':'black_win')?'Победа':'Поражение',status===(us==='w'?'white_win':'black_win')?'win':'loss'];return ['','draw'];}
 const scoreText=x=>x==null?'':` (${Math.round(Number(x))} ЯР)`;
 const botLevel=row=>BOT_LEVELS[Number(row.level)-1];

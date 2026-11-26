@@ -6,7 +6,7 @@ const base=process.env.RESPONSIVE_BASE_URL||'http://127.0.0.1:4270';
 const id='12345678-1234-1234-1234-123456789012',user={id,aud:'authenticated',role:'authenticated',user_metadata:{}};
 const token=['e30',Buffer.from(JSON.stringify({sub:id,exp:Math.floor(Date.now()/1000)+3600,role:'authenticated'})).toString('base64url'),'x'].join('.');
 const session={access_token:token,token_type:'bearer',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,refresh_token:'mock',user};
-const browser=await engine.launch({headless:true});
+const browser=await engine.launch({headless:true,...(process.env.CHROMIUM_PATH&&(!process.env.BROWSER||process.env.BROWSER==='chromium')?{executablePath:process.env.CHROMIUM_PATH,args:['--no-sandbox']}: {})});
 try {
  for(const viewport of [{width:1440,height:900},{width:390,height:844}]) for(const motion of ['no-preference','reduce']) {
   const page=await browser.newPage({viewport,reducedMotion:motion}),errors=[];let releaseArchive;const archiveGate=new Promise(resolve=>releaseArchive=resolve);page.on('pageerror',e=>errors.push(e.message));
@@ -34,16 +34,23 @@ try {
   await page.locator('#nav-archive').evaluate(el=>el.click());assert.equal(await frame.locator('#archive-detail').isVisible(),true,'active tab must not reset');
   await frame.locator('#history-first').click();
   assert.equal(await frame.locator('.move-number').first().textContent(),'1');
-  await frame.locator('#history-next').click();await frame.locator('#history-next').click();await frame.locator('#history-next').click();
+  // Inspect each animation in the same browser task as navigation. Under a busy CI
+  // runner a separate protocol round trip can arrive after the short flight ends.
+  const flights=await frame.locator('#history-next').evaluate(next=>{
+   const prev=document.querySelector('#history-prev');
+   const snapshot=()=>({count:document.querySelectorAll('.capture-flight').length,captured:document.querySelector('#archive-opponent-captured img')?.style.opacity,restored:document.querySelector('[data-square=d5] .piece')?.style.opacity});
+   next.click();next.click();next.click();const capture=snapshot();
+   prev.click();const rewind=snapshot();next.click();const forward=snapshot();prev.click();const rapidRewind=snapshot();
+   return {capture,rewind,forward,rapidRewind};
+  });
   if(motion==='no-preference') {
-   assert.equal(await frame.locator('.capture-flight').count(),1,'captured piece flies into strip');
-   assert.equal(await frame.locator('#archive-opponent-captured img').first().evaluate(el=>el.style.opacity),'0');
-   await frame.locator('#history-prev').click();
-   assert.equal(await frame.locator('.capture-flight').count(),1,'rewind launches reverse flight');
-   assert.equal(await frame.locator('[data-square=d5] .piece').evaluate(el=>el.style.opacity),'0','restored piece is hidden during reverse flight');
-   await frame.locator('#history-next').click();assert.equal(await frame.locator('.capture-flight').count(),1,'rapid forward cancels reverse flight');
-   await frame.locator('#history-prev').click();assert.equal(await frame.locator('.capture-flight').count(),1,'rapid rewind launches new reverse flight');
-  } else assert.equal(await frame.locator('.capture-flight').count(),0);
+   assert.equal(flights.capture.count,1,'captured piece flies into strip');
+   assert.equal(flights.capture.captured,'0');
+   assert.equal(flights.rewind.count,1,'rewind launches reverse flight');
+   assert.equal(flights.rewind.restored,'0','restored piece is hidden during reverse flight');
+   assert.equal(flights.forward.count,1,'rapid forward cancels reverse flight');
+   assert.equal(flights.rapidRewind.count,1,'rapid rewind launches new reverse flight');
+  } else assert.equal(flights.capture.count,0);
   await page.locator('#nav-archive').focus();
   for(const key of ['w','s','w','s','w','s']) await page.keyboard.press(key);
   await frame.locator('#history-last:disabled').waitFor();
@@ -94,7 +101,7 @@ try {
   assert.match(await frame.locator('.review-bar').getAttribute('aria-label'),/белые \d+%/);
   assert.match(await frame.locator('.review-accuracy').first().textContent(),/^\d+%$/);
   assert.equal(await frame.locator('.review-brilliant b').first().textContent(),'—');
-  assert.equal(await frame.locator('[data-square=d5] .piece').getAttribute('src'),'/pieces/cburnett/bQ.svg');
+  assert.equal(await frame.locator('[data-square=d5] .piece').getAttribute('data-board-color'),'b');assert.equal(await frame.locator('[data-square=d5] .piece').getAttribute('data-board-type'),'Q');
   // The archive rail and its nested move list use the same wheel smoothing as the main archive.
   const rail=frame.locator('.game-rail'),list=frame.locator('#move-list');
   await list.evaluate(el=>{for(let i=0;i<50;i++){const row=document.createElement('li');row.textContent='1. e4 e5';row.style.minHeight='30px';el.append(row)}el.scrollTop=0});

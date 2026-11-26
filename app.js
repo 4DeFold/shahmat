@@ -309,7 +309,7 @@ async function loadView(name) {
     if (name === 'game' || name === 'bot' || name === 'watch' || name === 'archive' || name === 'puzzles') {
       const frame = $(({game:'member-game-frame',bot:'bot-game-frame',watch:'watch-frame',archive:'archive-frame',puzzles:'puzzles-frame'})[name]);
       const ready = new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error('Game load timed out')), 15000);
+        const timeout = setTimeout(() => reject(new Error('Game load timed out')), 90000);
         frame.addEventListener('load', () => { clearTimeout(timeout); resolve(); }, { once: true });
         frame.addEventListener('error', () => { clearTimeout(timeout); reject(new Error('Game load failed')); }, { once: true });
       });
@@ -339,7 +339,12 @@ window.addEventListener('message', event => {
   if (event.data?.type === 'shahmat-open-profile' && typeof event.data.username === 'string') void openOtherProfile(event.data.username);
 });
 function preloadDashboard() {
-  for (const name of ['game', 'profile', 'settings', 'help']) void loadView(name).catch(() => {});
+  // Speculatively fetch only small view templates, not whole hidden iframes.
+  // On metered or slow connections leave bandwidth for the active page.
+  const connection=navigator.connection;
+  if(connection?.saveData || /(^|-)2g/.test(connection?.effectiveType||''))return;
+  const warm=()=>{if(!dashboardPreloadEnabled||$('dashboard-screen').hidden)return;for(const name of ['game','profile','settings','help'])void pageLoaders[name]().catch(()=>{});};
+  if(window.requestIdleCallback)window.requestIdleCallback(warm,{timeout:5000});else setTimeout(warm,1500);
 }
 function currentPage() {
   const name = window.location.pathname.replace(/^\/+|\/+$/g, '');
@@ -422,7 +427,8 @@ async function showPage(name, { updateHistory = false, focus = false } = {}) {
     if (name === 'watch') { $('page-watch')?.remove(); watchFrameReady = null; }
     if (name === 'archive') { $('page-archive')?.remove(); archiveFrameReady = null; }
     if (name === 'puzzles') { $('page-puzzles')?.remove(); puzzlesFrameReady = null; }
-    $('page-content').insertAdjacentHTML('beforeend', '<section class="empty-page" id="page-load-error" role="alert"><h2>Страница не загрузилась.</h2><p>Проверь соединение и обнови страницу.</p></section>');
+    $('page-content').insertAdjacentHTML('beforeend', '<section class="empty-page" id="page-load-error" role="alert"><h2>Страница не загрузилась.</h2><p>Проверь соединение и попробуй ещё раз.</p><button type="button" id="page-load-retry">Повторить</button></section>');
+    $('page-load-retry').addEventListener('click',()=>void showPage(name,{focus:true}));
   }
 }
 // The game remains a separate page; send appearance only to our own frame.

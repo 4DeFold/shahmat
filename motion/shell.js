@@ -78,7 +78,11 @@ function start() {
     let views = false, nav = false, screens = false;
     for (const record of records) {
       const target = record.target;
-      if (record.type === 'childList') { views = true; continue; }
+      if (record.type === 'childList') {
+        // Clock ticks, rating numbers and transient effects are not page views.
+        if (target.id === 'page-content' || [...record.addedNodes].some(node => node.nodeType === 1 && (node.matches?.('[data-view]') || (node.childElementCount && node.querySelector?.('[data-view]'))))) views = true;
+        continue;
+      }
       if (record.attributeName === 'aria-current') nav = true;
       if (record.attributeName === 'hidden') {
         if (target.matches?.('[data-view]')) views = true;

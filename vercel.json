@@ -3,17 +3,91 @@
   "outputDirectory": "dist",
   "installCommand": "npm ci",
   "rewrites": [
-    { "source": "/home", "destination": "/index.html" },
-    { "source": "/play", "destination": "/pages/play.html" },
-    { "source": "/bot", "destination": "/index.html" },
-    { "source": "/game", "destination": "/index.html" },
-    { "source": "/archive", "destination": "/index.html" },
-    { "source": "/puzzles", "destination": "/index.html" },
-    { "source": "/watch", "destination": "/index.html" },
-    { "source": "/rating", "destination": "/index.html" },
-    { "source": "/login", "destination": "/index.html" },
-    { "source": "/profile", "destination": "/index.html" },
-    { "source": "/settings", "destination": "/index.html" },
-    { "source": "/help", "destination": "/index.html" }
+    {
+      "source": "/home",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/play",
+      "destination": "/pages/play.html"
+    },
+    {
+      "source": "/bot",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/game",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/archive",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/puzzles",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/watch",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/rating",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/login",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/profile",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/settings",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/help",
+      "destination": "/index.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/piece-packs/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/stockfish/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/pieces/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400, stale-while-revalidate=604800"
+        }
+      ]
+    },
+    {
+      "source": "/puzzles/tactics.json",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, stale-while-revalidate=86400"
+        }
+      ]
+    }
   ]
 }

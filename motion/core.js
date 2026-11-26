@@ -94,6 +94,7 @@ function follow(el, prop, target, format) {
   if (!state) { state = { x: 0, y: 0, tx: 0, ty: 0, prop, format, frame: 0 }; springs.set(el, state); }
   state.tx = target[0]; state.ty = target[1]; state.format = format; state.prop = prop;
   if (!state.frame) state.frame = requestAnimationFrame(function step() {
+    if (!el.isConnected) { el.style.removeProperty(state.prop); springs.delete(el); state.frame = 0; return; }
     state.x += (state.tx - state.x) * .16; state.y += (state.ty - state.y) * .16;
     const near = Math.abs(state.tx - state.x) < .02 && Math.abs(state.ty - state.y) < .02;
     if (near) { state.x = state.tx; state.y = state.ty; }
@@ -176,9 +177,18 @@ export function splitText(el, { delay = 0, step = 32, by = 'char' } = {}) {
     delete el.dataset.mSplitting; el.style.removeProperty('--m-delay');
   }, delay + index * step + 800);
 }
+const restartListeners = new WeakMap();
+const animationNames = { 'm-new': 'm-captured-in' };
 function restart(el, className) {
-  el.classList.remove(className); void el.offsetWidth; el.classList.add(className);
-  el.addEventListener('animationend', function done(event) { if (event.target === el) { el.classList.remove(className); el.removeEventListener('animationend', done); } });
+  // Most incoming list items are new; avoid forcing layout for each one.
+  let listeners = restartListeners.get(el);
+  if (!listeners) { listeners = new Map(); restartListeners.set(el, listeners); }
+  const previous = listeners.get(className);
+  if (previous) { el.removeEventListener('animationend', previous); }
+  if (el.classList.contains(className)) { el.classList.remove(className); void el.offsetWidth; }
+  el.classList.add(className);
+  const done = event => { if (event.target !== el || event.animationName !== (animationNames[className] || className)) return; el.classList.remove(className); el.removeEventListener('animationend', done); listeners.delete(className); if (!listeners.size) restartListeners.delete(el); };
+  listeners.set(className, done); el.addEventListener('animationend', done);
 }
 const ERROR = /не удалось|неверн|ошиб|слишком много|не менее|занято|недоступ|напиши от|введи шест|не совпад|нельзя/i;
 const WIN = /вы победили|пазл решён|верно!/i;
@@ -204,7 +214,7 @@ function textChanged(el) {
   if (el.id === 'puzzle-status' && /^ошибка/i.test(text)) restart(el.closest('.puzzle-status-card') || el, 'm-shake');
 }
 // React Bits Count Up for statistics.
-const COUNT = '.archive-stats-grid dd, #puzzle-rating';
+const COUNT = '.archive-stats-grid dd';
 const counting = new WeakMap();
 function countChanged(el) {
   const text = el.textContent, state = counting.get(el) || {};
@@ -272,23 +282,17 @@ function onMove(event) {
     if (detail.san.includes('#')) board.closest('.board-frame')?.animate([{ scale: 1 }, { scale: .985 }, { scale: 1 }], { duration: 520, easing: SPRING });
   });
 }
-// Ripple-wave entrance (Animata grid / React Bits Pixel Transition) the first
-// time a full board becomes visible.
+// One short board-level entrance avoids dozens of simultaneous animations and
+// never makes individual pieces disappear while a user starts interacting.
 const wavedBoards = new WeakSet();
 const boardObserver = typeof IntersectionObserver === 'function' ? new IntersectionObserver(entries => {
   for (const entry of entries) {
     const board = entry.target;
     if (!entry.isIntersecting || wavedBoards.has(board)) continue;
-    const squares = board.querySelectorAll(':scope > .square');
-    if (squares.length < 64) continue;
+    if (board.querySelectorAll(':scope > .square').length < 64) continue;
     wavedBoards.add(board); boardObserver.unobserve(board);
     if (!motionOK() || board.closest('.bot-shell, #member-game')) continue;
-    squares.forEach(square => {
-      const name = square.dataset.square || 'a1', distance = 'abcdefgh'.indexOf(name[0]) + (8 - Number(name[1]));
-      square.animate([{ opacity: 0, scale: .6 }, { opacity: 1, scale: 1 }], { duration: 520, delay: distance * 24, easing: EASE, fill: 'backwards' });
-      const piece = square.querySelector('.piece');
-      piece?.animate([{ opacity: 0, translate: '0 -22%' }, { opacity: 1, translate: '0 0' }], { duration: 560, delay: 140 + distance * 24, easing: SPRING, fill: 'backwards' });
-    });
+    board.animate([{ opacity: .8 }, { opacity: 1 }], { duration: 350, easing: EASE });
   }
 }, { threshold: .25 }) : null;
 
@@ -296,7 +300,9 @@ const boardObserver = typeof IntersectionObserver === 'function' ? new Intersect
 export function confetti({ count = 150, duration = 2600 } = {}) {
   if (!motionOK() || doc.hidden) return;
   const canvas = doc.createElement('canvas'); canvas.className = 'm-confetti'; canvas.setAttribute('aria-hidden', 'true');
-  const dpr = Math.min(2, win.devicePixelRatio || 1), w = win.innerWidth, h = win.innerHeight;
+  // Keep the effect but bound canvas memory and work on compact devices.
+  const dpr = Math.min(1.5, win.devicePixelRatio || 1), w = win.innerWidth, h = win.innerHeight;
+  count = Math.min(count, w < 700 ? 90 : 150);
   canvas.width = w * dpr; canvas.height = h * dpr; doc.body.append(canvas);
   const ctx = canvas.getContext('2d'); if (!ctx) { canvas.remove(); return; }
   ctx.scale(dpr, dpr);
@@ -307,6 +313,7 @@ export function confetti({ count = 150, duration = 2600 } = {}) {
   });
   const start = performance.now();
   const frame = time => {
+    if (doc.hidden || !motionOK()) { canvas.remove(); return; }
     const t = time - start; ctx.clearRect(0, 0, w, h);
     for (const p of pieces) {
       p.vx *= .985; p.vy = p.vy * .985 + .32; p.x += p.vx; p.y += p.vy; p.r += p.vr;
@@ -334,13 +341,22 @@ const textObserver = new MutationObserver(records => {
 });
 function wire(root) {
   if (!(root instanceof Element)) return;
-  for (const el of [root, ...root.querySelectorAll(`${STATUS}, ${COUNT}`)]) {
-    if (!el.matches?.(`${STATUS}, ${COUNT}`) || watched.has(el)) continue;
+  // Transient animation overlays and pieces never contain statuses or boards.
+  // Avoid two descendant queries per piece / shard on every board update.
+  if (root.matches('.m-ripple-host, .m-spark, .m-burst, .m-shard, .m-confetti') || (root.closest('.board') && !root.matches('.board'))) return;
+  const selectors = `${STATUS}, ${COUNT}`;
+  const track = el => {
+    if (!el.matches?.(selectors) || watched.has(el)) return;
     watched.add(el);
     if (el.matches(COUNT)) counting.set(el, { text: el.textContent, value: null }); else lastText.set(el, el.textContent.trim());
     textObserver.observe(el, { childList: true, characterData: true, subtree: true });
+  };
+  track(root);
+  if (root.childElementCount) root.querySelectorAll(selectors).forEach(track);
+  if (boardObserver) {
+    if (root.matches('.board') && !wavedBoards.has(root)) boardObserver.observe(root);
+    if (root.childElementCount) root.querySelectorAll('.board').forEach(board => { if (!wavedBoards.has(board)) boardObserver.observe(board); });
   }
-  for (const board of [root, ...root.querySelectorAll('.board')]) if (board.matches?.('.board') && boardObserver && !wavedBoards.has(board)) boardObserver.observe(board);
 }
 const captured = new WeakMap();
 const domObserver = new MutationObserver(records => {
@@ -357,6 +373,11 @@ const domObserver = new MutationObserver(records => {
       if (node.nodeType !== 1) continue;
       wire(node);
       if (motionOK() && node.matches(ENTER)) { const list = batches.get(node.parentElement) || []; list.push(node); batches.set(node.parentElement, list); }
+    }
+    if (record.removedNodes.length) {
+      if (magnetEl && !magnetEl.isConnected) release('magnet');
+      if (tiltEl && !tiltEl.isConnected) release('tilt');
+      if (spotEl && !spotEl.isConnected) release('spot');
     }
   }
   for (const list of batches.values()) list.forEach((node, i) => { node.style.animationDelay = `${Math.min(i, 12) * 35}ms`; restart(node, 'm-enter'); node.addEventListener('animationend', () => node.style.removeProperty('animation-delay'), { once: true }); });
@@ -386,14 +407,16 @@ function install() {
     if (el && !el.disabled && !el.closest('#landing-screen')) spark(event.clientX, event.clientY);
   }, { capture: true, passive: true });
   doc.addEventListener('pointermove', event => {
-    if (event.pointerType === 'touch') return;
+    if (event.pointerType === 'touch' || doc.hidden || !hoverOK()) return;
     lastMove = event; if (!moveFrame) moveFrame = requestAnimationFrame(onMoveFrame);
   }, { passive: true });
   doc.documentElement.addEventListener('pointerleave', () => { release('magnet'); release('tilt'); release('spot'); }, { passive: true });
   doc.addEventListener('scroll', () => { release('tilt'); }, { passive: true, capture: true });
   doc.addEventListener('invalid', event => { if (motionOK() && event.target instanceof Element) restart(event.target, 'm-shake'); }, true);
   win.addEventListener('shahmat-move', onMove);
-  reduced.addEventListener?.('change', () => { release('magnet'); release('tilt'); release('spot'); });
+  const releaseHover = () => { release('magnet'); release('tilt'); release('spot'); };
+  reduced.addEventListener?.('change', releaseHover);
+  doc.addEventListener('visibilitychange', () => { if (doc.hidden) releaseHover(); });
   const start = () => { wire(doc.body); domObserver.observe(doc.body, { childList: true, subtree: true }); };
   if (doc.body) start(); else doc.addEventListener('DOMContentLoaded', start, { once: true });
 }

@@ -66,3 +66,9 @@
 .radar-sector{fill:color-mix(in srgb,var(--accent) 20%,transparent);stroke:none}.radar-data{transform-origin:350px 310px;animation:radar-grow .75s cubic-bezier(.22,1,.36,1) both}@keyframes radar-grow{from{transform:scale(.001);opacity:0}to{transform:scale(1);opacity:1}}
 @media(prefers-reduced-motion:reduce){.radar-data,.puzzle-status-card[data-state=success]::after{animation:none}}
 .history-source-status{font:11px/1.3 system-ui;color:var(--muted);margin:0 0 8px}.history-source-status:empty{display:none}
+/* Reuse the same move list, figures and moving marker as archive review. */
+#puzzle-move-list{display:block;overflow:visible;max-height:none}
+.puzzle-rail #move-list{max-height:180px;grid-template-columns:none}
+.puzzle-rail #move-list li{grid-template-columns:36px minmax(0,1fr) minmax(0,1fr)}
+.puzzle-sync-status{font:12px/1.35 system-ui;color:var(--muted);margin:0}
+.puzzle-sync-status:empty{display:none}

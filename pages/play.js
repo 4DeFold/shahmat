@@ -1,3 +1,4 @@
+import {setBoardPiece} from './board-pieces.js';
 import './standalone-guest-presence.js';
 import {createGameSound} from './game-sound.js';
 const sound=createGameSound(window);
@@ -147,7 +148,7 @@ function render(move = null) {
     cell.classList.toggle('last-move', !!lastMove && (lastMove.from === square || lastMove.to === square));
     cell.setAttribute('aria-label', `${square}, ${piece ? (piece.color === 'w' ? 'белые, ' : 'чёрные, ') + names[piece.type] : 'пусто'}${legal.includes(square) ? ', возможный ход' : ''}${premove.some(m=>m.from===square || m.to===square) ? ', предварительный ход' : ''}`);
     cell.setAttribute('aria-pressed', String(selected === square));
-    if (piece) { const icon = document.createElement('img'); icon.className = 'piece'; icon.src = pieceSrc(piece.color, piece.type); icon.alt = ''; icon.draggable = false; const real=game.get(square); if(premove.length&&(!real||real.color!==piece.color||real.type!==piece.type))icon.classList.add('premove-ghost'); cell.append(icon); }
+    if (piece) { const icon = document.createElement('img'); icon.className = 'piece'; setBoardPiece(icon,piece.color,piece.type); icon.alt = ''; icon.draggable = false; const real=game.get(square); if(premove.length&&(!real||real.color!==piece.color||real.type!==piece.type))icon.classList.add('premove-ghost'); cell.append(icon); }
     if (rank === ranks[7]) { const coord = document.createElement('span'); coord.className = 'coord file'; coord.textContent = files[file]; cell.append(coord); }
     if (column === columns[0]) { const coord = document.createElement('span'); coord.className = 'coord rank'; coord.textContent = rank; cell.append(coord); }
     fragment.append(cell);
@@ -177,7 +178,7 @@ function attempt(from, to) {
     pending = { from, to, premove:game.turn() !== playerColor }; promotion.hidden = false; options.replaceChildren();
     for (const type of ['q','r','b','n']) {
       const button = document.createElement('button'); button.type='button'; button.setAttribute('aria-label',names[type]);
-      const icon=document.createElement('img'); icon.src=pieceSrc(playerColor,type); icon.alt=''; button.append(icon);
+      const icon=document.createElement('img'); setBoardPiece(icon,playerColor,type); icon.alt=''; button.append(icon);
       button.addEventListener('click',()=>{ if(!pending)return; const choice=pending; pending=null; promotion.hidden=true; if(choice.premove && game.turn()!==playerColor) { if(premove.length>=20)return; premove.push({from:choice.from,to:choice.to,promotion:type}); selected=null; render(); status.textContent='Предварительный ход готов. До 20 ходов; пустая клетка отменяет очередь.'; } else playMove({from:choice.from,to:choice.to,promotion:type}); }); options.append(button);
     }
     options.firstChild.focus(); return true;
@@ -202,7 +203,7 @@ board.addEventListener('pointermove', event => {
   if(!drag || drag.pointer!==event.pointerId) return;
   if(!drag.ghost && Math.hypot(event.clientX-drag.x,event.clientY-drag.y)>5) {
     board.setPointerCapture?.(event.pointerId); selected=drag.from; render(); drag.cell=board.querySelector(`[data-square="${drag.from}"]`);
-    drag.ghost=document.createElement('img'); drag.ghost.className='drag-ghost'; drag.ghost.src=pieceSrc(playerColor,projected().get(drag.from).type); drag.ghost.alt='';
+    drag.ghost=document.createElement('img'); drag.ghost.className='drag-ghost'; setBoardPiece(drag.ghost,playerColor,projected().get(drag.from).type); drag.ghost.alt='';
     drag.ghost.style.setProperty('--drag-size',`${drag.cell.getBoundingClientRect().width}px`); drag.cell.classList.add('dragging'); document.body.append(drag.ghost);
   }
   if(drag.ghost) drag.ghost.style.transform=`translate3d(${event.clientX}px,${event.clientY}px,0) translate(-50%,-50%)`;

@@ -20,6 +20,8 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
   const cache = new Map(), pending = new Map();
   const freshness = 15000;
   let mode = 'overall', sequence = 0, destroyed = false, indicatorFrame = null, onlineNames = null;
+  const scoreUnit=()=>mode==='puzzle'?'yar':unit;
+  const updateUnitLabel=()=>{const label=root.querySelector('.rating-unit');if(label)label.textContent=scoreUnit()==='elo'?'ЭЛО':'ЯР';};
   function updateOnlineIndicators() {
     for (const person of root.querySelectorAll('.rating-person')) {
       const name = person.dataset.profileName;
@@ -147,7 +149,7 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
       }
       row.classList.toggle('rating-row-self',!!ownName && nameText===ownName);
       row.querySelector('.rating-place').textContent=String(index+1);
-      const score = row.querySelector('.rating-score'), value = player[unit] == null ? null : Number(player[unit]);
+      const score = row.querySelector('.rating-score'), value = player[scoreUnit()] == null ? null : Number(player[scoreUnit()]);
       const from = visualScores.get(score);
       stopElement(score);
       score.textContent=formatScore(player);
@@ -191,7 +193,7 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
     } catch { /* Ranking remains available if images cannot load. */ }
   }
 
-  function formatScore(player) { return player?.[unit] == null ? '—' : number.format(Number(player[unit])); }
+  function formatScore(player) { return player?.[scoreUnit()] == null ? '—' : number.format(Number(player[scoreUnit()])); }
   function fetchMode(requestedMode) {
     if (pending.has(requestedMode)) return pending.get(requestedMode).promise;
     const controller = new AbortController();
@@ -200,7 +202,7 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
       try {
         // Install the in-flight entry before a client can synchronously throw.
         await Promise.resolve();
-        const call = client.rpc('rank_leaderboard', { p_mode:requestedMode });
+        const call = requestedMode==='puzzle' ? client.rpc('puzzle_leaderboard') : client.rpc('rank_leaderboard', { p_mode:requestedMode });
         const query = typeof call?.abortSignal === 'function' ? call.abortSignal(controller.signal) : call;
         const timeout = new Promise((_, reject) => {
           timer = win.setTimeout(() => { controller.abort(); reject(new Error('timeout')); }, 10000);
@@ -221,14 +223,14 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
   async function refreshSelf(requestedMode, request) {
     if (!showSelf || !self) return;
     try {
-      const { data, error } = await client.rpc('rank_my_position', { p_mode:requestedMode });
+      const { data, error } = await (requestedMode==='puzzle' ? client.rpc('puzzle_my_position') : client.rpc('rank_my_position', { p_mode:requestedMode }));
       if (destroyed || request !== sequence) return;
       if (error || !Array.isArray(data) || !data[0]) { if (selfMode !== requestedMode) self.hidden = true; return; }
       const player = data[0], selfScore = self.querySelector('.rating-self-score'), previousName = ownName; ownName = player.username; self.dataset.profileName=String(player.username ?? ''); self.querySelector('.rating-person').dataset.profileName=String(player.username ?? ''); ownPlayer = player; selfMode = requestedMode;
       self.querySelector('.rating-self-place').textContent = player.place != null ? String(player.place) : '—';
       self.querySelector('.rating-self-name').textContent = String(player.username ?? '');
       const from = previousName === player.username ? visualScores.get(selfScore) : undefined;
-      const target = player[unit] == null ? null : Number(player[unit]);
+      const target = player[scoreUnit()] == null ? null : Number(player[scoreUnit()]);
       stopElement(selfScore);
       selfScore.textContent = formatScore(player);
       if (Number.isFinite(target)) { if (!Number.isFinite(from)) visualScores.set(selfScore,target); } else visualScores.delete(selfScore);
@@ -280,6 +282,7 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
     if (button && root.contains(button)) {
       if (button.dataset.ratingMode === mode) return;
       mode = button.dataset.ratingMode;
+      updateUnitLabel();
       buttons.forEach(item => item.setAttribute('aria-pressed',String(item === button)));
       scheduleIndicator();
       void refresh();
@@ -302,11 +305,11 @@ export function createRatingView(root, client, { showSelf = false, onOpenProfile
       if (unit === next) return;
       clearMotion(); unit = next;
       for (const el of root.querySelectorAll('.rating-score,.rating-self-score')) visualScores.delete(el);
-      const label = root.querySelector('.rating-unit'); if (label) label.textContent = unit === 'elo' ? 'ЭЛО' : 'ЯР';
+      updateUnitLabel();
       if (displayed) render(displayed);
       if (ownPlayer && self && !self.hidden) {
         const score=self.querySelector('.rating-self-score'); score.textContent=formatScore(ownPlayer);
-        if (ownPlayer[unit] != null && Number.isFinite(Number(ownPlayer[unit]))) visualScores.set(score,Number(ownPlayer[unit]));
+        if (ownPlayer[scoreUnit()] != null && Number.isFinite(Number(ownPlayer[scoreUnit()]))) visualScores.set(score,Number(ownPlayer[scoreUnit()]));
       }
     },
     show() {

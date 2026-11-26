@@ -35,6 +35,31 @@ jobs:
           result=$?
           cat /tmp/browser-test.log
           if [ "$result" -eq 0 ]; then
+            RESPONSIVE_BASE_URL=http://127.0.0.1:4271 node scripts/puzzle-input-check.mjs > /tmp/browser-test.log 2>&1
+            result=$?
+            cat /tmp/browser-test.log
+          fi
+          if [ "$result" -eq 0 ]; then
+            RESPONSIVE_BASE_URL=http://127.0.0.1:4271 node scripts/puzzle-sync-check.mjs > /tmp/browser-test.log 2>&1
+            result=$?
+            cat /tmp/browser-test.log
+          fi
+          if [ "$result" -eq 0 ]; then
+            RESPONSIVE_BASE_URL=http://127.0.0.1:4271 node scripts/weak-network-check.mjs > /tmp/browser-test.log 2>&1
+            result=$?
+            cat /tmp/browser-test.log
+          fi
+          if [ "$result" -eq 0 ]; then
+            RESPONSIVE_BASE_URL=http://127.0.0.1:4271 node scripts/motion-performance-check.mjs > /tmp/browser-test.log 2>&1
+            result=$?
+            cat /tmp/browser-test.log
+          fi
+          if [ "$result" -eq 0 ]; then
+            RESPONSIVE_BASE_URL=http://127.0.0.1:4270 node scripts/review-worker-check.mjs > /tmp/browser-test.log 2>&1
+            result=$?
+            cat /tmp/browser-test.log
+          fi
+          if [ "$result" -eq 0 ]; then
             RESPONSIVE_BASE_URL=http://127.0.0.1:4271 node scripts/archive-motion-check.mjs > /tmp/browser-test.log 2>&1
             result=$?
             cat /tmp/browser-test.log

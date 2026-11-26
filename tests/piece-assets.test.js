@@ -59,3 +59,15 @@ test('large preview renders the full initial position and updates without clones
   assert.equal(board.querySelectorAll('img[src^="/pieces/firi/"]').length, 32);
   assert.equal(doc.querySelectorAll('img').length, 32);
 });
+
+test('bundled board sets are complete, versioned and match the licensed originals', async()=>{
+ const {default:standard}=await import('../pages/piece-bundles/cburnett.js');
+ const {default:packs}=await import('../pages/piece-packs-manifest.js');
+ const {createHash}=await import('node:crypto');
+ for(const [set,path] of [['cburnett',null],...Object.entries(packs)]){
+  const text=path&&await readFile('public'+path,'utf8'),data=path?JSON.parse(text):standard;
+  if(path)assert.ok(path.includes(createHash('sha256').update(text).digest('hex').slice(0,12)));
+  assert.equal(Object.keys(data).length,12);
+  for(const color of 'wb')for(const type of 'KQRBNP')assert.equal(data[color+type],await readFile(`public/pieces/${set}/${color}${type}.svg`,'utf8'));
+ }
+});

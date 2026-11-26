@@ -51,7 +51,7 @@ export function createHistoryTimeline(chess) {
     return [...states[to]].map(([square,id])=>({from:origins.get(id),to:square})).filter(m=>m.from&&m.from!==m.to);
   }};
 }
-export function createMoveHistory({document,list,count,onSelect}) {
+export function createMoveHistory({document,list,count,onSelect,partialScore=false,showTimes=true,decorateButton=()=>{}}) {
   const buttons=[], moves=[]; let lastIndex=-1,lastCount=-1,marker=null,markerAnimation=null,lastScore=null;
   function moveMarker(button) {
     if(!marker){marker=document.createElement('span');marker.className='history-marker';marker.setAttribute('aria-hidden','true');list.append(marker);list.classList.add('has-history-marker');}
@@ -63,15 +63,19 @@ export function createMoveHistory({document,list,count,onSelect}) {
   list.addEventListener('click',event=>{const button=event.target.closest('[data-history-index]');if(button)onSelect(Number(button.dataset.historyIndex));});
   return function render(chess,index,cachedScore=null) {
     const score=cachedScore || chess.history({verbose:true}); let common=score===lastScore ? moves.length : 0;
-    while(common<moves.length&&common<score.length&&moves[common]===score[common].san)common++;
+    const moveKey=move=>partialScore?`${move.before}|${move.san}`:move.san;
+    while(common<moves.length&&common<score.length&&moves[common]===moveKey(score[common]))common++;
     lastScore=cachedScore;
     while(buttons.length>common){const button=buttons.pop(), row=button.parentElement; button.remove();if(!row.querySelector('button'))row.remove();moves.pop();}
     for(let i=common;i<score.length;i++) {
-      const move=score[i]; let row=buttons.at(-1)?.parentElement;
-      if(i%2===0){row=document.createElement('li');const n=document.createElement('span');n.className='move-number';n.textContent=`${i/2+1}`;const times=document.createElement('span');times.className='history-times';times.setAttribute('aria-label','Время ходов не записано');times.innerHTML='<span>—</span><span>—</span>';row.append(n,times);list.append(row);}
-      const button=document.createElement('button');button.type='button';button.dataset.historyIndex=String(i+1);button.setAttribute('aria-label',`${Math.floor(i/2)+1}${i%2?'...':'.'} ${move.san}`);
+      const move=score[i], fenParts=partialScore ? move.before.split(' ') : null;
+      const white=partialScore ? fenParts[1]==='w' : i%2===0;
+      const number=partialScore ? Number(fenParts[5]) : Math.floor(i/2)+1;
+      let row=buttons.at(-1)?.parentElement;
+      if(white || !row){row=document.createElement('li');row.className='history-row';const n=document.createElement('span');n.className='move-number';n.textContent=String(number);row.append(n);if(showTimes){const times=document.createElement('span');times.className='history-times';times.setAttribute('aria-label','Время ходов не записано');times.innerHTML='<span>—</span><span>—</span>';row.append(times);}list.append(row);}
+      const button=document.createElement('button');button.type='button';button.dataset.historyIndex=String(i+1);button.style.gridColumn=white?'2':'3';button.setAttribute('aria-label',`${number}${white?'.':'...'} ${move.san}`);decorateButton(button,i,move);
       if(move.piece!=='p'){const img=document.createElement('img');img.className='history-piece';img.dataset.side=move.color;img.alt='';img.src=themedPieceSrc(move.color,move.piece);button.append(img);}
-      const text=document.createElement('span');text.textContent=move.piece==='p'?move.san:move.san.replace(/^[KQRBN]/,'');button.append(text);row.insertBefore(button,row.querySelector('.history-times'));buttons.push(button);moves.push(move.san);
+      const text=document.createElement('span');text.textContent=move.piece==='p'?move.san:move.san.replace(/^[KQRBN]/,'');button.append(text);row.insertBefore(button,row.querySelector('.history-times'));buttons.push(button);moves.push(moveKey(move));
     }
     const active=index??score.length;
     const oldButton=buttons[lastIndex-1], newButton=buttons[active-1];
@@ -79,6 +83,6 @@ export function createMoveHistory({document,list,count,onSelect}) {
     if(newButton){newButton.classList.add('current');newButton.setAttribute('aria-current','step');}
     const button=buttons[active-1];
     if(button&&(lastIndex!==active||(index===null&&lastCount!==score.length))){const top=button.getBoundingClientRect().top-list.getBoundingClientRect().top+list.scrollTop,bottom=top+button.offsetHeight;if(top<list.scrollTop)list.scrollTop=top;else if(bottom>list.scrollTop+list.clientHeight)list.scrollTop=bottom-list.clientHeight;}
-    if(lastIndex!==active||lastCount!==score.length)moveMarker(button);lastIndex=active;lastCount=score.length; if(count)count.textContent=String(Math.ceil(score.length/2)).padStart(2,'0');
+    if(lastIndex!==active||lastCount!==score.length||common<score.length)moveMarker(button);lastIndex=active;lastCount=score.length; if(count)count.textContent=String(Math.ceil(score.length/2)).padStart(2,'0');
   };
 }

@@ -1,3 +1,4 @@
+import {setBoardPiece} from './board-pieces.js';
 import {createGameReview} from './game-review.js';
 import {pieceSrc as themedPieceSrc,setPublicPiece} from './piece-theme.js';
 import {applyProfileTheme,isProfileImage,profileAvatarColor} from './profile-theme.js';
@@ -398,7 +399,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
       pending = { from, to, premove: chess.turn() !== currentColor() }; promotion.hidden = false; options.replaceChildren(); setStatus('Пешка дошла до края. Выберите фигуру.', true);
       for (const type of ['q','r','b','n']) {
         const button = document.createElement('button'); button.type = 'button'; button.setAttribute('aria-label', names[type]);
-        const img = document.createElement('img'); img.src = pieceSrc(currentColor(), type); img.alt = ''; button.append(img);
+        const img = document.createElement('img'); setBoardPiece(img,currentColor(),type); img.alt = ''; button.append(img);
         button.addEventListener('click', () => {
           if (!pending) return;
           const choice = pending; pending = null; promotion.hidden = true;
@@ -468,7 +469,7 @@ export function createMemberGame({ document, api, opponentName = async () => nul
       board.setPointerCapture?.(event.pointerId);
       const size = drag.cell.getBoundingClientRect().width; selected = drag.from; renderBoard();
       drag.ghost = document.createElement('img'); drag.ghost.className = 'drag-ghost'; drag.ghost.alt = '';
-      drag.ghost.src = pieceSrc(currentColor(), projected().get(drag.from).type); drag.ghost.style.setProperty('--drag-size', `${size}px`);
+      setBoardPiece(drag.ghost,currentColor(),projected().get(drag.from).type); drag.ghost.style.setProperty('--drag-size', `${size}px`);
       drag.cell.classList.add('dragging'); document.body.append(drag.ghost); moveGhost(drag);
     }
     if (drag.ghost && drag.raf == null) {

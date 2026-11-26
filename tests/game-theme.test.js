@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { JSDOM } from 'jsdom';
-const source = 'const installPieceTheme = () => {};\n' + (await readFile('pages/game-theme.js', 'utf8')).replace(/^import .*;\n/gm, '');
+const source = 'const installPieceTheme = () => {}; const installBoardPieces = () => {};\n' + (await readFile('pages/game-theme.js', 'utf8')).replace(/^import .*;\n/gm, '');
 const key = 'sb-eswyxbyddkajysogtglp-auth-token';
 function setup({ dark = false, session = null, stored = {} } = {}) {
   const dom = new JSDOM('<meta name="theme-color" content="#fff">', { url: 'https://example.com/play', runScripts: 'outside-only' });

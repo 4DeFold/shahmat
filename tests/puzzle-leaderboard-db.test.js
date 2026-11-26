@@ -1,0 +1,16 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';import {PGlite} from '@electric-sql/pglite';
+test('puzzle leaderboard and profile expose only completed scores, not history or game ratings',async()=>{
+ const db=new PGlite();try{
+  await db.exec(`create role anon; create role authenticated; create schema auth; create table auth.users(id uuid primary key); create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$; grant usage on schema auth to authenticated,anon; grant execute on function auth.uid() to authenticated,anon; create table public.profiles(id uuid primary key,username text); create table public.yar_mode_ratings(user_id uuid,yar numeric); insert into auth.users values ('11111111-1111-1111-1111-111111111111'),('22222222-2222-2222-2222-222222222222'),('33333333-3333-3333-3333-333333333333'); insert into public.profiles values ('11111111-1111-1111-1111-111111111111','Alice'),('22222222-2222-2222-2222-222222222222','Bob'),('33333333-3333-3333-3333-333333333333','NoPlay'); insert into public.yar_mode_ratings values ('11111111-1111-1111-1111-111111111111',1200);`);
+  await db.exec(readFileSync('supabase/migrations/20261128120000_puzzle_progress.sql','utf8'));await db.exec(readFileSync('supabase/migrations/20261129120000_puzzle_leaderboard.sql','utf8'));
+  await db.exec(`insert into public.puzzle_progress(user_id,revision,progress) values ('11111111-1111-1111-1111-111111111111',1,'{"version":1,"rating":1450,"history":[{"id":"private"}]}'),('22222222-2222-2222-2222-222222222222',1,'{"version":1,"rating":1600,"history":[{"id":"other"}]}'),('33333333-3333-3333-3333-333333333333',1,'{"version":1,"rating":1500,"history":[]}'); set role authenticated; set request.jwt.claim.sub='11111111-1111-1111-1111-111111111111';`);
+  const ranking=(await db.query('select * from public.puzzle_leaderboard()')).rows;assert.deepEqual(ranking.map(x=>x.username),['Bob','Alice']);assert.equal(Number(ranking[0].yar),1600);assert.deepEqual(Object.keys(ranking[0]),['username','yar','elo','ranked']);
+  const own=(await db.query('select * from public.puzzle_my_position()')).rows[0];assert.equal(Number(own.place),2);assert.equal(Number(own.yar),1450);
+  assert.equal(Number((await db.query("select public.profile_puzzle_rating('bob') score")).rows[0].score),1600);
+  assert.equal((await db.query("select public.profile_puzzle_rating('NoPlay') score")).rows[0].score,null);
+  assert.equal((await db.query('select * from public.puzzle_progress')).rows.length,1);await assert.rejects(db.query('select * from public.yar_mode_ratings'));
+  await db.exec('reset role');assert.equal(Number((await db.query('select yar from public.yar_mode_ratings')).rows[0].yar),1200);
+  await db.exec("update public.puzzle_progress set progress='{\"rating\":\"bad\",\"history\":{}}' where user_id='22222222-2222-2222-2222-222222222222'; set role authenticated");assert.equal((await db.query('select * from public.puzzle_leaderboard()')).rows.length,1);
+  await db.exec('reset role; set role anon');await assert.rejects(db.query('select * from public.puzzle_leaderboard()'));
+ }finally{await db.close()}
+});
