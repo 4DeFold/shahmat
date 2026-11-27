@@ -730,3 +730,11 @@ test('new game searches immediately in the same pool and other mode returns the 
  let chosen=null;const other=setup(async()=>({game:finished}),()=>0,{onGameReset:value=>{chosen=value}});t.after(()=>other.close());
  await other.ui.open(A);await flush();other.$('other-mode').click();assert.deepEqual(chosen,{mode:'rapid',kind:'friendly',timeControl:'10+5'});
 });
+
+
+test('a direct game never automatically enters the public queue on replay',async t=>{
+ const finished={...game({status:'finished',result:'draw'}),game_kind:'friendly',direct_challenge:true,time_control:'10+5',mode:'rapid'};
+ const calls=[];let chosen=null;const app=setup(async body=>{calls.push(body);return {game:finished}},()=>0,{onGameReset:value=>{chosen=value}});t.after(()=>app.close());
+ await app.ui.open(A);app.$('new-game').click();await flush();
+ assert.equal(calls.some(c=>c.action==='search'),false);assert.deepEqual(chosen,{mode:'rapid',kind:'friendly',timeControl:'10+5'});
+});

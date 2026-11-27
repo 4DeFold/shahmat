@@ -1141,7 +1141,7 @@ body.startup-ready #landing-screen:not([hidden]) .hero-reveal--tail { animation-
 @media(max-width:360px){.home-hero{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}.home-poster{width:100%}.home-actions a{flex:1 1 100%}}
 @media(max-height:500px){.home-links{grid-template-columns:repeat(3,minmax(0,1fr))}.home-link{height:50px;gap:6px}.home-link strong{font-size:15px}.home-link-icon{font-size:18px}.home-link-arrow{right:9px;font-size:15px}.home-actions{margin-top:8px}}
 /* Exceptionally short viewports can scroll instead of clipping controls. */
-@media(max-height:300px){
+@media(max-height:400px){
  .landing:has(.dashboard:not([hidden]) #dashboard-home:not([hidden])){height:auto;min-height:100dvh;overflow:visible}
  .landing:has(.dashboard:not([hidden]) #dashboard-home:not([hidden])) .dashboard,
  .landing:has(.dashboard:not([hidden]) #dashboard-home:not([hidden])) #page-content,

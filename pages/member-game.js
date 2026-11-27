@@ -535,6 +535,8 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   start.addEventListener('click', () => void search()); cancel.addEventListener('click', () => void cancelSearch());
   function resetFinished(replay) {
     if (phase !== 'finished') return;
+    // Never silently send a direct opponent into public matchmaking.
+    if (snapshot?.direct_challenge) replay = false;
     const chosen = selection || (mode ? {kind:'rated',timeControl:`${times[mode]/60000}+0`} : null);
     const chosenMode = mode;
     annotations.clear(); review.clear();reviewKey=null; onGameChanged(null); cancelTimer(); generation++; snapshot = null;
@@ -595,6 +597,17 @@ export function createMemberGame({ document, api, opponentName = async () => nul
   if (win.parent === win) revealPieces();
   return {
     navigateHistory, setThreat, clearThreats,
+    async joinInvited(gameId) {
+      if (!userId || destroyed || (phase === 'active' && snapshot?.id !== gameId)) return false;
+      try {
+        const result=await api({action:'snapshot',gameId});
+        if (!result?.game || result.game.id!==gameId || result.game.status!=='active') return false;
+        if (phase==='finished') resetFinished(false);
+        cancelTimer(); generation++; ready=true; applyGame(result.game);
+        if (isVisible()) void poll(++generation);
+        return snapshot?.id===gameId;
+      } catch { return false; }
+    },
     configureMatch(value) {
       if (phase !== 'idle' || !times[value?.mode] || !['rated','friendly'].includes(value.kind) || !/^\d+\+\d+$/.test(value.timeControl)) return false;
       mode = value.mode; selection = {kind:value.kind,timeControl:value.timeControl};
