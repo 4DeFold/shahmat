@@ -15,3 +15,9 @@ test('challenge selection uses two steps, confirms and opens the private game',a
  [...panel.querySelectorAll('button')].find(b=>b.textContent==='3+2').click();await tick();assert.deepEqual(calls.at(-1).p_mode,'blitz');assert.equal(calls.at(-1).p_control,'3+2');assert.match(panel.textContent,/Ожидание подтверждения/);
  data={...data,state:'started',game_id:'game-id'};timer();await tick();await tick();assert.equal(opened,'game-id');assert.equal(calls.at(-1).p_action,'seen');view.destroy();dom.window.close();
 });
+
+
+test('invalid snapshots do not display a phantom challenge',async()=>{
+ const dom=new JSDOM('<!doctype html><body></body>',{url:'https://example.com'});let timer;dom.window.setInterval=fn=>(timer=fn,1);dom.window.clearInterval=()=>{};
+ const view=startDirectChallenges({rpc:async()=>({data:[],error:null})},dom.window,{openGame:async()=>{}});await tick();timer();await tick();assert.equal(dom.window.document.querySelector('.direct-challenge').hidden,true);view.destroy();dom.window.close();
+});

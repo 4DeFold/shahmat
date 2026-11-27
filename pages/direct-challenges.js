@@ -42,7 +42,8 @@ export function startDirectChallenges(client, win, {openGame}) {
  }
  async function poll(force=false){
   if(stopped||pending&&!force)return;pending=true;
-  try{const {data,error}=await client.rpc('direct_challenge_snapshot');if(error)throw error;if(stopped)return;
+  try{const response=await client.rpc('direct_challenge_snapshot');if(response.error)throw response.error;if(stopped)return;
+   const raw=response.data;const data=raw && !Array.isArray(raw) && typeof raw.id==='string' && typeof raw.name==='string' && typeof raw.outgoing==='boolean' && ['pending','accepted','proposed','started','cancelled'].includes(raw.state) ? raw : null;
    current=data;
    if(data?.state==='started'&&data.game_id){panel.hidden=true;if(joining!==data.id){joining=data.id;try{await openGame(data.game_id);if(!stopped){const result=await client.rpc('direct_challenge_action',{p_action:'seen',p_id:data.id});if(result.error)throw result.error;current=null;key='';}}catch{joining=null;panel.hidden=false;panel.replaceChildren(el('strong','Партия готова'),button('Открыть',()=>{joining=null;void poll()},true));}}return;}
    const next=JSON.stringify(data);if(key==='dismissed:'+data?.id&&data?.state==='cancelled')return;if(next!==key){key=next;render(data)}
