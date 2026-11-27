@@ -73,7 +73,8 @@ for(const name of requested){
     return fulfill({json:[]});
    });
    await page.goto(`${base}/home`);await page.locator('#dashboard-home').waitFor({state:'visible'});
-   assert.equal(await page.locator('#dashboard-home a[data-page]').count(),5);
+   assert.equal(await page.locator('#dashboard-home a[data-page]').count(),6);
+   assert.equal(await page.locator('.home-poster').getAttribute('href'),'/clans');
    await page.waitForFunction(()=>document.querySelector('.home-poster img')?.naturalWidth>0);
    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),`${name} home: horizontal overflow`);
    const homeFit=await page.evaluate(()=>({scroll:document.documentElement.scrollHeight,height:innerHeight,rects:[...document.querySelectorAll('#dashboard-home a[data-page], #dashboard-home h2, .home-poster')].map(el=>{const r=el.getBoundingClientRect();return {top:r.top,bottom:r.bottom,left:r.left,right:r.right}})}));

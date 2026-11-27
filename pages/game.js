@@ -38,9 +38,11 @@ let stopOnline = null, stopHeartbeat = null;
 if (window.parent !== window) { lobby.setVisible(false); ui.hide(); }
 let cachedId = null;
 try { cachedId = cachedUserId(window.localStorage); if (cachedId) { const local = JSON.parse(localStorage.getItem(`shahmat.appearance.${cachedId}`) || 'null'); const session = JSON.parse(localStorage.getItem('sb-eswyxbyddkajysogtglp-auth-token') || 'null'); ui.setRatingUnit(local?.rankUnit || session?.user?.user_metadata?.rank_unit); } } catch { /* Storage may be blocked. */ }
+let sessionReadyResolve;
+const sessionReady=new Promise(resolve=>{sessionReadyResolve=resolve});
 startSessionMonitor({
   auth: supabase.auth, cachedId,
-  open: id => { void lobby.activate(); void supabase.from('profiles').select('username').eq('id', id).maybeSingle().then(async ({data}) => { ui.setPlayerName(data?.username); if(data?.username) document.getElementById('player-profile-trigger').dataset.profileName=data.username; if(data?.username) { const result=await supabase.rpc('profile_avatars',{p_names:[data.username]}); ui.setPlayerAvatar(result.data?.[0]?.avatar); } }).catch(() => {}); if (window.parent === window && !stopOnline) { stopOnline = startOnlinePresence(supabase, id, updateOnline); stopHeartbeat = startMatchHeartbeat(supabase, window); } return ui.open(id); },
+  open: id => { void lobby.activate(); void supabase.from('profiles').select('username').eq('id', id).maybeSingle().then(async ({data}) => { ui.setPlayerName(data?.username); if(data?.username) document.getElementById('player-profile-trigger').dataset.profileName=data.username; if(data?.username) { const result=await supabase.rpc('profile_avatars',{p_names:[data.username]}); ui.setPlayerAvatar(result.data?.[0]?.avatar); } }).catch(() => {}); if (window.parent === window && !stopOnline) { stopOnline = startOnlinePresence(supabase, id, updateOnline); stopHeartbeat = startMatchHeartbeat(supabase, window); } return ui.open(id).then(()=>sessionReadyResolve()); },
   logout: () => { stopOnline?.(); stopHeartbeat?.(); ownProfileCard.destroy(); lobby.destroy(); ui.destroy(); document.getElementById('member-game').hidden = true; window.top.location.replace('/'); },
   accountChanged: () => { stopOnline?.(); stopHeartbeat?.(); ownProfileCard.destroy(); lobby.destroy(); ui.destroy(); document.getElementById('member-game').hidden = true; window.location.reload(); },
 });
@@ -50,6 +52,7 @@ ui.browserVisibility(!document.hidden);
 if (window.parent !== window) {
   window.addEventListener('message', event => {
     if (event.origin !== window.location.origin || event.source !== window.parent) return;
+    if (event.data?.type === 'shahmat-direct-game' && typeof event.data.gameId === 'string') { const gameId=event.data.gameId; void sessionReady.then(async()=>{const ok=await ui.joinInvited(gameId);window.parent.postMessage({type:'shahmat-direct-game-result',gameId,ok},window.location.origin);}); return; }
     if (event.data?.type === 'shahmat-threat-key') { ui.setThreat(event.data.code,!!event.data.down); return; }
     if (event.data?.type === 'shahmat-history-key' && typeof event.data.key === 'string') { ui.navigateHistory(event.data.key,event.data.code); return; }
     if (event.data?.type === 'shahmat-profile-updated') { ui.setPlayerName(event.data.username); document.getElementById('player-profile-trigger').dataset.profileName=event.data.username; ui.setPlayerAvatar(event.data.avatar); return; }

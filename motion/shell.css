@@ -53,9 +53,8 @@
   }
 
   /* Home ─ cards and actions cascade in every time the view appears. */
-  #dashboard-home:not([hidden]) .home-actions a { animation: m-rise-blur .7s var(--m-ease) backwards; }
-  #dashboard-home:not([hidden]) .home-actions a:nth-child(1) { animation-delay: .32s; }
-  #dashboard-home:not([hidden]) .home-actions a:nth-child(2) { animation-delay: .4s; }
+  #dashboard-home:not([hidden]) .home-actions { animation: m-rise-blur .7s var(--m-ease) backwards; }
+  #dashboard-home:not([hidden]) .home-actions { animation-delay: .32s; }
   #dashboard-home:not([hidden]) .home-link { animation: m-rise-blur .75s var(--m-ease) backwards; }
   #dashboard-home:not([hidden]) .home-link:nth-child(1) { animation-delay: .38s; }
   #dashboard-home:not([hidden]) .home-link:nth-child(2) { animation-delay: .46s; }

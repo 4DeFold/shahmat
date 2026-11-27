@@ -4,9 +4,11 @@ import {installPieceTheme,setPieceSet,selectedPieceSet,validPieceSet,renderLarge
 installPieceTheme();
 import './pages/profile-card.css';
 import './pages/social.css';
+import './pages/direct-challenges.css';
 import { createRatingView } from './pages/rating.js';
 import { startOnlinePresence, guestPresenceId } from './pages/online-presence.js';
 import { startMatchHeartbeat } from './pages/match-heartbeat.js';
+import { startDirectChallenges } from './pages/direct-challenges.js';
 import { createClient } from '@supabase/supabase-js';
 import './theme.js';
 import './pages/profile.css';
@@ -279,13 +281,25 @@ const isSocialPage = name => name === 'friends' || name === 'clans';
 const viewId = name => name === 'home' ? 'dashboard-home' : isSocialPage(name) ? 'page-social' : `page-${name}`;
 const viewLoads = new Map();
 let frameReady = null, botFrameReady = null, watchFrameReady = null, archiveFrameReady = null, puzzlesFrameReady = null, ratingView = null, socialView = null, profileView = null, profileReturnPage = 'rating';
+let challenges = null;
 let onlineStop = null, heartbeatStop = null, onlineUser = null, onlineCount = null, onlineNames = null, onlineEpoch = 0, onlineUsername = null;
+async function openDirectGame(gameId) {
+  await showPage('game',{updateHistory:true,focus:true});
+  const frame=$('member-game-frame')?.contentWindow;
+  if (!frame || currentPage()!=='game') throw Error('game unavailable');
+  await new Promise((resolve,reject)=>{
+    const timer=window.setTimeout(()=>{window.removeEventListener('message',result);reject(Error('game timeout'));},15000);
+    function result(event){if(event.origin!==window.location.origin||event.source!==frame||event.data?.type!=='shahmat-direct-game-result'||event.data.gameId!==gameId)return;window.clearTimeout(timer);window.removeEventListener('message',result);event.data.ok?resolve():reject(Error('game unavailable'));}
+    window.addEventListener('message',result);frame.postMessage({type:'shahmat-direct-game',gameId},window.location.origin);
+  });
+}
 function sendOnline() { $('member-game-frame')?.contentWindow?.postMessage({ type: 'shahmat-online', count: onlineCount }, window.location.origin); }
 async function startOnline(id, username = null) {
   if (onlineUser === id && onlineUsername === username) return;
-  const epoch = ++onlineEpoch, previous = onlineStop?.(); onlineStop = null; heartbeatStop?.(); onlineUser = id; onlineUsername = username; onlineCount = null; sendOnline();
+  const epoch = ++onlineEpoch, previous = onlineStop?.(); onlineStop = null; heartbeatStop?.(); challenges?.destroy(); challenges=null; onlineUser = id; onlineUsername = username; onlineCount = null; sendOnline();
   onlineNames = null; ratingView?.setOnlineNames(null);
   heartbeatStop = !id.startsWith('guest:') ? startMatchHeartbeat(supabase, window) : null;
+  if (!id.startsWith('guest:')) challenges=startDirectChallenges(supabase,window,{openGame:openDirectGame});
   try { await previous; } catch { /* A new subscription can still recover. */ }
   if (epoch !== onlineEpoch) return;
   onlineStop = startOnlinePresence(supabase, id, count => { onlineCount = count; sendOnline(); }, { username, onNames: names => { onlineNames = names; ratingView?.setOnlineNames(names); } });
@@ -302,7 +316,7 @@ async function loadView(name) {
     $('page-content').insertAdjacentHTML('beforeend', html);
     if (name === 'home') void import('./pages/home-particles.js').then(({createHomeParticles}) => { const home=$('dashboard-home'); if(home&&!home.dataset.particlesReady) { home.dataset.particlesReady='true'; createHomeParticles(home); } }).catch(()=>{});
     if (name === 'rating') { ratingView = createRatingView($('page-rating'), supabase, { showSelf:true, onOpenProfile:openOtherProfile }); ratingView.setUnit(rankUnit); ratingView.setOnlineNames(onlineNames); }
-    if (key === 'social') socialView=socialModule.createSocialView($('page-social'),supabase,{onOpenProfile:openOtherProfile});
+    if (key === 'social') socialView=socialModule.createSocialView($('page-social'),supabase,{onOpenProfile:openOtherProfile,onChallenge:name=>challenges?.send(name),ownName:()=>profile?.username});
     if (name === 'settings') { applyPalette(selectedPalette); applyRankUnit(rankUnit); window.dispatchEvent(new Event('shahmat-piece-set')); }
     if (name === 'profile') {
       updateProfileAppearance();
